@@ -29,12 +29,15 @@ This repository currently implements the first MVP slice:
 - `local-run` runner that clones a git repo per task, runs a source-free adapter
   command, executes validation, infers edited files from git diff, and emits
   trace JSON
+- `claude-run` and `codex-run` launch presets that run agents non-interactively
+  inside isolated clones using the same source-free event contract
 - recommendation precision and recall metrics for context-plan evaluation
 
-It does **not** yet launch Claude Code, Codex, Cursor, or other agents directly.
-The current runner ingests source-free traces, can generate ctxhelm plan traces,
-can convert source-free Claude Code events, and can execute explicit local
-adapter commands. Direct Claude/Codex process adapters come next.
+It does **not** yet parse raw Claude Code, Codex, Cursor, or other agent
+transcripts. The current runner ingests source-free traces, can generate ctxhelm
+plan traces, can convert source-free Claude Code events, can execute explicit
+local adapter commands, and can launch Claude/Codex with source-free event
+instructions.
 
 ## Quickstart
 
@@ -82,6 +85,26 @@ cargo run -- dashboard \
   --report reports/example-claude-code.json \
   --out docs/example-dashboard.html
 ```
+
+Run direct agent presets:
+
+```bash
+cargo run -- claude-run \
+  --suite suites/local-run-smoke.json \
+  --repo . \
+  --dangerously-skip-permissions \
+  --out-dir traces/claude-run
+
+cargo run -- codex-run \
+  --suite suites/local-run-smoke.json \
+  --repo . \
+  --out-dir traces/codex-run
+```
+
+These commands suppress agent stdout/stderr and do not store transcripts. They
+ask the agent to emit source-free `record-event` calls. HelmBench still infers
+edited files from git status and records validation from the suite
+`successCommand`.
 
 Convert sanitized Claude Code events into traces:
 
@@ -230,6 +253,8 @@ helmbench-cli
   ctxhelm-trace
   claude-trace
   local-run
+  claude-run
+  codex-run
   record-event
   compare
   dashboard
@@ -239,17 +264,17 @@ adapters
   ctxhelm prepare-task trace generation
   Claude Code source-free event import
   explicit local adapter command runner
+  Claude Code direct launch preset
+  Codex direct launch preset
 
 future direct-agent adapters
-  claude-code
-  codex
   cursor
 ```
 
 ## Next Milestones
 
-1. Add a Claude Code adapter that drives `local-run` with Claude Code commands
-   and source-free hooks.
+1. Add stronger Claude/Codex event capture through hooks or structured streams
+   where available, without storing transcripts.
 2. Extend the ctxhelm adapter from `prepare-task` plans to MCP resource reads
    and pack usage without raw MCP payloads.
 3. Add public benchmark suites over small reproducible repositories.

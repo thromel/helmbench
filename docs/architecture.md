@@ -69,8 +69,13 @@ variables such as `HELMBENCH_TASK_ID`, `HELMBENCH_REPO`, and
 4. records command class, command hash, exit status, and final status; and
 5. writes a normal HelmBench trace JSON.
 
-This is still not a Claude/Codex launcher. It is the isolation and observation
-foundation those launchers will use.
+`local-run` itself is not agent-specific. It is the isolation and observation
+foundation the Claude/Codex launch presets use.
+
+`claude-run` and `codex-run` are thin launch presets over `local-run`. They
+start the installed agent CLI non-interactively, suppress raw stdout/stderr, and
+inject instructions that ask the agent to emit source-free `record-event` calls.
+HelmBench still owns edited-file inference and validation recording.
 
 ## Metrics
 
@@ -137,6 +142,15 @@ isolation, event-file plumbing, validation command execution, edited-file
 detection, and trace emission. Claude Code and Codex adapters can now focus on
 starting the agent and emitting source-free events instead of each reinventing
 runner mechanics.
+
+### Why launch presets before transcript parsers?
+
+Raw agent transcripts are high-leakage artifacts: they can contain source,
+prompts, terminal output, MCP payloads, and secrets. The first direct adapters
+therefore avoid transcript parsing. They launch the agent, ask it to emit
+source-free events, infer edits from git status, and record validation results.
+Later adapters can add deeper tool-stream capture only if that stream can be
+sanitized before it is persisted.
 
 ### Why not pass/fail only?
 

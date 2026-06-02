@@ -91,6 +91,48 @@ enum Command {
         #[arg(long)]
         keep_workdirs: bool,
     },
+    /// Run Claude Code non-interactively through the isolated local runner.
+    ClaudeRun {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        repo: PathBuf,
+        #[arg(long, default_value = ".helmbench/workdirs")]
+        work_dir: PathBuf,
+        #[arg(long, default_value = "traces/claude-run")]
+        out_dir: PathBuf,
+        #[arg(long, default_value = "claude")]
+        claude_bin: PathBuf,
+        #[arg(long)]
+        model: Option<String>,
+        #[arg(long)]
+        claude_arg: Vec<String>,
+        #[arg(long)]
+        dangerously_skip_permissions: bool,
+        #[arg(long)]
+        keep_workdirs: bool,
+    },
+    /// Run Codex non-interactively through the isolated local runner.
+    CodexRun {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        repo: PathBuf,
+        #[arg(long, default_value = ".helmbench/workdirs")]
+        work_dir: PathBuf,
+        #[arg(long, default_value = "traces/codex-run")]
+        out_dir: PathBuf,
+        #[arg(long, default_value = "codex")]
+        codex_bin: PathBuf,
+        #[arg(long)]
+        model: Option<String>,
+        #[arg(long)]
+        codex_arg: Vec<String>,
+        #[arg(long)]
+        dangerously_bypass_approvals_and_sandbox: bool,
+        #[arg(long)]
+        keep_workdirs: bool,
+    },
     /// Append one validated source-free event to a JSONL file.
     RecordEvent {
         #[arg(long)]
@@ -351,6 +393,68 @@ fn main() -> Result<()> {
                 keep_workdirs,
             )?;
         }
+        Command::ClaudeRun {
+            suite,
+            repo,
+            work_dir,
+            out_dir,
+            claude_bin,
+            model,
+            claude_arg,
+            dangerously_skip_permissions,
+            keep_workdirs,
+        } => {
+            let suite = load_suite(&suite)?;
+            let command = claude_adapter_command(
+                &current_helmbench_bin()?,
+                &claude_bin,
+                model.as_deref(),
+                &claude_arg,
+                dangerously_skip_permissions,
+            );
+            run_local_suite(
+                &suite,
+                &repo,
+                &work_dir,
+                &out_dir,
+                "claude-code",
+                AgentVariant::Native,
+                &[],
+                Some(&command),
+                keep_workdirs,
+            )?;
+        }
+        Command::CodexRun {
+            suite,
+            repo,
+            work_dir,
+            out_dir,
+            codex_bin,
+            model,
+            codex_arg,
+            dangerously_bypass_approvals_and_sandbox,
+            keep_workdirs,
+        } => {
+            let suite = load_suite(&suite)?;
+            let command = codex_adapter_command(
+                &current_helmbench_bin()?,
+                &codex_bin,
+                model.as_deref(),
+                &codex_arg,
+                dangerously_bypass_approvals_and_sandbox,
+            );
+            run_local_suite(
+                &suite,
+                &repo,
+                &work_dir,
+                &out_dir,
+                "codex",
+                AgentVariant::Native,
+                &[],
+                Some(&command),
+                keep_workdirs,
+            )?;
+        }
         Command::RecordEvent {
             events,
             task_id,
@@ -591,6 +695,92 @@ fn append_event(path: &PathBuf, event: &AgentEvent) -> Result<()> {
         .with_context(|| format!("append {}", path.display()))
 }
 
+fn claude_adapter_command(
+    helmbench_bin: &Path,
+    claude_bin: &Path,
+    model: Option<&str>,
+    extra_args: &[String],
+    dangerously_skip_permissions: bool,
+) -> String {
+    let mut parts = vec![
+        format!(
+            "HELMBENCH_BIN={}",
+            shell_escape(&helmbench_bin.to_string_lossy())
+        ),
+        shell_escape(&claude_bin.to_string_lossy()),
+        "--print".to_string(),
+        "--output-format".to_string(),
+        "text".to_string(),
+        "--no-session-persistence".to_string(),
+        "--append-system-prompt".to_string(),
+        shell_escape(AGENT_EVENT_INSTRUCTIONS),
+    ];
+    if dangerously_skip_permissions {
+        parts.push("--dangerously-skip-permissions".to_string());
+    }
+    if let Some(model) = model {
+        parts.push("--model".to_string());
+        parts.push(shell_escape(model));
+    }
+    parts.extend(extra_args.iter().map(|arg| shell_escape(arg)));
+    parts.push("\"$HELMBENCH_TASK_PROMPT\"".to_string());
+    parts.push(">/dev/null".to_string());
+    parts.push("2>/dev/null".to_string());
+    parts.join(" ")
+}
+
+fn codex_adapter_command(
+    helmbench_bin: &Path,
+    codex_bin: &Path,
+    model: Option<&str>,
+    extra_args: &[String],
+    dangerously_bypass_approvals_and_sandbox: bool,
+) -> String {
+    let mut parts = vec![
+        format!(
+            "HELMBENCH_BIN={}",
+            shell_escape(&helmbench_bin.to_string_lossy())
+        ),
+        shell_escape(&codex_bin.to_string_lossy()),
+        "exec".to_string(),
+        "--cd".to_string(),
+        "\"$HELMBENCH_REPO\"".to_string(),
+    ];
+    if dangerously_bypass_approvals_and_sandbox {
+        parts.push("--dangerously-bypass-approvals-and-sandbox".to_string());
+    } else {
+        parts.push("--full-auto".to_string());
+    }
+    if let Some(model) = model {
+        parts.push("--model".to_string());
+        parts.push(shell_escape(model));
+    }
+    parts.extend(extra_args.iter().map(|arg| shell_escape(arg)));
+    parts.push("\"$(printf '%s\\n\\nTask:\\n%s'".to_string());
+    parts.push(shell_escape(AGENT_EVENT_INSTRUCTIONS));
+    parts.push("\"$HELMBENCH_TASK_PROMPT\")\"".to_string());
+    parts.push(">/dev/null".to_string());
+    parts.push("2>/dev/null".to_string());
+    parts.join(" ")
+}
+
+const AGENT_EVENT_INSTRUCTIONS: &str = r#"You are running inside HelmBench, a source-free evaluation harness.
+Work only inside HELMBENCH_REPO.
+Before or immediately after inspecting a relevant file, emit:
+$HELMBENCH_BIN record-event --events "$HELMBENCH_EVENTS" --task-id "$HELMBENCH_TASK_ID" --event-kind file-read --path <relative-path>
+If ctxhelm or another context source recommends a file, emit event-kind recommended-file.
+Do not put source code, model text, terminal output, secrets, or raw tool payloads into HelmBench events.
+HelmBench will infer edited files from git status and run the task validation command after you exit.
+Make the smallest useful change for the task."#;
+
+fn current_helmbench_bin() -> Result<PathBuf> {
+    std::env::current_exe()
+        .context("resolve current helmbench executable")
+        .and_then(|path| {
+            std::fs::canonicalize(&path).with_context(|| format!("resolve {}", path.display()))
+        })
+}
+
 fn clone_repo(repo: &Path, out: &Path) -> Result<()> {
     let status = ProcessCommand::new("git")
         .arg("clone")
@@ -783,4 +973,44 @@ fn path_as_str(path: &Path) -> Result<&str> {
 
 fn shell_escape(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn claude_command_includes_source_free_event_instructions() {
+        let command = claude_adapter_command(
+            Path::new("/tmp/helmbench"),
+            Path::new("claude"),
+            Some("sonnet"),
+            &["--debug".to_string()],
+            true,
+        );
+        assert!(command.contains("claude"));
+        assert!(command.contains("--print"));
+        assert!(command.contains("--append-system-prompt"));
+        assert!(command.contains("record-event"));
+        assert!(command.contains("--dangerously-skip-permissions"));
+        assert!(command.contains("--model 'sonnet'"));
+        assert!(command.contains(">/dev/null 2>/dev/null"));
+    }
+
+    #[test]
+    fn codex_command_uses_isolated_repo_and_workspace_sandbox_by_default() {
+        let command = codex_adapter_command(
+            Path::new("/tmp/helmbench"),
+            Path::new("codex"),
+            None,
+            &[],
+            false,
+        );
+        assert!(command.contains("'codex' exec"));
+        assert!(command.contains("--cd \"$HELMBENCH_REPO\""));
+        assert!(command.contains("--full-auto"));
+        assert!(command.contains("record-event"));
+        assert!(command.contains("HELMBENCH_TASK_PROMPT"));
+        assert!(command.contains(">/dev/null 2>/dev/null"));
+    }
 }
