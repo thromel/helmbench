@@ -324,6 +324,11 @@ enum Command {
         #[arg(long)]
         bundle: PathBuf,
     },
+    /// Verify a run-matrix output directory and nested evidence bundle.
+    VerifyMatrix {
+        #[arg(long)]
+        matrix: PathBuf,
+    },
     /// Fail if a benchmark summary violates source-free quality thresholds.
     QualityGate {
         #[arg(long)]
@@ -921,6 +926,15 @@ fn main() -> Result<()> {
             println!(
                 "bundle `{}` is valid: source-free manifest and artifact hashes ok",
                 bundle.display()
+            );
+        }
+        Command::VerifyMatrix { matrix } => {
+            let manifest = verify_run_matrix(&matrix)?;
+            println!(
+                "matrix `{}` is valid: {} head run(s), evidence bundle verified, quality gate passed: {}",
+                matrix.display(),
+                manifest.heads.len(),
+                manifest.quality_gate_passed
             );
         }
         Command::QualityGate {
@@ -2065,6 +2079,117 @@ fn manifest_path(out_dir: &Path, path: &Path) -> String {
         .unwrap_or(path)
         .display()
         .to_string()
+}
+
+fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
+    let manifest_path = matrix_dir.join("matrix-manifest.json");
+    let raw = std::fs::read_to_string(&manifest_path)
+        .with_context(|| format!("read {}", manifest_path.display()))?;
+    let manifest = serde_json::from_str::<RunMatrixManifest>(&raw)
+        .with_context(|| format!("parse {}", manifest_path.display()))?;
+
+    if manifest.schema_version != 1 {
+        anyhow::bail!(
+            "unsupported matrix manifest schemaVersion {}; expected 1",
+            manifest.schema_version
+        );
+    }
+    if manifest.suite_path.trim().is_empty() {
+        anyhow::bail!("matrix manifest suitePath must not be empty");
+    }
+    if manifest.repo_path.trim().is_empty() {
+        anyhow::bail!("matrix manifest repoPath must not be empty");
+    }
+    if manifest.baseline.name.trim().is_empty() {
+        anyhow::bail!("matrix manifest baseline name must not be empty");
+    }
+    if manifest.heads.is_empty() {
+        anyhow::bail!("matrix manifest must contain at least one head run");
+    }
+    if !manifest.evidence_bundle_verified {
+        anyhow::bail!("matrix manifest evidenceBundleVerified must be true");
+    }
+    if !manifest.privacy.source_free
+        || manifest.privacy.raw_source_logged
+        || manifest.privacy.raw_prompt_logged
+        || manifest.privacy.raw_transcript_logged
+        || manifest.privacy.raw_terminal_logged
+    {
+        anyhow::bail!("matrix manifest is not source-free");
+    }
+
+    verify_matrix_run(matrix_dir, &manifest.baseline)?;
+    let mut names = BTreeSet::new();
+    names.insert(manifest.baseline.name.clone());
+    for head in &manifest.heads {
+        if !names.insert(head.name.clone()) {
+            anyhow::bail!("duplicate matrix run name `{}`", head.name);
+        }
+        verify_matrix_run(matrix_dir, head)?;
+    }
+
+    let artifact_paths = [
+        &manifest.artifacts.benchmark_summary_json,
+        &manifest.artifacts.benchmark_summary_markdown,
+        &manifest.artifacts.quality_gate_json,
+        &manifest.artifacts.quality_gate_markdown,
+        &manifest.artifacts.dashboard_html,
+        &manifest.artifacts.baseline_autopsy_markdown,
+        &manifest.artifacts.evidence_manifest,
+    ];
+    for path in artifact_paths {
+        require_matrix_file(matrix_dir, path)?;
+    }
+
+    let evidence_manifest = matrix_path(matrix_dir, &manifest.artifacts.evidence_manifest)?;
+    let evidence_dir = evidence_manifest
+        .parent()
+        .with_context(|| format!("resolve evidence dir {}", evidence_manifest.display()))?;
+    verify_evidence_bundle(evidence_dir)?;
+
+    Ok(manifest)
+}
+
+fn verify_matrix_run(matrix_dir: &Path, run: &RunMatrixManifestRun) -> Result<()> {
+    if run.name.trim().is_empty() {
+        anyhow::bail!("matrix run name must not be empty");
+    }
+    if run.agent.trim().is_empty() {
+        anyhow::bail!("matrix run `{}` agent must not be empty", run.name);
+    }
+    require_matrix_file(matrix_dir, &run.report_path)
+        .with_context(|| format!("verify report for run `{}`", run.name))?;
+    require_matrix_dir(matrix_dir, &run.trace_dir)
+        .with_context(|| format!("verify trace dir for run `{}`", run.name))?;
+    Ok(())
+}
+
+fn require_matrix_file(matrix_dir: &Path, relative_path: &str) -> Result<PathBuf> {
+    let path = matrix_path(matrix_dir, relative_path)?;
+    if !path.is_file() {
+        anyhow::bail!(
+            "matrix artifact `{}` is missing or not a file",
+            relative_path
+        );
+    }
+    Ok(path)
+}
+
+fn require_matrix_dir(matrix_dir: &Path, relative_path: &str) -> Result<PathBuf> {
+    let path = matrix_path(matrix_dir, relative_path)?;
+    if !path.is_dir() {
+        anyhow::bail!(
+            "matrix artifact `{}` is missing or not a directory",
+            relative_path
+        );
+    }
+    Ok(path)
+}
+
+fn matrix_path(matrix_dir: &Path, relative_path: &str) -> Result<PathBuf> {
+    helmbench::validate_safe_relative_path_for_cli(relative_path)
+        .with_context(|| format!("validate matrix path `{relative_path}`"))?;
+    Ok(matrix_dir.join(relative_path))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3377,6 +3502,16 @@ mod tests {
             manifest["artifacts"]["evidenceManifest"],
             "evidence/manifest.json"
         );
+
+        let verified = verify_run_matrix(&out).expect("verify matrix");
+        assert_eq!(verified.heads.len(), 1);
+        assert!(verified.evidence_bundle_verified);
+
+        let mut tampered = verified;
+        tampered.artifacts.dashboard_html = "../dashboard.html".to_string();
+        write_json(&tampered, &out.join("matrix-manifest.json")).expect("tampered manifest");
+        let err = verify_run_matrix(&out).expect_err("unsafe manifest should fail");
+        assert!(err.to_string().contains("validate matrix path"), "{err}");
     }
 
     #[test]

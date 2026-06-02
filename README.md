@@ -129,6 +129,8 @@ HELMBENCH_BIN=$(pwd)/target/debug/helmbench \
 Every successful matrix run writes `matrix-manifest.json`, a source-free
 top-level index of run labels, report paths, dashboard/evidence artifacts,
 quality-gate status, and evidence verification status.
+Use `verify-matrix --matrix <out-dir>` to validate the manifest, referenced
+artifacts, and nested evidence bundle before publishing results.
 
 Add `ctxhelm=true` to a `--head` spec when the row should call
 `ctxhelm prepare-task` before the adapter. Add `pack=true` to also call

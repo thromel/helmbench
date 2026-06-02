@@ -24,6 +24,7 @@ cargo run -- init-public-suite --help >/dev/null
 cargo run -- benchmark-summary --help >/dev/null
 cargo run -- evidence-bundle --help >/dev/null
 cargo run -- verify-bundle --help >/dev/null
+cargo run -- verify-matrix --help >/dev/null
 cargo run -- quality-gate --help >/dev/null
 cargo run -- doctor --repo . >/dev/null
 
@@ -135,8 +136,14 @@ cargo run -- verify-bundle \
 cargo run -- verify-bundle \
   --bundle "$TMP_DIR/matrix/evidence"
 
+cargo run -- verify-matrix \
+  --matrix "$TMP_DIR/matrix"
+
 cargo run -- verify-bundle \
   --bundle "$TMP_DIR/matrix-config/evidence"
+
+cargo run -- verify-matrix \
+  --matrix "$TMP_DIR/matrix-config"
 
 test -f "$TMP_DIR/report.json"
 test -f "$TMP_DIR/autopsy.md"

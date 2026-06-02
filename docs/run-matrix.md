@@ -117,9 +117,16 @@ status, and source-free privacy flags.
 Verify the bundle before publishing:
 
 ```bash
+helmbench verify-matrix \
+  --matrix /tmp/helmbench-matrix
+
 helmbench verify-bundle \
   --bundle /tmp/helmbench-matrix/evidence
 ```
+
+`verify-matrix` validates `matrix-manifest.json`, checks that every referenced
+report, trace directory, Markdown/HTML artifact, and evidence manifest exists,
+and then verifies the nested evidence bundle hashes.
 
 Use `--fail-on-regression` when this command runs in CI and should exit
 non-zero if the default quality gate fails.
