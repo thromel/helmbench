@@ -1,10 +1,31 @@
 # Demo Benchmark
 
-`init-demo-repo` creates a tiny reproducible benchmark repository and matching
-suite. It is meant for smoke testing HelmBench itself and for demos where a real
-agent call would be too slow or expensive.
+`demo-run` creates a tiny reproducible benchmark repository, runs a failing
+native baseline and a successful guided adapter variant, and writes source-free
+reports, autopsy, dashboard, benchmark summary, quality gate, and evidence
+bundle artifacts. It is meant for smoke testing HelmBench itself and for demos
+where a real agent call would be too slow or expensive.
+
+## One-Command Demo
+
+```bash
+helmbench demo-run \
+  --out-dir /tmp/helmbench-demo-run \
+  --force
+```
+
+Important outputs:
+
+- `/tmp/helmbench-demo-run/reports/native.json`
+- `/tmp/helmbench-demo-run/reports/guided.json`
+- `/tmp/helmbench-demo-run/reports/benchmark-summary.json`
+- `/tmp/helmbench-demo-run/reports/quality-gate.json`
+- `/tmp/helmbench-demo-run/docs/dashboard.html`
+- `/tmp/helmbench-demo-run/evidence/manifest.json`
 
 ## Create The Demo Repo
+
+`init-demo-repo` is the lower-level fixture generator used by `demo-run`.
 
 ```bash
 helmbench init-demo-repo \
@@ -21,7 +42,7 @@ The generated repo contains two tasks:
 It also contains `scripts/demo-agent.sh`, a deterministic adapter that emits
 source-free read/recommendation events and makes the expected fixes.
 
-## Run The Full Pipeline
+## Manual Pipeline
 
 ```bash
 helmbench local-run \
@@ -47,11 +68,11 @@ helmbench dashboard \
 
 Expected result:
 
-- task success: 100%;
-- validation coverage: 100%;
-- context precision: 100%;
-- edited-file recall: 100%;
-- no high-risk autopsy findings.
+- guided task success: 100%;
+- guided validation coverage: 100%;
+- guided context precision: 100%;
+- guided edited-file recall: 100%;
+- quality gate: pass.
 
 The generated repository is initialized with git because `local-run` clones
 benchmark repos per task.

@@ -42,6 +42,13 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Run the full deterministic demo pipeline and write source-free artifacts.
+    DemoRun {
+        #[arg(long, default_value = ".helmbench/demo-run")]
+        out_dir: PathBuf,
+        #[arg(long)]
+        force: bool,
+    },
     /// Generate a source-free suite from a known public repository fixture.
     InitPublicSuite {
         #[arg(long, value_enum)]
@@ -437,6 +444,10 @@ fn main() -> Result<()> {
             init_demo_repo(&repo_out, &suite_out, force)?;
             println!("wrote {}", repo_out.display());
             println!("wrote {}", suite_out.display());
+        }
+        Command::DemoRun { out_dir, force } => {
+            run_demo_pipeline(&out_dir, force)?;
+            println!("wrote {}", out_dir.display());
         }
         Command::InitPublicSuite {
             preset,
@@ -1403,6 +1414,131 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
     }
 }
 
+fn run_demo_pipeline(out_dir: &Path, force: bool) -> Result<()> {
+    run_demo_pipeline_with_adapter(out_dir, force, None)
+}
+
+fn run_demo_pipeline_with_adapter(
+    out_dir: &Path,
+    force: bool,
+    adapter_command_override: Option<String>,
+) -> Result<()> {
+    if out_dir.exists() {
+        if !force {
+            anyhow::bail!(
+                "{} already exists; pass --force to replace it",
+                out_dir.display()
+            );
+        }
+        std::fs::remove_dir_all(out_dir)
+            .with_context(|| format!("remove {}", out_dir.display()))?;
+    }
+    std::fs::create_dir_all(out_dir).with_context(|| format!("create {}", out_dir.display()))?;
+    let repo = out_dir.join("repo");
+    let suite_path = out_dir.join("suite.json");
+    let reports_dir = out_dir.join("reports");
+    let traces_dir = out_dir.join("traces");
+    let work_dir = out_dir.join("workdirs");
+    let docs_dir = out_dir.join("docs");
+    std::fs::create_dir_all(&reports_dir)
+        .with_context(|| format!("create {}", reports_dir.display()))?;
+    std::fs::create_dir_all(&docs_dir).with_context(|| format!("create {}", docs_dir.display()))?;
+
+    init_demo_repo(&repo, &suite_path, false)?;
+    let suite = load_suite(&suite_path)?;
+
+    let native_traces = traces_dir.join("native");
+    run_local_suite(
+        &suite,
+        &repo,
+        &work_dir.join("native"),
+        &native_traces,
+        "demo-baseline",
+        AgentVariant::Native,
+        &[],
+        None,
+        None,
+        false,
+    )?;
+    let native_report = build_report(&suite, &load_traces(&native_traces)?)?;
+    let native_report_path = reports_dir.join("native.json");
+    write_json(&native_report, &native_report_path)?;
+    write_text(
+        &render_markdown_report(&native_report),
+        &reports_dir.join("native.md"),
+    )?;
+
+    let guided_traces = traces_dir.join("guided");
+    let adapter_command = match adapter_command_override {
+        Some(command) => command,
+        None => format!(
+            "HELMBENCH_BIN={} sh scripts/demo-agent.sh",
+            shell_escape(&current_helmbench_bin()?.to_string_lossy())
+        ),
+    };
+    run_local_suite(
+        &suite,
+        &repo,
+        &work_dir.join("guided"),
+        &guided_traces,
+        "demo-guided",
+        AgentVariant::CtxhelmMcp,
+        &[],
+        None,
+        Some(&adapter_command),
+        false,
+    )?;
+    let guided_report = build_report(&suite, &load_traces(&guided_traces)?)?;
+    let guided_report_path = reports_dir.join("guided.json");
+    write_json(&guided_report, &guided_report_path)?;
+    write_text(
+        &render_markdown_report(&guided_report),
+        &reports_dir.join("guided.md"),
+    )?;
+
+    let compare = compare_reports(&native_report, &guided_report);
+    write_text(
+        &render_markdown_compare(&compare),
+        &docs_dir.join("compare.md"),
+    )?;
+
+    let summary = build_benchmark_summary(&native_report, &[guided_report.clone()])?;
+    let summary_json_path = reports_dir.join("benchmark-summary.json");
+    write_json(&summary, &summary_json_path)?;
+    write_text(
+        &render_markdown_benchmark_summary(&summary),
+        &docs_dir.join("benchmark-summary.md"),
+    )?;
+
+    let gate = evaluate_quality_gate(&summary, &QualityGateConfig::default())?;
+    write_json(&gate, &reports_dir.join("quality-gate.json"))?;
+    write_text(
+        &render_markdown_quality_gate(&gate),
+        &docs_dir.join("quality-gate.md"),
+    )?;
+    if !gate.passed {
+        anyhow::bail!("demo quality gate failed");
+    }
+
+    let autopsy = build_autopsy(&suite, &load_traces(&native_traces)?)?;
+    write_text(
+        &render_markdown_autopsy(&autopsy),
+        &docs_dir.join("native-autopsy.md"),
+    )?;
+    let dashboard = render_html_dashboard(&[native_report, guided_report])?;
+    write_text(&dashboard, &docs_dir.join("dashboard.html"))?;
+
+    write_evidence_bundle(
+        &suite_path,
+        None,
+        &native_report_path,
+        std::slice::from_ref(&guided_report_path),
+        &out_dir.join("evidence"),
+        false,
+    )?;
+    Ok(())
+}
+
 fn init_demo_repo(repo_out: &Path, suite_out: &Path, force: bool) -> Result<()> {
     if repo_out.exists() {
         if !force {
@@ -2270,6 +2406,49 @@ mod tests {
     }
 
     #[test]
+    fn demo_pipeline_writes_full_artifact_set() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let out = temp.path().join("demo-run");
+        let adapter = temp.path().join("fake-demo-agent.sh");
+        std::fs::write(&adapter, FAKE_DEMO_AGENT).expect("adapter");
+        set_executable(&adapter).expect("chmod adapter");
+
+        run_demo_pipeline_with_adapter(
+            &out,
+            false,
+            Some(format!("sh {}", shell_escape(&adapter.to_string_lossy()))),
+        )
+        .expect("demo pipeline");
+
+        assert!(out.join("suite.json").exists());
+        assert!(out.join("repo/.git").exists());
+        assert!(out
+            .join("traces/native/demo-auth-redirect-001.json")
+            .exists());
+        assert!(out
+            .join("traces/guided/demo-auth-redirect-001.json")
+            .exists());
+        assert!(out.join("reports/native.json").exists());
+        assert!(out.join("reports/guided.json").exists());
+        assert!(out.join("reports/benchmark-summary.json").exists());
+        assert!(out.join("reports/quality-gate.json").exists());
+        assert!(out.join("docs/compare.md").exists());
+        assert!(out.join("docs/benchmark-summary.md").exists());
+        assert!(out.join("docs/quality-gate.md").exists());
+        assert!(out.join("docs/native-autopsy.md").exists());
+        assert!(out.join("docs/dashboard.html").exists());
+        assert!(out.join("evidence/manifest.json").exists());
+
+        let gate = std::fs::read_to_string(out.join("reports/quality-gate.json")).expect("gate");
+        let gate = serde_json::from_str::<serde_json::Value>(&gate).expect("json");
+        assert_eq!(gate["passed"], true);
+        let guided =
+            std::fs::read_to_string(out.join("reports/guided.json")).expect("guided report");
+        let guided = serde_json::from_str::<serde_json::Value>(&guided).expect("json");
+        assert_eq!(guided["summary"]["successRate"], 1.0);
+    }
+
+    #[test]
     fn refactoring_miner_public_suite_is_source_free_and_valid() {
         let suite = refactoring_miner_suite();
         validate_suite(&suite).expect("suite");
@@ -2484,4 +2663,26 @@ mod tests {
             observed_at_millis: None,
         }
     }
+
+    const FAKE_DEMO_AGENT: &str = r#"#!/usr/bin/env sh
+set -eu
+
+case "$HELMBENCH_TASK_ID" in
+  demo-auth-redirect-001)
+    path=src/auth/session.txt
+    printf 'expired sessions redirect to /login\nactive sessions redirect to /dashboard\n' > "$path"
+    ;;
+  demo-billing-rounding-001)
+    path=src/billing/invoice.txt
+    printf 'invoice rounding mode: round half up\ncurrency: USD\n' > "$path"
+    ;;
+  *)
+    exit 2
+    ;;
+esac
+
+mkdir -p "$(dirname "$HELMBENCH_EVENTS")"
+printf '{"schemaVersion":1,"taskId":"%s","eventKind":"recommended_file","path":"%s","observedAtMillis":5}\n' "$HELMBENCH_TASK_ID" "$path" >> "$HELMBENCH_EVENTS"
+printf '{"schemaVersion":1,"taskId":"%s","eventKind":"file_read","path":"%s","observedAtMillis":15}\n' "$HELMBENCH_TASK_ID" "$path" >> "$HELMBENCH_EVENTS"
+"#;
 }

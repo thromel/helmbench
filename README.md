@@ -11,9 +11,9 @@ HelmBench is designed as a companion to `ctxhelm`:
 - `ctxhelm` improves agent context.
 - `HelmBench` proves whether that context helped.
 
-## MVP status
+## Current status
 
-This repository currently implements the first MVP slice:
+This repository currently implements the core HelmBench workflow:
 
 - task suite schema
 - source-free trace schema
@@ -36,6 +36,8 @@ This repository currently implements the first MVP slice:
   payloads
 - `init-public-suite` generator for verified public-repo benchmark suites,
   starting with RefactoringMiner
+- `demo-run` one-command deterministic demo pipeline with reports, dashboard,
+  quality gate, and evidence bundle
 - `benchmark-summary` reports that compare one baseline against multiple
   source-free variant reports
 - `evidence-bundle` packaging for source-free suites, health reports, run
@@ -79,6 +81,14 @@ Create a reproducible demo benchmark repo plus matching suite:
 cargo run -- init-demo-repo \
   --repo-out /tmp/helmbench-demo-repo \
   --suite-out /tmp/helmbench-demo-suite.json \
+  --force
+```
+
+Run the full deterministic demo pipeline:
+
+```bash
+cargo run -- demo-run \
+  --out-dir /tmp/helmbench-demo-run \
   --force
 ```
 
@@ -386,6 +396,7 @@ helmbench-core
 helmbench-cli
   init-suite
   init-demo-repo
+  demo-run
   init-public-suite
   validate-suite
   run

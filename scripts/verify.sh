@@ -17,6 +17,7 @@ cargo test
 cargo clippy --all-targets -- -D warnings
 
 cargo run -- --help >/dev/null
+cargo run -- demo-run --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
 cargo run -- benchmark-summary --help >/dev/null
 cargo run -- evidence-bundle --help >/dev/null
@@ -26,6 +27,10 @@ cargo run -- doctor --repo . >/dev/null
 cargo run -- init-demo-repo \
   --repo-out "$TMP_DIR/demo-repo" \
   --suite-out "$TMP_DIR/demo-suite.json" \
+  --force
+
+cargo run -- demo-run \
+  --out-dir "$TMP_DIR/full-demo" \
   --force
 
 cargo run -- validate-suite "$TMP_DIR/demo-suite.json"
@@ -88,6 +93,8 @@ test -f "$TMP_DIR/benchmark-summary.md"
 test -f "$TMP_DIR/benchmark-summary.json"
 test -f "$TMP_DIR/quality-gate.md"
 test -f "$TMP_DIR/evidence/manifest.json"
+test -f "$TMP_DIR/full-demo/evidence/manifest.json"
+test -f "$TMP_DIR/full-demo/docs/dashboard.html"
 
 git diff --check
 
