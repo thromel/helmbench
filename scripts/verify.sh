@@ -20,6 +20,7 @@ cargo run -- --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
 cargo run -- benchmark-summary --help >/dev/null
 cargo run -- evidence-bundle --help >/dev/null
+cargo run -- quality-gate --help >/dev/null
 cargo run -- doctor --repo . >/dev/null
 
 cargo run -- init-demo-repo \
@@ -59,6 +60,19 @@ cargo run -- benchmark-summary \
   --out "$TMP_DIR/benchmark-summary.md" \
   --format markdown
 
+cargo run -- benchmark-summary \
+  --base reports/example-native.json \
+  --head reports/example-ctxhelm.json \
+  --head reports/example-claude-code.json \
+  --out "$TMP_DIR/benchmark-summary.json" \
+  --format json
+
+cargo run -- quality-gate \
+  --summary "$TMP_DIR/benchmark-summary.json" \
+  --out "$TMP_DIR/quality-gate.md" \
+  --max-total-tool-calls-delta 0 \
+  --max-total-token-estimate-delta 0
+
 cargo run -- evidence-bundle \
   --suite suites/example-auth-bugs.json \
   --base-report reports/example-native.json \
@@ -71,6 +85,8 @@ test -f "$TMP_DIR/report.json"
 test -f "$TMP_DIR/autopsy.md"
 test -f "$TMP_DIR/dashboard.html"
 test -f "$TMP_DIR/benchmark-summary.md"
+test -f "$TMP_DIR/benchmark-summary.json"
+test -f "$TMP_DIR/quality-gate.md"
 test -f "$TMP_DIR/evidence/manifest.json"
 
 git diff --check

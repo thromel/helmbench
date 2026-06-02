@@ -9,6 +9,7 @@ pub const TRACE_SCHEMA_VERSION: u32 = 1;
 pub const REPORT_SCHEMA_VERSION: u32 = 1;
 pub const AUTOPSY_SCHEMA_VERSION: u32 = 1;
 pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 1;
+pub const QUALITY_GATE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -294,6 +295,55 @@ pub enum BenchmarkVerdict {
     Regressed,
     Mixed,
     NoChange,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct QualityGateReport {
+    pub schema_version: u32,
+    pub suite_name: String,
+    pub passed: bool,
+    pub checks: Vec<QualityGateCheck>,
+    pub privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct QualityGateCheck {
+    pub head_agent: String,
+    pub head_variant: AgentVariant,
+    pub metric: String,
+    pub operator: String,
+    pub actual: f64,
+    pub threshold: f64,
+    pub passed: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct QualityGateConfig {
+    pub min_success_rate_delta: f32,
+    pub min_validation_coverage_rate_delta: f32,
+    pub max_irrelevant_read_rate_delta: f32,
+    pub min_recommendation_recall_delta: f32,
+    pub min_context_precision_delta: f32,
+    pub min_edited_file_recall_delta: f32,
+    pub max_total_tool_calls_delta: Option<i64>,
+    pub max_total_token_estimate_delta: Option<i64>,
+}
+
+impl Default for QualityGateConfig {
+    fn default() -> Self {
+        Self {
+            min_success_rate_delta: 0.0,
+            min_validation_coverage_rate_delta: 0.0,
+            max_irrelevant_read_rate_delta: 0.0,
+            min_recommendation_recall_delta: 0.0,
+            min_context_precision_delta: 0.0,
+            min_edited_file_recall_delta: 0.0,
+            max_total_tool_calls_delta: None,
+            max_total_token_estimate_delta: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -968,6 +1018,191 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
     out
 }
 
+pub fn evaluate_quality_gate(
+    summary: &BenchmarkSummaryReport,
+    config: &QualityGateConfig,
+) -> Result<QualityGateReport> {
+    if !summary.privacy.source_free
+        || summary.privacy.raw_source_logged
+        || summary.privacy.raw_prompt_logged
+        || summary.privacy.raw_transcript_logged
+        || summary.privacy.raw_terminal_logged
+    {
+        bail!("quality gates require source-free benchmark summaries");
+    }
+
+    let mut checks = Vec::new();
+    for comparison in &summary.comparisons {
+        push_min_check(
+            &mut checks,
+            comparison,
+            "success_rate_delta",
+            comparison.success_rate_delta,
+            config.min_success_rate_delta,
+        );
+        push_min_check(
+            &mut checks,
+            comparison,
+            "validation_coverage_rate_delta",
+            comparison.validation_coverage_rate_delta,
+            config.min_validation_coverage_rate_delta,
+        );
+        push_max_check(
+            &mut checks,
+            comparison,
+            "irrelevant_read_rate_delta",
+            comparison.irrelevant_read_rate_delta,
+            config.max_irrelevant_read_rate_delta,
+        );
+        push_min_check(
+            &mut checks,
+            comparison,
+            "recommendation_recall_delta",
+            comparison.recommendation_recall_delta,
+            config.min_recommendation_recall_delta,
+        );
+        push_min_check(
+            &mut checks,
+            comparison,
+            "context_precision_delta",
+            comparison.context_precision_delta,
+            config.min_context_precision_delta,
+        );
+        push_min_check(
+            &mut checks,
+            comparison,
+            "edited_file_recall_delta",
+            comparison.edited_file_recall_delta,
+            config.min_edited_file_recall_delta,
+        );
+        if let Some(threshold) = config.max_total_tool_calls_delta {
+            push_i64_max_check(
+                &mut checks,
+                comparison,
+                "total_tool_calls_delta",
+                comparison.total_tool_calls_delta,
+                threshold,
+            );
+        }
+        if let Some(threshold) = config.max_total_token_estimate_delta {
+            push_i64_max_check(
+                &mut checks,
+                comparison,
+                "total_token_estimate_delta",
+                comparison.total_token_estimate_delta,
+                threshold,
+            );
+        }
+    }
+
+    Ok(QualityGateReport {
+        schema_version: QUALITY_GATE_SCHEMA_VERSION,
+        suite_name: summary.suite_name.clone(),
+        passed: checks.iter().all(|check| check.passed),
+        checks,
+        privacy: PrivacyStatus::source_free(),
+    })
+}
+
+fn push_min_check(
+    checks: &mut Vec<QualityGateCheck>,
+    comparison: &BenchmarkComparison,
+    metric: &str,
+    actual: f32,
+    threshold: f32,
+) {
+    checks.push(quality_gate_check(
+        comparison,
+        metric,
+        ">=",
+        actual as f64,
+        threshold as f64,
+        actual + 0.0001 >= threshold,
+    ));
+}
+
+fn push_max_check(
+    checks: &mut Vec<QualityGateCheck>,
+    comparison: &BenchmarkComparison,
+    metric: &str,
+    actual: f32,
+    threshold: f32,
+) {
+    checks.push(quality_gate_check(
+        comparison,
+        metric,
+        "<=",
+        actual as f64,
+        threshold as f64,
+        actual <= threshold + 0.0001,
+    ));
+}
+
+fn push_i64_max_check(
+    checks: &mut Vec<QualityGateCheck>,
+    comparison: &BenchmarkComparison,
+    metric: &str,
+    actual: i64,
+    threshold: i64,
+) {
+    checks.push(quality_gate_check(
+        comparison,
+        metric,
+        "<=",
+        actual as f64,
+        threshold as f64,
+        actual <= threshold,
+    ));
+}
+
+fn quality_gate_check(
+    comparison: &BenchmarkComparison,
+    metric: &str,
+    operator: &str,
+    actual: f64,
+    threshold: f64,
+    passed: bool,
+) -> QualityGateCheck {
+    QualityGateCheck {
+        head_agent: comparison.head_agent.clone(),
+        head_variant: comparison.head_variant.clone(),
+        metric: metric.to_string(),
+        operator: operator.to_string(),
+        actual,
+        threshold,
+        passed,
+    }
+}
+
+pub fn render_markdown_quality_gate(report: &QualityGateReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "# HelmBench Quality Gate: `{}`\n\n",
+        report.suite_name
+    ));
+    out.push_str(&format!(
+        "Status: **{}**\n\n",
+        if report.passed { "passed" } else { "failed" }
+    ));
+    out.push_str("| Variant | Metric | Rule | Actual | Result |\n");
+    out.push_str("| --- | --- | --- | ---: | --- |\n");
+    for check in &report.checks {
+        out.push_str(&format!(
+            "| {} / {:?} | `{}` | {} {:.4} | {:.4} | {} |\n",
+            check.head_agent,
+            check.head_variant,
+            check.metric,
+            check.operator,
+            check.threshold,
+            check.actual,
+            if check.passed { "pass" } else { "fail" }
+        ));
+    }
+    out.push_str("\n## Privacy\n\n");
+    out.push_str("- Source-free: `true`\n");
+    out
+}
+
 pub fn render_markdown_autopsy(report: &AutopsyReport) -> String {
     let mut out = String::new();
     out.push_str(&format!(
@@ -1308,6 +1543,21 @@ pub fn read_report(path: &Path) -> Result<RunReport> {
         || report.privacy.raw_terminal_logged
     {
         bail!("report is not source-free");
+    }
+    Ok(report)
+}
+
+pub fn read_benchmark_summary(path: &Path) -> Result<BenchmarkSummaryReport> {
+    let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    let report = serde_json::from_str::<BenchmarkSummaryReport>(&raw)
+        .with_context(|| format!("parse benchmark summary {}", path.display()))?;
+    if !report.privacy.source_free
+        || report.privacy.raw_source_logged
+        || report.privacy.raw_prompt_logged
+        || report.privacy.raw_transcript_logged
+        || report.privacy.raw_terminal_logged
+    {
+        bail!("benchmark summary is not source-free");
     }
     Ok(report)
 }
@@ -2301,6 +2551,78 @@ mod tests {
 
         let error = build_benchmark_summary(&base, &[head]).expect_err("privacy");
         assert!(error.to_string().contains("source-free reports"));
+    }
+
+    #[test]
+    fn quality_gate_passes_and_fails_thresholds() {
+        let suite = example_suite();
+        let base = build_report(
+            &suite,
+            &[AgentTrace {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                agent: "claude-code".to_string(),
+                variant: AgentVariant::Native,
+                status: TaskStatus::Failure,
+                recommended_files: Vec::new(),
+                files_read: vec![timed_path("README.md", 10)],
+                files_edited: Vec::new(),
+                commands: Vec::new(),
+                tool_call_count: 10,
+                token_estimate: Some(5000),
+                elapsed_millis: Some(1000),
+                time_to_first_relevant_file_millis: None,
+                privacy: PrivacyStatus::source_free(),
+            }],
+        )
+        .expect("base");
+        let head = build_report(
+            &suite,
+            &[AgentTrace {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                agent: "claude-code".to_string(),
+                variant: AgentVariant::CtxhelmMcp,
+                status: TaskStatus::Success,
+                recommended_files: vec![path("src/auth/session.ts")],
+                files_read: vec![timed_path("src/auth/session.ts", 20)],
+                files_edited: vec![path("src/auth/session.ts")],
+                commands: Vec::new(),
+                tool_call_count: 7,
+                token_estimate: Some(3000),
+                elapsed_millis: Some(900),
+                time_to_first_relevant_file_millis: None,
+                privacy: PrivacyStatus::source_free(),
+            }],
+        )
+        .expect("head");
+        let summary = build_benchmark_summary(&base, &[head]).expect("summary");
+
+        let pass = evaluate_quality_gate(
+            &summary,
+            &QualityGateConfig {
+                max_total_tool_calls_delta: Some(0),
+                max_total_token_estimate_delta: Some(0),
+                ..QualityGateConfig::default()
+            },
+        )
+        .expect("gate");
+        assert!(pass.passed);
+        assert!(render_markdown_quality_gate(&pass).contains("Status: **passed**"));
+
+        let fail = evaluate_quality_gate(
+            &summary,
+            &QualityGateConfig {
+                min_success_rate_delta: 2.0,
+                ..QualityGateConfig::default()
+            },
+        )
+        .expect("gate");
+        assert!(!fail.passed);
+        assert!(fail
+            .checks
+            .iter()
+            .any(|check| check.metric == "success_rate_delta" && !check.passed));
     }
 
     #[test]

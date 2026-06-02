@@ -40,6 +40,7 @@ This repository currently implements the first MVP slice:
   source-free variant reports
 - `evidence-bundle` packaging for source-free suites, health reports, run
   reports, benchmark summaries, and artifact hashes
+- `quality-gate` checks that fail CI when benchmark-summary deltas regress
 - recommendation precision and recall metrics for context-plan evaluation
 
 It does **not** yet parse raw Claude Code, Codex, Cursor, or other agent
@@ -131,6 +132,15 @@ cargo run -- benchmark-summary \
   --head reports/example-claude-code.json \
   --out reports/example-benchmark-summary.md \
   --format markdown
+```
+
+Fail CI if a summary regresses against quality thresholds:
+
+```bash
+cargo run -- quality-gate \
+  --summary reports/example-benchmark-summary.json \
+  --max-total-tool-calls-delta 0 \
+  --max-total-token-estimate-delta 0
 ```
 
 Package a source-free evidence bundle:
@@ -389,6 +399,7 @@ helmbench-cli
   record-event
   compare
   benchmark-summary
+  quality-gate
   evidence-bundle
   autopsy
   dashboard

@@ -130,6 +130,20 @@ The summary artifact includes:
 This is the artifact to publish when showing whether ctxhelm made an agent
 better, cheaper, or less wasteful across a benchmark suite.
 
+## Quality Gate
+
+`quality-gate` turns a benchmark summary into a CI decision. It reads a
+source-free `benchmark-summary.json`, checks each variant delta against
+thresholds, writes an optional JSON or Markdown gate report, and exits non-zero
+if any check fails.
+
+Default thresholds require no regression in success rate, validation coverage,
+recommendation recall, context precision, edited-file recall, or irrelevant read
+rate. Optional thresholds can also cap tool-call and token deltas.
+
+This is the command to use when ctxhelm changes should be blocked unless they
+preserve or improve agent behavior on a suite.
+
 ## Evidence Bundle
 
 `evidence-bundle` packages the source-free proof for a benchmark run. It

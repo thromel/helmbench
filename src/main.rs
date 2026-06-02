@@ -1,13 +1,14 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use helmbench::{
-    build_autopsy, build_benchmark_summary, build_report, compare_reports,
+    build_autopsy, build_benchmark_summary, build_report, compare_reports, evaluate_quality_gate,
     events_from_agent_stream_jsonl, example_suite, load_agent_events, load_suite, load_traces,
-    project_root_for_cli, read_report, render_html_dashboard, render_markdown_autopsy,
-    render_markdown_benchmark_summary, render_markdown_compare, render_markdown_report,
-    trace_from_ctxhelm_prepare_json, traces_from_agent_events, validate_agent_event,
-    validate_suite, write_json, AgentEvent, AgentEventKind, AgentVariant, CommandClass,
-    PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
+    project_root_for_cli, read_benchmark_summary, read_report, render_html_dashboard,
+    render_markdown_autopsy, render_markdown_benchmark_summary, render_markdown_compare,
+    render_markdown_quality_gate, render_markdown_report, trace_from_ctxhelm_prepare_json,
+    traces_from_agent_events, validate_agent_event, validate_suite, write_json, AgentEvent,
+    AgentEventKind, AgentVariant, CommandClass, PrivacyStatus, QualityGateConfig, TaskStatus,
+    TRACE_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
@@ -279,6 +280,31 @@ enum Command {
         out_dir: PathBuf,
         #[arg(long)]
         force: bool,
+    },
+    /// Fail if a benchmark summary violates source-free quality thresholds.
+    QualityGate {
+        #[arg(long)]
+        summary: PathBuf,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
+        format: OutputFormat,
+        #[arg(long, default_value_t = 0.0)]
+        min_success_rate_delta: f32,
+        #[arg(long, default_value_t = 0.0)]
+        min_validation_coverage_rate_delta: f32,
+        #[arg(long, default_value_t = 0.0)]
+        max_irrelevant_read_rate_delta: f32,
+        #[arg(long, default_value_t = 0.0)]
+        min_recommendation_recall_delta: f32,
+        #[arg(long, default_value_t = 0.0)]
+        min_context_precision_delta: f32,
+        #[arg(long, default_value_t = 0.0)]
+        min_edited_file_recall_delta: f32,
+        #[arg(long)]
+        max_total_tool_calls_delta: Option<i64>,
+        #[arg(long)]
+        max_total_token_estimate_delta: Option<i64>,
     },
     /// Diagnose source-free agent behavior from task traces.
     Autopsy {
@@ -791,6 +817,47 @@ fn main() -> Result<()> {
                 force,
             )?;
             println!("wrote {}", out_dir.display());
+        }
+        Command::QualityGate {
+            summary,
+            out,
+            format,
+            min_success_rate_delta,
+            min_validation_coverage_rate_delta,
+            max_irrelevant_read_rate_delta,
+            min_recommendation_recall_delta,
+            min_context_precision_delta,
+            min_edited_file_recall_delta,
+            max_total_tool_calls_delta,
+            max_total_token_estimate_delta,
+        } => {
+            let summary = read_benchmark_summary(&summary)?;
+            let gate = evaluate_quality_gate(
+                &summary,
+                &QualityGateConfig {
+                    min_success_rate_delta,
+                    min_validation_coverage_rate_delta,
+                    max_irrelevant_read_rate_delta,
+                    min_recommendation_recall_delta,
+                    min_context_precision_delta,
+                    min_edited_file_recall_delta,
+                    max_total_tool_calls_delta,
+                    max_total_token_estimate_delta,
+                },
+            )?;
+            let rendered = match format {
+                OutputFormat::Json => serde_json::to_string_pretty(&gate)?,
+                OutputFormat::Markdown => render_markdown_quality_gate(&gate),
+            };
+            if let Some(out) = out {
+                write_text(&rendered, &out)?;
+                println!("wrote {}", out.display());
+            } else {
+                print!("{rendered}");
+            }
+            if !gate.passed {
+                anyhow::bail!("quality gate failed");
+            }
         }
         Command::Autopsy {
             suite,
