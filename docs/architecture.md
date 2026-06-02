@@ -43,6 +43,12 @@ health JSON is saved under `reports/suite-health.json`, referenced from
 `matrix-manifest.json`, and copied into the evidence bundle as `health.json` so
 published matrix artifacts carry their own source-free preflight proof.
 
+The matrix manifest also carries reproducibility provenance: HelmBench version,
+suite hash, repo HEAD, dirty-checkout flag, setup-command hashes, and per-row
+adapter/ctxhelm configuration hashes. This lets reviewers compare or rerun a
+benchmark without storing raw commands, prompts, terminal logs, transcripts,
+ctxhelm pack sections, or source content.
+
 ## Source-Free Trace Model
 
 A trace records only evaluation-safe metadata:

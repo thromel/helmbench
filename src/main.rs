@@ -18,6 +18,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command as ProcessCommand, Stdio};
 use std::time::{Duration, Instant};
 
+const RUN_MATRIX_MANIFEST_SCHEMA_VERSION: u32 = 2;
+
 #[derive(Debug, Parser)]
 #[command(
     name = "helmbench",
@@ -2095,12 +2097,24 @@ struct RunMatrixManifest {
     suite_path: String,
     repo_path: String,
     out_dir: String,
+    provenance: RunMatrixProvenance,
     baseline: RunMatrixManifestRun,
     heads: Vec<RunMatrixManifestRun>,
     artifacts: RunMatrixManifestArtifacts,
     quality_gate_passed: bool,
     evidence_bundle_verified: bool,
     privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunMatrixProvenance {
+    helmbench_version: String,
+    suite_hash: String,
+    repo_head: Option<String>,
+    repo_dirty: bool,
+    setup_command_count: usize,
+    setup_command_hashes: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2114,6 +2128,8 @@ struct RunMatrixManifestRun {
     ctxhelm_enabled: bool,
     pack_enabled: bool,
     stream_capture_enabled: bool,
+    adapter_command_hash: Option<String>,
+    ctxhelm_config_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2573,7 +2589,7 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         &evidence_dir.join("manifest.json"),
         gate.passed,
         true,
-    );
+    )?;
     write_json(&manifest, &out_dir.join("matrix-manifest.json"))?;
 
     if request.fail_on_regression && !gate.passed {
@@ -2598,12 +2614,14 @@ fn build_run_matrix_manifest(
     evidence_manifest: &Path,
     quality_gate_passed: bool,
     evidence_bundle_verified: bool,
-) -> RunMatrixManifest {
-    RunMatrixManifest {
-        schema_version: 1,
+) -> Result<RunMatrixManifest> {
+    let provenance = run_matrix_provenance(request)?;
+    Ok(RunMatrixManifest {
+        schema_version: RUN_MATRIX_MANIFEST_SCHEMA_VERSION,
         suite_path: request.suite_path.display().to_string(),
         repo_path: request.repo.display().to_string(),
         out_dir: request.out_dir.display().to_string(),
+        provenance,
         baseline: run_matrix_manifest_run(&request.out_dir, baseline),
         heads: heads
             .iter()
@@ -2622,7 +2640,29 @@ fn build_run_matrix_manifest(
         quality_gate_passed,
         evidence_bundle_verified,
         privacy: PrivacyStatus::source_free(),
-    }
+    })
+}
+
+fn run_matrix_provenance(request: &RunMatrixRequest) -> Result<RunMatrixProvenance> {
+    let suite_raw = std::fs::read_to_string(&request.suite_path)
+        .with_context(|| format!("read {}", request.suite_path.display()))?;
+    let repo_head = git_output(&request.repo, &["rev-parse", "HEAD"]).ok();
+    let repo_dirty = git_output(&request.repo, &["status", "--short"])
+        .map(|status| !status.trim().is_empty())
+        .unwrap_or(true);
+
+    Ok(RunMatrixProvenance {
+        helmbench_version: env!("CARGO_PKG_VERSION").to_string(),
+        suite_hash: source_free_hash("suite", &suite_raw),
+        repo_head,
+        repo_dirty,
+        setup_command_count: request.setup_commands.len(),
+        setup_command_hashes: request
+            .setup_commands
+            .iter()
+            .map(|command| command_hash(command))
+            .collect(),
+    })
 }
 
 fn run_matrix_manifest_run(out_dir: &Path, result: &RunMatrixResult) -> RunMatrixManifestRun {
@@ -2639,6 +2679,12 @@ fn run_matrix_manifest_run(out_dir: &Path, result: &RunMatrixResult) -> RunMatri
             .as_ref()
             .is_some_and(|ctxhelm| ctxhelm.include_pack),
         stream_capture_enabled: result.spec.capture_stream,
+        adapter_command_hash: result
+            .spec
+            .adapter_command
+            .as_ref()
+            .map(|command| command_hash(command)),
+        ctxhelm_config_hash: result.spec.ctxhelm.as_ref().map(ctxhelm_config_hash),
     }
 }
 
@@ -2656,10 +2702,11 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     let manifest = serde_json::from_str::<RunMatrixManifest>(&raw)
         .with_context(|| format!("parse {}", manifest_path.display()))?;
 
-    if manifest.schema_version != 1 {
+    if manifest.schema_version != RUN_MATRIX_MANIFEST_SCHEMA_VERSION {
         anyhow::bail!(
-            "unsupported matrix manifest schemaVersion {}; expected 1",
-            manifest.schema_version
+            "unsupported matrix manifest schemaVersion {}; expected {}",
+            manifest.schema_version,
+            RUN_MATRIX_MANIFEST_SCHEMA_VERSION
         );
     }
     if manifest.suite_path.trim().is_empty() {
@@ -2677,6 +2724,7 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     if !manifest.evidence_bundle_verified {
         anyhow::bail!("matrix manifest evidenceBundleVerified must be true");
     }
+    verify_matrix_provenance(&manifest.provenance)?;
     if !manifest.privacy.source_free
         || manifest.privacy.raw_source_logged
         || manifest.privacy.raw_prompt_logged
@@ -2720,6 +2768,24 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     verify_evidence_bundle(evidence_dir)?;
 
     Ok(manifest)
+}
+
+fn verify_matrix_provenance(provenance: &RunMatrixProvenance) -> Result<()> {
+    if provenance.helmbench_version.trim().is_empty() {
+        anyhow::bail!("matrix manifest helmbenchVersion must not be empty");
+    }
+    if !provenance.suite_hash.starts_with("suite:") {
+        anyhow::bail!("matrix manifest suiteHash must be a source-free suite hash");
+    }
+    if provenance.setup_command_count != provenance.setup_command_hashes.len() {
+        anyhow::bail!("matrix manifest setup command count does not match hashes");
+    }
+    for hash in &provenance.setup_command_hashes {
+        if !hash.starts_with("cmd:") {
+            anyhow::bail!("matrix manifest setup command hash must be source-free");
+        }
+    }
+    Ok(())
 }
 
 fn build_matrix_history_report(matrix_dirs: &[PathBuf]) -> Result<MatrixHistoryReport> {
@@ -3283,6 +3349,26 @@ fn verify_matrix_run(matrix_dir: &Path, run: &RunMatrixManifestRun) -> Result<()
     }
     if run.agent.trim().is_empty() {
         anyhow::bail!("matrix run `{}` agent must not be empty", run.name);
+    }
+    if run
+        .adapter_command_hash
+        .as_deref()
+        .is_some_and(|hash| !hash.starts_with("cmd:"))
+    {
+        anyhow::bail!(
+            "matrix run `{}` adapter command hash must be source-free",
+            run.name
+        );
+    }
+    if run
+        .ctxhelm_config_hash
+        .as_deref()
+        .is_some_and(|hash| !hash.starts_with("ctxhelm:"))
+    {
+        anyhow::bail!(
+            "matrix run `{}` ctxhelm config hash must be source-free",
+            run.name
+        );
     }
     require_matrix_file(matrix_dir, &run.report_path)
         .with_context(|| format!("verify report for run `{}`", run.name))?;
@@ -4595,12 +4681,34 @@ fn infer_command_class(command: &str) -> CommandClass {
 }
 
 fn command_hash(command: &str) -> String {
+    source_free_hash("cmd", command)
+}
+
+fn source_free_hash(label: &str, value: &str) -> String {
     let mut hash = 0xcbf29ce484222325u64;
-    for byte in command.as_bytes() {
+    for byte in value.as_bytes() {
         hash ^= u64::from(*byte);
         hash = hash.wrapping_mul(0x100000001b3);
     }
-    format!("cmd:{hash:016x}")
+    format!("{label}:{hash:016x}")
+}
+
+fn ctxhelm_config_hash(config: &CtxhelmRunConfig) -> String {
+    source_free_hash(
+        "ctxhelm",
+        &format!(
+            "bin={}|mode={}|target={}|semantic={}|provider={:?}|model={:?}|dimensions={:?}|pack={}|budget={}",
+            config.ctxhelm_bin.display(),
+            config.mode,
+            config.target_agent,
+            config.semantic,
+            config.semantic_provider,
+            config.semantic_model,
+            config.semantic_dimensions,
+            config.include_pack,
+            config.pack_budget
+        ),
+    )
 }
 
 fn safe_task_dir_name(task_id: &str) -> String {
@@ -4811,10 +4919,11 @@ mod tests {
         set_executable(&ctxhelm).expect("chmod ctxhelm");
 
         let out = temp.path().join("matrix");
+        let adapter_command = format!("sh {}", shell_escape(&adapter.to_string_lossy()));
         let head = format!(
-            "name=guided,agent=demo-guided,variant=ctxhelm_mcp,ctxhelm=true,ctxhelm_bin={},pack=true,pack_budget=brief,command=sh {}",
+            "name=guided,agent=demo-guided,variant=ctxhelm_mcp,ctxhelm=true,ctxhelm_bin={},pack=true,pack_budget=brief,command={}",
             ctxhelm.to_string_lossy(),
-            shell_escape(&adapter.to_string_lossy()),
+            adapter_command,
         );
         let request = build_run_matrix_request(
             None,
@@ -4882,11 +4991,46 @@ mod tests {
 
         let manifest = std::fs::read_to_string(out.join("matrix-manifest.json")).expect("manifest");
         let manifest = serde_json::from_str::<serde_json::Value>(&manifest).expect("json");
-        assert_eq!(manifest["schemaVersion"], 1);
+        assert_eq!(
+            manifest["schemaVersion"],
+            serde_json::json!(RUN_MATRIX_MANIFEST_SCHEMA_VERSION)
+        );
+        assert_eq!(
+            manifest["provenance"]["helmbenchVersion"],
+            serde_json::json!(env!("CARGO_PKG_VERSION"))
+        );
+        assert!(manifest["provenance"]["suiteHash"]
+            .as_str()
+            .expect("suite hash")
+            .starts_with("suite:"));
+        assert!(
+            manifest["provenance"]["repoHead"]
+                .as_str()
+                .expect("repo head")
+                .len()
+                >= 40
+        );
+        assert_eq!(manifest["provenance"]["repoDirty"], false);
+        assert_eq!(
+            manifest["provenance"]["setupCommandCount"],
+            serde_json::json!(0)
+        );
         assert_eq!(manifest["baseline"]["name"], "native");
+        assert_eq!(
+            manifest["baseline"]["adapterCommandHash"],
+            serde_json::Value::Null
+        );
         assert_eq!(manifest["heads"][0]["name"], "guided");
         assert_eq!(manifest["heads"][0]["ctxhelmEnabled"], true);
         assert_eq!(manifest["heads"][0]["packEnabled"], true);
+        assert_eq!(
+            manifest["heads"][0]["adapterCommandHash"],
+            serde_json::json!(command_hash(&adapter_command))
+        );
+        assert!(manifest["heads"][0]["ctxhelmConfigHash"]
+            .as_str()
+            .expect("ctxhelm hash")
+            .starts_with("ctxhelm:"));
         assert_eq!(manifest["qualityGatePassed"], true);
         assert_eq!(manifest["evidenceBundleVerified"], true);
         assert_eq!(manifest["privacy"]["sourceFree"], true);

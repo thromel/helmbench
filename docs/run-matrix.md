@@ -126,7 +126,14 @@ source-free baseline trace.
 `matrix-manifest.json` is the top-level source-free run identity. It records the
 suite path, repo path, baseline/head run labels, relative report and trace
 paths, suite-health artifact, key artifact paths, quality-gate status,
-evidence-bundle verification status, and source-free privacy flags.
+evidence-bundle verification status, source-free privacy flags, and
+reproducibility provenance.
+
+The provenance block includes the HelmBench version, suite content hash, repo
+HEAD, dirty-checkout flag, setup-command count, and setup-command hashes. Each
+run row also records adapter command and ctxhelm configuration hashes when
+present. The manifest does not store raw adapter commands, setup commands,
+prompts, transcripts, terminal logs, ctxhelm pack sections, or source content.
 
 `reports/benchmark-summary.json` includes confidence metadata. HelmBench writes
 95% Wilson score intervals for success and validation coverage and warns when a
