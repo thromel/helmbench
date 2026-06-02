@@ -81,6 +81,10 @@ enum Command {
         keep_workdirs: bool,
         #[arg(long)]
         fail_on_regression: bool,
+        #[arg(long, default_value_t = 1)]
+        health_min_commits: u64,
+        #[arg(long)]
+        allow_dirty_health: bool,
     },
     /// Compare verified run-matrix outputs across time.
     MatrixHistory {
@@ -544,6 +548,8 @@ fn main() -> Result<()> {
                 false,
                 false,
                 false,
+                1,
+                false,
             )?;
             let suite = validate_run_matrix_request(&request)?;
             println!(
@@ -566,6 +572,8 @@ fn main() -> Result<()> {
             force,
             keep_workdirs,
             fail_on_regression,
+            health_min_commits,
+            allow_dirty_health,
         } => {
             let request = build_run_matrix_request(
                 config.as_deref(),
@@ -578,6 +586,8 @@ fn main() -> Result<()> {
                 force,
                 keep_workdirs,
                 fail_on_regression,
+                health_min_commits,
+                allow_dirty_health,
             )?;
             run_matrix(&request)?;
             println!("wrote {}", request.out_dir.display());
@@ -2062,6 +2072,7 @@ struct RunMatrixManifestRun {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RunMatrixManifestArtifacts {
+    suite_health_json: String,
     benchmark_summary_json: String,
     benchmark_summary_markdown: String,
     quality_gate_json: String,
@@ -2147,6 +2158,8 @@ struct RunMatrixRequest {
     force: bool,
     keep_workdirs: bool,
     fail_on_regression: bool,
+    health_min_commits: u64,
+    allow_dirty_health: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2164,6 +2177,10 @@ struct RunMatrixConfig {
     keep_workdirs: Option<bool>,
     #[serde(default)]
     fail_on_regression: Option<bool>,
+    #[serde(default)]
+    health_min_commits: Option<u64>,
+    #[serde(default)]
+    allow_dirty_health: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -2210,6 +2227,8 @@ fn build_run_matrix_request(
     force: bool,
     keep_workdirs: bool,
     fail_on_regression: bool,
+    health_min_commits: u64,
+    allow_dirty_health: bool,
 ) -> Result<RunMatrixRequest> {
     let config = config_path
         .map(load_run_matrix_config)
@@ -2268,6 +2287,19 @@ fn build_run_matrix_request(
             .as_ref()
             .and_then(|config| config.fail_on_regression)
             .unwrap_or(false);
+    let health_min_commits = if health_min_commits != 1 {
+        health_min_commits
+    } else {
+        config
+            .as_ref()
+            .and_then(|config| config.health_min_commits)
+            .unwrap_or(1)
+    };
+    let allow_dirty_health = allow_dirty_health
+        || config
+            .as_ref()
+            .and_then(|config| config.allow_dirty_health)
+            .unwrap_or(false);
 
     validate_run_matrix_specs(&baseline, &heads)?;
     Ok(RunMatrixRequest {
@@ -2280,6 +2312,8 @@ fn build_run_matrix_request(
         force,
         keep_workdirs,
         fail_on_regression,
+        health_min_commits,
+        allow_dirty_health,
     })
 }
 
@@ -2373,6 +2407,23 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         .with_context(|| format!("create {}", reports_dir.display()))?;
     std::fs::create_dir_all(&docs_dir).with_context(|| format!("create {}", docs_dir.display()))?;
 
+    let suite_health = suite_health_report(
+        None,
+        &request.repo,
+        request.health_min_commits,
+        request.allow_dirty_health,
+        &suite,
+        &[],
+    )?;
+    let suite_health_json_path = reports_dir.join("suite-health.json");
+    write_json(&suite_health, &suite_health_json_path)?;
+    if !suite_health.ok {
+        anyhow::bail!(
+            "run-matrix suite health check failed; wrote source-free health report to {}",
+            suite_health_json_path.display()
+        );
+    }
+
     let baseline_result = run_matrix_spec(
         &suite,
         &request.repo,
@@ -2453,7 +2504,7 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
     let evidence_dir = out_dir.join("evidence");
     write_evidence_bundle(
         &request.suite_path,
-        None,
+        Some(&suite_health_json_path),
         &baseline_result.report_path,
         &head_report_paths,
         &evidence_dir,
@@ -2465,6 +2516,7 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         request,
         &baseline_result,
         &head_results,
+        &suite_health_json_path,
         &summary_json_path,
         &docs_dir.join("benchmark-summary.md"),
         &quality_gate_json_path,
@@ -2489,6 +2541,7 @@ fn build_run_matrix_manifest(
     request: &RunMatrixRequest,
     baseline: &RunMatrixResult,
     heads: &[RunMatrixResult],
+    suite_health_json: &Path,
     benchmark_summary_json: &Path,
     benchmark_summary_markdown: &Path,
     quality_gate_json: &Path,
@@ -2510,6 +2563,7 @@ fn build_run_matrix_manifest(
             .map(|head| run_matrix_manifest_run(&request.out_dir, head))
             .collect(),
         artifacts: RunMatrixManifestArtifacts {
+            suite_health_json: manifest_path(&request.out_dir, suite_health_json),
             benchmark_summary_json: manifest_path(&request.out_dir, benchmark_summary_json),
             benchmark_summary_markdown: manifest_path(&request.out_dir, benchmark_summary_markdown),
             quality_gate_json: manifest_path(&request.out_dir, quality_gate_json),
@@ -2596,6 +2650,7 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     }
 
     let artifact_paths = [
+        &manifest.artifacts.suite_health_json,
         &manifest.artifacts.benchmark_summary_json,
         &manifest.artifacts.benchmark_summary_markdown,
         &manifest.artifacts.quality_gate_json,
@@ -2607,6 +2662,9 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     for path in artifact_paths {
         require_matrix_file(matrix_dir, path)?;
     }
+    let suite_health_path = matrix_path(matrix_dir, &manifest.artifacts.suite_health_json)?;
+    validate_public_suite_health(&suite_health_path)
+        .with_context(|| format!("validate suite health {}", suite_health_path.display()))?;
 
     let evidence_manifest = matrix_path(matrix_dir, &manifest.artifacts.evidence_manifest)?;
     let evidence_dir = evidence_manifest
@@ -4680,6 +4738,8 @@ mod tests {
             false,
             false,
             true,
+            1,
+            false,
         )
         .expect("matrix request");
         run_matrix(&request).expect("run matrix");
@@ -4693,12 +4753,14 @@ mod tests {
         assert!(out.join("reports/native.json").exists());
         assert!(out.join("reports/guided.json").exists());
         assert!(out.join("reports/compare-guided.json").exists());
+        assert!(out.join("reports/suite-health.json").exists());
         assert!(out.join("reports/benchmark-summary.json").exists());
         assert!(out.join("reports/quality-gate.json").exists());
         assert!(out.join("docs/compare-guided.md").exists());
         assert!(out.join("docs/benchmark-summary.md").exists());
         assert!(out.join("docs/native-autopsy.md").exists());
         assert!(out.join("docs/dashboard.html").exists());
+        assert!(out.join("evidence/health.json").exists());
         assert!(out.join("evidence/manifest.json").exists());
         assert!(out.join("matrix-manifest.json").exists());
         verify_evidence_bundle(&out.join("evidence")).expect("verify evidence");
@@ -4710,6 +4772,11 @@ mod tests {
         let gate = std::fs::read_to_string(out.join("reports/quality-gate.json")).expect("gate");
         let gate = serde_json::from_str::<serde_json::Value>(&gate).expect("json");
         assert_eq!(gate["passed"], true);
+        let health =
+            std::fs::read_to_string(out.join("reports/suite-health.json")).expect("health");
+        let health = serde_json::from_str::<serde_json::Value>(&health).expect("json");
+        assert_eq!(health["ok"], true);
+        assert_eq!(health["privacy"]["sourceFree"], true);
 
         let traces = load_traces(&out.join("traces/guided")).expect("guided traces");
         assert!(traces.iter().all(|trace| trace.token_estimate == Some(321)));
@@ -4734,6 +4801,10 @@ mod tests {
         assert_eq!(manifest["qualityGatePassed"], true);
         assert_eq!(manifest["evidenceBundleVerified"], true);
         assert_eq!(manifest["privacy"]["sourceFree"], true);
+        assert_eq!(
+            manifest["artifacts"]["suiteHealthJson"],
+            "reports/suite-health.json"
+        );
         assert_eq!(
             manifest["artifacts"]["benchmarkSummaryJson"],
             "reports/benchmark-summary.json"
@@ -4803,6 +4874,8 @@ mod tests {
                 "outDir": "matrix-out",
                 "setupCommands": ["printf setup >/dev/null"],
                 "failOnRegression": true,
+                "healthMinCommits": 2,
+                "allowDirtyHealth": true,
                 "baseline": {
                     "name": "native",
                     "agent": "demo-baseline",
@@ -4836,6 +4909,8 @@ mod tests {
             true,
             false,
             false,
+            1,
+            false,
         )
         .expect("request");
 
@@ -4844,6 +4919,8 @@ mod tests {
         assert_eq!(request.out_dir, PathBuf::from("matrix-out"));
         assert!(request.force);
         assert!(request.fail_on_regression);
+        assert_eq!(request.health_min_commits, 2);
+        assert!(request.allow_dirty_health);
         assert_eq!(request.setup_commands, vec!["printf setup >/dev/null"]);
         assert_eq!(request.baseline.safe_name, "native");
         assert_eq!(request.heads[0].safe_name, "ctxhelm");
@@ -4875,6 +4952,8 @@ mod tests {
             false,
             true,
             true,
+            3,
+            false,
         )
         .expect("override request");
         assert_eq!(
@@ -4891,6 +4970,8 @@ mod tests {
         );
         assert!(override_request.keep_workdirs);
         assert!(override_request.fail_on_regression);
+        assert_eq!(override_request.health_min_commits, 3);
+        assert!(override_request.allow_dirty_health);
     }
 
     #[test]
@@ -4932,6 +5013,8 @@ mod tests {
             Vec::new(),
             false,
             false,
+            false,
+            1,
             false,
         )
         .expect("request");

@@ -38,6 +38,8 @@ Config format:
   "outDir": ".helmbench/matrix-demo",
   "setupCommands": [],
   "failOnRegression": true,
+  "healthMinCommits": 1,
+  "allowDirtyHealth": false,
   "baseline": {
     "name": "native",
     "agent": "demo-baseline",
@@ -59,9 +61,15 @@ Config format:
 ```
 
 CLI values override `suite`, `repo`, `outDir`, `baseline`, and `heads` when
-provided. `setupCommands` from the config run before additional
+provided. `healthMinCommits` and `allowDirtyHealth` control the matrix
+suite-health gate. `setupCommands` from the config run before additional
 `--setup-command` values. Config paths are resolved from the current working
 directory.
+
+Before any agent row executes, `run-matrix` writes `reports/suite-health.json`
+and fails if the suite/repo preflight is unhealthy. This keeps publishable
+matrix evidence tied to a checked git repo, expected file/test existence,
+success-command coverage, and source-free privacy flags.
 
 Run specs use comma-separated `key=value` fields:
 
@@ -98,6 +106,7 @@ source-free baseline trace.
 │   ├── native/
 │   └── guided/
 ├── reports/
+│   ├── suite-health.json
 │   ├── native.json
 │   ├── guided.json
 │   ├── compare-guided.json
@@ -110,13 +119,14 @@ source-free baseline trace.
 │   ├── native-autopsy.md
 │   └── dashboard.html
 └── evidence/
+    ├── health.json
     └── manifest.json
 ```
 
 `matrix-manifest.json` is the top-level source-free run identity. It records the
 suite path, repo path, baseline/head run labels, relative report and trace
-paths, key artifact paths, quality-gate status, evidence-bundle verification
-status, and source-free privacy flags.
+paths, suite-health artifact, key artifact paths, quality-gate status,
+evidence-bundle verification status, and source-free privacy flags.
 
 Verify the bundle before publishing:
 
@@ -129,8 +139,8 @@ helmbench verify-bundle \
 ```
 
 `verify-matrix` validates `matrix-manifest.json`, checks that every referenced
-report, trace directory, Markdown/HTML artifact, and evidence manifest exists,
-and then verifies the nested evidence bundle hashes.
+report, trace directory, suite-health artifact, Markdown/HTML artifact, and
+evidence manifest exists, and then verifies the nested evidence bundle hashes.
 
 Use `--fail-on-regression` when this command runs in CI and should exit
 non-zero if the default quality gate fails.

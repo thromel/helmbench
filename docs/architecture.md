@@ -29,13 +29,19 @@ tested without external agents or network access.
 `run-matrix` is the main orchestration command for real eval runs. It executes
 one baseline plus one or more local adapter variants over the same suite, then
 writes per-run reports, pairwise comparisons, a benchmark summary, quality
-gate, baseline autopsy, dashboard, and verifiable evidence bundle.
+gate, suite-health report, baseline autopsy, dashboard, and verifiable evidence
+bundle.
 
 `suite-health` is the preflight check for custom benchmark suites. It verifies
 that expected files and tests exist in the target repo, every task has a
 validation command, git metadata is readable, and the checkout is clean unless
 explicitly allowed. The resulting health report is source-free and can be
 included in evidence bundles.
+
+`run-matrix` runs the same suite-health check before launching any row. The
+health JSON is saved under `reports/suite-health.json`, referenced from
+`matrix-manifest.json`, and copied into the evidence bundle as `health.json` so
+published matrix artifacts carry their own source-free preflight proof.
 
 ## Source-Free Trace Model
 

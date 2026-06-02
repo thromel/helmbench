@@ -45,7 +45,7 @@ This repository currently implements the core HelmBench workflow:
   quality gate, and evidence bundle
 - `run-matrix` benchmark coordinator that runs one baseline plus one or more
   local adapter variants and emits reports, comparisons, dashboard, quality
-  gate, autopsy, and evidence bundle artifacts
+  gate, suite-health, autopsy, and evidence bundle artifacts
 - `matrix-history` longitudinal comparison and static HTML trend dashboards for
   verified run-matrix outputs
 - GitHub release workflow with packaged binaries, SHA-256 checksums, and
@@ -156,8 +156,9 @@ HELMBENCH_BIN=$(pwd)/target/debug/helmbench \
 ```
 
 Every successful matrix run writes `matrix-manifest.json`, a source-free
-top-level index of run labels, report paths, dashboard/evidence artifacts,
-quality-gate status, and evidence verification status.
+top-level index of run labels, suite-health, report paths,
+dashboard/evidence artifacts, quality-gate status, and evidence verification
+status.
 Use `verify-matrix --matrix <out-dir>` to validate the manifest, referenced
 artifacts, and nested evidence bundle before publishing results.
 
