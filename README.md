@@ -53,7 +53,8 @@ This repository currently implements the core HelmBench workflow:
 - GitHub release workflow with packaged binaries, SHA-256 checksums, and
   provenance attestations
 - `benchmark-summary` reports that compare one baseline against multiple
-  source-free variant reports
+  source-free variant reports, including confidence intervals and low-sample
+  warnings
 - `evidence-bundle` packaging for source-free suites, health reports, run
   reports, benchmark summaries, and artifact hashes
 - `verify-bundle` validation for source-free evidence manifests, safe artifact
@@ -452,6 +453,8 @@ pollute ctxhelm recommendation quality.
 | Metric | Meaning |
 | --- | --- |
 | Task success | Whether the trace reports success, failure, or skip. |
+| 95% confidence intervals | Wilson score intervals for binary per-task rates in benchmark summaries. |
+| Low-sample warning | Whether a benchmark suite has fewer than the recommended 10 tasks. |
 | Files read | Source-free paths the agent inspected. |
 | Irrelevant file reads | Files read that were not in the expected evidence set. |
 | Recommendation precision | Expected evidence paths divided by recommended paths. |

@@ -9,8 +9,10 @@ pub const TRACE_SCHEMA_VERSION: u32 = 1;
 pub const REPORT_SCHEMA_VERSION: u32 = 1;
 pub const AUTOPSY_SCHEMA_VERSION: u32 = 1;
 pub const DIFF_AUTOPSY_SCHEMA_VERSION: u32 = 1;
-pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 1;
+pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 2;
 pub const QUALITY_GATE_SCHEMA_VERSION: u32 = 1;
+pub const CONFIDENCE_LEVEL_95: f32 = 0.95;
+pub const MIN_RECOMMENDED_BENCHMARK_TASKS: usize = 10;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -253,6 +255,7 @@ pub struct BenchmarkSummaryReport {
     pub baseline: BenchmarkRunSummary,
     pub runs: Vec<BenchmarkRunSummary>,
     pub comparisons: Vec<BenchmarkComparison>,
+    pub confidence: BenchmarkConfidence,
     pub privacy: PrivacyStatus,
 }
 
@@ -262,8 +265,12 @@ pub struct BenchmarkRunSummary {
     pub agent: String,
     pub variant: AgentVariant,
     pub task_count: usize,
+    pub success_count: usize,
     pub success_rate: f32,
+    pub success_rate_interval: ProportionInterval,
+    pub validation_covered_count: usize,
     pub validation_coverage_rate: f32,
+    pub validation_coverage_rate_interval: ProportionInterval,
     pub irrelevant_read_rate: f32,
     pub recommendation_precision: f32,
     pub recommendation_recall: f32,
@@ -289,6 +296,24 @@ pub struct BenchmarkComparison {
     pub verdict: BenchmarkVerdict,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BenchmarkConfidence {
+    pub confidence_level: f32,
+    pub min_recommended_task_count: usize,
+    pub task_count: usize,
+    pub low_sample_warning: bool,
+    pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProportionInterval {
+    pub confidence_level: f32,
+    pub lower: f32,
+    pub upper: f32,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum BenchmarkVerdict {
@@ -304,6 +329,7 @@ pub struct QualityGateReport {
     pub schema_version: u32,
     pub suite_name: String,
     pub passed: bool,
+    pub warnings: Vec<String>,
     pub checks: Vec<QualityGateCheck>,
     pub privacy: PrivacyStatus,
 }
@@ -780,6 +806,7 @@ pub fn build_benchmark_summary(
         baseline: benchmark_run_summary(baseline),
         runs,
         comparisons,
+        confidence: benchmark_confidence(baseline.summary.task_count),
         privacy: PrivacyStatus::source_free(),
     })
 }
@@ -805,12 +832,29 @@ fn report_task_ids(report: &RunReport) -> BTreeSet<String> {
 }
 
 fn benchmark_run_summary(report: &RunReport) -> BenchmarkRunSummary {
+    let validation_covered_count = report
+        .tasks
+        .iter()
+        .filter(|task| task.validation_covered)
+        .count();
     BenchmarkRunSummary {
         agent: report.agent.clone(),
         variant: report.variant.clone(),
         task_count: report.summary.task_count,
+        success_count: report.summary.success_count,
         success_rate: report.summary.success_rate,
+        success_rate_interval: wilson_interval(
+            report.summary.success_count,
+            report.summary.task_count,
+            CONFIDENCE_LEVEL_95,
+        ),
+        validation_covered_count,
         validation_coverage_rate: report.summary.validation_coverage_rate,
+        validation_coverage_rate_interval: wilson_interval(
+            validation_covered_count,
+            report.summary.task_count,
+            CONFIDENCE_LEVEL_95,
+        ),
         irrelevant_read_rate: report.summary.irrelevant_read_rate,
         recommendation_precision: report.summary.average_recommendation_precision,
         recommendation_recall: report.summary.average_recommendation_recall,
@@ -818,6 +862,62 @@ fn benchmark_run_summary(report: &RunReport) -> BenchmarkRunSummary {
         edited_file_recall: report.summary.average_edited_file_recall,
         total_tool_calls: report.summary.total_tool_calls,
         total_token_estimate: report.summary.total_token_estimate,
+    }
+}
+
+fn benchmark_confidence(task_count: usize) -> BenchmarkConfidence {
+    let low_sample_warning = task_count < MIN_RECOMMENDED_BENCHMARK_TASKS;
+    let mut notes = Vec::new();
+    if low_sample_warning {
+        notes.push(format!(
+            "Low sample size: {} task(s). Treat deltas as directional until the suite has at least {} tasks.",
+            task_count, MIN_RECOMMENDED_BENCHMARK_TASKS
+        ));
+    } else {
+        notes.push(format!(
+            "Task count meets the recommended minimum of {} tasks.",
+            MIN_RECOMMENDED_BENCHMARK_TASKS
+        ));
+    }
+    notes.push("Intervals use a Wilson score interval for binary per-task rates.".to_string());
+
+    BenchmarkConfidence {
+        confidence_level: CONFIDENCE_LEVEL_95,
+        min_recommended_task_count: MIN_RECOMMENDED_BENCHMARK_TASKS,
+        task_count,
+        low_sample_warning,
+        notes,
+    }
+}
+
+fn wilson_interval(successes: usize, total: usize, confidence_level: f32) -> ProportionInterval {
+    if total == 0 {
+        return ProportionInterval {
+            confidence_level,
+            lower: 0.0,
+            upper: 0.0,
+        };
+    }
+
+    let z = match (confidence_level * 100.0).round() as u32 {
+        90 => 1.644_854_f64,
+        95 => 1.959_964_f64,
+        99 => 2.575_829_f64,
+        _ => 1.959_964_f64,
+    };
+    let n = total as f64;
+    let p = successes as f64 / n;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = p + z2 / (2.0 * n);
+    let margin = z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt());
+    let lower = ((center - margin) / denominator).clamp(0.0, 1.0);
+    let upper = ((center + margin) / denominator).clamp(0.0, 1.0);
+
+    ProportionInterval {
+        confidence_level,
+        lower: lower as f32,
+        upper: upper as f32,
     }
 }
 
@@ -1159,18 +1259,34 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
         "Baseline: **{} / {:?}**\n\n",
         report.baseline.agent, report.baseline.variant
     ));
+    out.push_str("## Confidence\n\n");
+    out.push_str(&format!(
+        "- Confidence level: `{:.0}%`\n- Tasks: `{}`\n- Recommended minimum tasks: `{}`\n- Low sample warning: `{}`\n\n",
+        pct(report.confidence.confidence_level),
+        report.confidence.task_count,
+        report.confidence.min_recommended_task_count,
+        report.confidence.low_sample_warning
+    ));
+    for note in &report.confidence.notes {
+        out.push_str(&format!("- {}\n", note));
+    }
+    out.push('\n');
 
     out.push_str("## Runs\n\n");
-    out.push_str("| Run | Tasks | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | Tools | Tokens |\n");
-    out.push_str("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    out.push_str("| Run | Tasks | Success | 95% CI | Validation | 95% CI | Rec recall | Context precision | Edited recall | Irrelevant reads | Tools | Tokens |\n");
+    out.push_str(
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n",
+    );
     for run in &report.runs {
         out.push_str(&format!(
-            "| {} / {:?} | {} | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {} | {} |\n",
+            "| {} / {:?} | {} | {:.1}% | {} | {:.1}% | {} | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {} | {} |\n",
             run.agent,
             run.variant,
             run.task_count,
             pct(run.success_rate),
+            format_interval(&run.success_rate_interval),
             pct(run.validation_coverage_rate),
+            format_interval(&run.validation_coverage_rate_interval),
             pct(run.recommendation_recall),
             pct(run.context_precision),
             pct(run.edited_file_recall),
@@ -1290,9 +1406,18 @@ pub fn evaluate_quality_gate(
         schema_version: QUALITY_GATE_SCHEMA_VERSION,
         suite_name: summary.suite_name.clone(),
         passed: checks.iter().all(|check| check.passed),
+        warnings: quality_gate_warnings(summary),
         checks,
         privacy: PrivacyStatus::source_free(),
     })
+}
+
+fn quality_gate_warnings(summary: &BenchmarkSummaryReport) -> Vec<String> {
+    if summary.confidence.low_sample_warning {
+        summary.confidence.notes.clone()
+    } else {
+        Vec::new()
+    }
 }
 
 fn push_min_check(
@@ -1388,6 +1513,12 @@ pub fn render_markdown_quality_gate(report: &QualityGateReport) -> String {
             check.actual,
             if check.passed { "pass" } else { "fail" }
         ));
+    }
+    if !report.warnings.is_empty() {
+        out.push_str("\n## Warnings\n\n");
+        for warning in &report.warnings {
+            out.push_str(&format!("- {}\n", warning));
+        }
     }
     out.push_str("\n## Privacy\n\n");
     out.push_str("- Source-free: `true`\n");
@@ -1806,6 +1937,13 @@ pub fn read_benchmark_summary(path: &Path) -> Result<BenchmarkSummaryReport> {
     let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     let report = serde_json::from_str::<BenchmarkSummaryReport>(&raw)
         .with_context(|| format!("parse benchmark summary {}", path.display()))?;
+    if report.schema_version != BENCHMARK_SUMMARY_SCHEMA_VERSION {
+        bail!(
+            "unsupported benchmark summary schemaVersion {}; expected {}",
+            report.schema_version,
+            BENCHMARK_SUMMARY_SCHEMA_VERSION
+        );
+    }
     if !report.privacy.source_free
         || report.privacy.raw_source_logged
         || report.privacy.raw_prompt_logged
@@ -2609,6 +2747,10 @@ fn pct(value: f32) -> f32 {
     value * 100.0
 }
 
+fn format_interval(interval: &ProportionInterval) -> String {
+    format!("{:.1}-{:.1}%", pct(interval.lower), pct(interval.upper))
+}
+
 fn stable_hash(value: &str) -> String {
     let mut hash = 0xcbf29ce484222325u64;
     for byte in value.as_bytes() {
@@ -2770,6 +2912,21 @@ mod tests {
         assert_eq!(summary.suite_name, "example-auth-bugs");
         assert_eq!(summary.runs.len(), 2);
         assert_eq!(summary.comparisons.len(), 1);
+        assert_eq!(summary.confidence.confidence_level, CONFIDENCE_LEVEL_95);
+        assert!(summary.confidence.low_sample_warning);
+        assert_eq!(
+            summary.confidence.min_recommended_task_count,
+            MIN_RECOMMENDED_BENCHMARK_TASKS
+        );
+        assert_eq!(summary.runs[0].success_count, 0);
+        assert_eq!(summary.runs[1].success_count, 1);
+        assert_eq!(summary.runs[1].validation_covered_count, 1);
+        assert_eq!(
+            summary.runs[1].success_rate_interval.confidence_level,
+            CONFIDENCE_LEVEL_95
+        );
+        assert!(summary.runs[1].success_rate_interval.lower >= 0.0);
+        assert!(summary.runs[1].success_rate_interval.upper <= 1.0);
         assert_eq!(summary.comparisons[0].success_rate_delta, 1.0);
         assert_eq!(summary.comparisons[0].total_tool_calls_delta, -3);
         assert_eq!(summary.comparisons[0].total_token_estimate_delta, -1500);
@@ -2777,6 +2934,9 @@ mod tests {
 
         let markdown = render_markdown_benchmark_summary(&summary);
         assert!(markdown.contains("HelmBench Benchmark Summary"));
+        assert!(markdown.contains("Confidence"));
+        assert!(markdown.contains("Low sample warning"));
+        assert!(markdown.contains("95% CI"));
         assert!(markdown.contains("Deltas From Baseline"));
         assert!(markdown.contains("Improved"));
     }
@@ -2882,7 +3042,10 @@ mod tests {
         )
         .expect("gate");
         assert!(pass.passed);
+        assert!(!pass.warnings.is_empty());
+        assert!(pass.warnings[0].contains("Low sample size"));
         assert!(render_markdown_quality_gate(&pass).contains("Status: **passed**"));
+        assert!(render_markdown_quality_gate(&pass).contains("Warnings"));
 
         let fail = evaluate_quality_gate(
             &summary,

@@ -157,6 +157,10 @@ The summary artifact includes:
 
 - one baseline run summary;
 - one row per source-free run report;
+- 95% Wilson score intervals for binary per-task rates such as task success
+  and validation coverage;
+- a low-sample warning when the suite has fewer than 10 tasks, so directional
+  early results are not presented as high-confidence proof;
 - deltas from baseline for success, validation, recommendation recall, context
   precision, edited-file recall, irrelevant reads, tool calls, and token
   estimate;
@@ -189,6 +193,8 @@ if any check fails.
 Default thresholds require no regression in success rate, validation coverage,
 recommendation recall, context precision, edited-file recall, or irrelevant read
 rate. Optional thresholds can also cap tool-call and token deltas.
+Quality-gate reports preserve benchmark-summary confidence warnings; a gate can
+pass while still warning that the suite is too small for strong claims.
 
 This is the command to use when ctxhelm changes should be blocked unless they
 preserve or improve agent behavior on a suite.

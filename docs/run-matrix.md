@@ -128,6 +128,11 @@ suite path, repo path, baseline/head run labels, relative report and trace
 paths, suite-health artifact, key artifact paths, quality-gate status,
 evidence-bundle verification status, and source-free privacy flags.
 
+`reports/benchmark-summary.json` includes confidence metadata. HelmBench writes
+95% Wilson score intervals for success and validation coverage and warns when a
+suite has fewer than 10 tasks, so small demo runs are clearly marked as
+directional evidence.
+
 Verify the bundle before publishing:
 
 ```bash
