@@ -50,6 +50,16 @@ instructions.
 
 ## Quickstart
 
+Run the local verification contract:
+
+```bash
+./scripts/verify.sh
+```
+
+This runs formatting, tests, clippy, CLI help checks, the reproducible demo
+benchmark, dashboard generation, benchmark summary generation, evidence bundle
+generation, and whitespace checks. GitHub Actions runs the same script.
+
 Create an example suite:
 
 ```bash
