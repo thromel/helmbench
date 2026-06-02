@@ -131,6 +131,32 @@ and then verifies the nested evidence bundle hashes.
 Use `--fail-on-regression` when this command runs in CI and should exit
 non-zero if the default quality gate fails.
 
+## Longitudinal History
+
+Use `matrix-history` to compare verified matrix outputs across repeated runs:
+
+```bash
+helmbench matrix-history \
+  --matrix /tmp/helmbench-matrix-week-1 \
+  --matrix /tmp/helmbench-matrix-week-2 \
+  --out /tmp/helmbench-matrix-history.md
+
+helmbench matrix-history \
+  --matrix /tmp/helmbench-matrix-week-1 \
+  --matrix /tmp/helmbench-matrix-week-2 \
+  --format json \
+  --out /tmp/helmbench-matrix-history.json
+```
+
+The command verifies every matrix first, loads each matrix's
+`reports/benchmark-summary.json`, requires matching suite and run names, and
+reports first-to-last deltas for success, validation coverage, recommendation
+recall, context precision, edited-file recall, irrelevant reads, tool calls,
+and token estimates.
+
+The history report is source-free. It does not include raw source, prompts,
+transcripts, terminal logs, MCP payloads, or absolute local matrix paths.
+
 ## ctxhelm Row
 
 ```bash

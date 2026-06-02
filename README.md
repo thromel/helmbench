@@ -41,6 +41,7 @@ This repository currently implements the core HelmBench workflow:
 - `run-matrix` benchmark coordinator that runs one baseline plus one or more
   local adapter variants and emits reports, comparisons, dashboard, quality
   gate, autopsy, and evidence bundle artifacts
+- `matrix-history` longitudinal comparison for verified run-matrix outputs
 - `benchmark-summary` reports that compare one baseline against multiple
   source-free variant reports
 - `evidence-bundle` packaging for source-free suites, health reports, run
@@ -111,6 +112,11 @@ cargo run -- run-matrix \
 
 cargo run -- verify-bundle \
   --bundle /tmp/helmbench-matrix/evidence
+
+cargo run -- matrix-history \
+  --matrix /tmp/helmbench-matrix-week-1 \
+  --matrix /tmp/helmbench-matrix-week-2 \
+  --out /tmp/helmbench-matrix-history.md
 ```
 
 For repeatable runs, put the matrix definition in JSON:
@@ -474,9 +480,11 @@ helmbench-cli
   record-event
   compare
   benchmark-summary
+  matrix-history
   quality-gate
   evidence-bundle
   verify-bundle
+  verify-matrix
   autopsy
   dashboard
   doctor
@@ -499,4 +507,4 @@ future direct-agent adapters
 
 1. Add Cursor direct-run preset when a stable non-interactive launch contract is available.
 2. Add more public benchmark presets with source-free fixture health checks.
-3. Add longitudinal matrix comparison for repeated runs over time.
+3. Add signed release artifacts and installation docs for public use.

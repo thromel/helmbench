@@ -148,6 +148,19 @@ The summary artifact includes:
 This is the artifact to publish when showing whether ctxhelm made an agent
 better, cheaper, or less wasteful across a benchmark suite.
 
+## Matrix History
+
+`matrix-history` compares two or more verified `run-matrix` output directories
+over time. It verifies every matrix, reads each matrix's source-free
+`reports/benchmark-summary.json`, requires the suite and run names to match,
+and reports first-to-last deltas for success, validation coverage,
+recommendation recall, context precision, edited-file recall, irrelevant reads,
+tool calls, and token estimates.
+
+The report intentionally does not echo absolute matrix paths. It uses
+source-free sequence labels so a published history artifact can show trend
+evidence without leaking local checkout locations.
+
 ## Quality Gate
 
 `quality-gate` turns a benchmark summary into a CI decision. It reads a

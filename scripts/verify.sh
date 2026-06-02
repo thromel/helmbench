@@ -20,6 +20,7 @@ cargo run -- --help >/dev/null
 cargo run -- demo-run --help >/dev/null
 cargo run -- validate-matrix --help >/dev/null
 cargo run -- run-matrix --help >/dev/null
+cargo run -- matrix-history --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
 cargo run -- benchmark-summary --help >/dev/null
 cargo run -- evidence-bundle --help >/dev/null
@@ -145,12 +146,25 @@ cargo run -- verify-bundle \
 cargo run -- verify-matrix \
   --matrix "$TMP_DIR/matrix-config"
 
+cargo run -- matrix-history \
+  --matrix "$TMP_DIR/matrix" \
+  --matrix "$TMP_DIR/matrix-config" \
+  --out "$TMP_DIR/matrix-history.md"
+
+cargo run -- matrix-history \
+  --matrix "$TMP_DIR/matrix" \
+  --matrix "$TMP_DIR/matrix-config" \
+  --format json \
+  --out "$TMP_DIR/matrix-history.json"
+
 test -f "$TMP_DIR/report.json"
 test -f "$TMP_DIR/autopsy.md"
 test -f "$TMP_DIR/dashboard.html"
 test -f "$TMP_DIR/benchmark-summary.md"
 test -f "$TMP_DIR/benchmark-summary.json"
 test -f "$TMP_DIR/quality-gate.md"
+test -f "$TMP_DIR/matrix-history.md"
+test -f "$TMP_DIR/matrix-history.json"
 test -f "$TMP_DIR/evidence/manifest.json"
 test -f "$TMP_DIR/full-demo/evidence/manifest.json"
 test -f "$TMP_DIR/full-demo/docs/dashboard.html"

@@ -7,11 +7,12 @@ use helmbench::{
     render_markdown_autopsy, render_markdown_benchmark_summary, render_markdown_compare,
     render_markdown_quality_gate, render_markdown_report, trace_from_ctxhelm_prepare_json,
     traces_from_agent_events, validate_agent_event, validate_comparable_reports, validate_suite,
-    write_json, AgentEvent, AgentEventKind, AgentVariant, CommandClass, PrivacyStatus,
-    QualityGateConfig, TaskStatus, TRACE_SCHEMA_VERSION,
+    write_json, AgentEvent, AgentEventKind, AgentVariant, BenchmarkRunSummary,
+    BenchmarkSummaryReport, CommandClass, PrivacyStatus, QualityGateConfig, TaskStatus,
+    TRACE_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::time::{Duration, Instant};
@@ -79,6 +80,15 @@ enum Command {
         keep_workdirs: bool,
         #[arg(long)]
         fail_on_regression: bool,
+    },
+    /// Compare verified run-matrix outputs across time.
+    MatrixHistory {
+        #[arg(long, required = true)]
+        matrix: Vec<PathBuf>,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
+        format: OutputFormat,
     },
     /// Generate a source-free suite from a known public repository fixture.
     InitPublicSuite {
@@ -540,6 +550,23 @@ fn main() -> Result<()> {
             )?;
             run_matrix(&request)?;
             println!("wrote {}", request.out_dir.display());
+        }
+        Command::MatrixHistory {
+            matrix,
+            out,
+            format,
+        } => {
+            let history = build_matrix_history_report(&matrix)?;
+            let rendered = match format {
+                OutputFormat::Json => serde_json::to_string_pretty(&history)?,
+                OutputFormat::Markdown => render_markdown_matrix_history(&history),
+            };
+            if let Some(out) = out {
+                write_text(&rendered, &out)?;
+                println!("wrote {}", out.display());
+            } else {
+                println!("{rendered}");
+            }
         }
         Command::InitPublicSuite {
             preset,
@@ -1798,6 +1825,71 @@ struct RunMatrixManifestArtifacts {
     evidence_manifest: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MatrixHistoryReport {
+    schema_version: u32,
+    suite_name: String,
+    matrices: Vec<MatrixHistoryEntry>,
+    trends: Vec<MatrixRunTrend>,
+    privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MatrixHistoryEntry {
+    matrix_index: usize,
+    label: String,
+    quality_gate_passed: bool,
+    evidence_bundle_verified: bool,
+    runs: Vec<MatrixHistoryRun>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MatrixHistoryRun {
+    name: String,
+    agent: String,
+    variant: AgentVariant,
+    task_count: usize,
+    success_rate: f32,
+    validation_coverage_rate: f32,
+    irrelevant_read_rate: f32,
+    recommendation_recall: f32,
+    context_precision: f32,
+    edited_file_recall: f32,
+    total_tool_calls: u32,
+    total_token_estimate: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct MatrixRunTrend {
+    name: String,
+    agent: String,
+    variant: AgentVariant,
+    first_success_rate: f32,
+    last_success_rate: f32,
+    success_rate_delta: f32,
+    first_validation_coverage_rate: f32,
+    last_validation_coverage_rate: f32,
+    validation_coverage_rate_delta: f32,
+    first_irrelevant_read_rate: f32,
+    last_irrelevant_read_rate: f32,
+    irrelevant_read_rate_delta: f32,
+    first_recommendation_recall: f32,
+    last_recommendation_recall: f32,
+    recommendation_recall_delta: f32,
+    first_context_precision: f32,
+    last_context_precision: f32,
+    context_precision_delta: f32,
+    first_edited_file_recall: f32,
+    last_edited_file_recall: f32,
+    edited_file_recall_delta: f32,
+    total_tool_calls_delta: i64,
+    total_token_estimate_delta: i64,
+}
+
 #[derive(Debug, Clone)]
 struct RunMatrixRequest {
     suite_path: PathBuf,
@@ -2273,6 +2365,254 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     verify_evidence_bundle(evidence_dir)?;
 
     Ok(manifest)
+}
+
+fn build_matrix_history_report(matrix_dirs: &[PathBuf]) -> Result<MatrixHistoryReport> {
+    if matrix_dirs.len() < 2 {
+        anyhow::bail!("matrix-history requires at least two --matrix directories");
+    }
+
+    let mut entries = Vec::with_capacity(matrix_dirs.len());
+    let mut suite_name = None::<String>;
+    let mut expected_run_names = None::<BTreeSet<String>>;
+
+    for (index, matrix_dir) in matrix_dirs.iter().enumerate() {
+        let manifest = verify_run_matrix(matrix_dir)
+            .with_context(|| format!("verify matrix {}", matrix_dir.display()))?;
+        let summary_path = matrix_path(matrix_dir, &manifest.artifacts.benchmark_summary_json)?;
+        let summary = read_benchmark_summary(&summary_path)
+            .with_context(|| format!("read matrix summary {}", matrix_dir.display()))?;
+
+        match &suite_name {
+            Some(expected) if expected != &summary.suite_name => anyhow::bail!(
+                "matrix `{}` suite `{}` does not match first suite `{}`",
+                index + 1,
+                summary.suite_name,
+                expected
+            ),
+            None => suite_name = Some(summary.suite_name.clone()),
+            _ => {}
+        }
+
+        let entry = matrix_history_entry(index + 1, matrix_dir, &manifest, &summary)?;
+        let run_names = entry
+            .runs
+            .iter()
+            .map(|run| run.name.clone())
+            .collect::<BTreeSet<_>>();
+        match &expected_run_names {
+            Some(expected) if expected != &run_names => {
+                anyhow::bail!("matrix `{}` run names do not match first matrix", index + 1)
+            }
+            None => expected_run_names = Some(run_names),
+            _ => {}
+        }
+        entries.push(entry);
+    }
+
+    let trends = matrix_history_trends(&entries)?;
+    Ok(MatrixHistoryReport {
+        schema_version: 1,
+        suite_name: suite_name.unwrap_or_default(),
+        matrices: entries,
+        trends,
+        privacy: PrivacyStatus::source_free(),
+    })
+}
+
+fn matrix_history_entry(
+    matrix_index: usize,
+    matrix_dir: &Path,
+    manifest: &RunMatrixManifest,
+    summary: &BenchmarkSummaryReport,
+) -> Result<MatrixHistoryEntry> {
+    let manifest_runs = std::iter::once(&manifest.baseline)
+        .chain(manifest.heads.iter())
+        .collect::<Vec<_>>();
+    if manifest_runs.len() != summary.runs.len() {
+        anyhow::bail!(
+            "matrix `{}` has {} manifest run(s) but {} summary run(s)",
+            matrix_index,
+            manifest_runs.len(),
+            summary.runs.len()
+        );
+    }
+
+    let runs = manifest_runs
+        .iter()
+        .zip(summary.runs.iter())
+        .map(|(manifest_run, summary_run)| {
+            matrix_history_run(manifest_run, summary_run).with_context(|| {
+                format!(
+                    "match matrix `{}` run `{}`",
+                    matrix_index, manifest_run.name
+                )
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(MatrixHistoryEntry {
+        matrix_index,
+        label: source_free_matrix_label(matrix_index, matrix_dir),
+        quality_gate_passed: manifest.quality_gate_passed,
+        evidence_bundle_verified: manifest.evidence_bundle_verified,
+        runs,
+    })
+}
+
+fn matrix_history_run(
+    manifest_run: &RunMatrixManifestRun,
+    summary_run: &BenchmarkRunSummary,
+) -> Result<MatrixHistoryRun> {
+    if manifest_run.agent != summary_run.agent || manifest_run.variant != summary_run.variant {
+        anyhow::bail!(
+            "manifest run `{}` is {} / {:?}, summary is {} / {:?}",
+            manifest_run.name,
+            manifest_run.agent,
+            manifest_run.variant,
+            summary_run.agent,
+            summary_run.variant
+        );
+    }
+    Ok(MatrixHistoryRun {
+        name: manifest_run.name.clone(),
+        agent: summary_run.agent.clone(),
+        variant: summary_run.variant.clone(),
+        task_count: summary_run.task_count,
+        success_rate: summary_run.success_rate,
+        validation_coverage_rate: summary_run.validation_coverage_rate,
+        irrelevant_read_rate: summary_run.irrelevant_read_rate,
+        recommendation_recall: summary_run.recommendation_recall,
+        context_precision: summary_run.context_precision,
+        edited_file_recall: summary_run.edited_file_recall,
+        total_tool_calls: summary_run.total_tool_calls,
+        total_token_estimate: summary_run.total_token_estimate,
+    })
+}
+
+fn matrix_history_trends(entries: &[MatrixHistoryEntry]) -> Result<Vec<MatrixRunTrend>> {
+    let first = entries
+        .first()
+        .context("matrix history requires a first entry")?;
+    let last = entries
+        .last()
+        .context("matrix history requires a last entry")?;
+    let last_by_name = last
+        .runs
+        .iter()
+        .map(|run| (run.name.as_str(), run))
+        .collect::<BTreeMap<_, _>>();
+
+    first
+        .runs
+        .iter()
+        .map(|first_run| {
+            let last_run = last_by_name
+                .get(first_run.name.as_str())
+                .with_context(|| format!("last matrix missing run `{}`", first_run.name))?;
+            Ok(MatrixRunTrend {
+                name: first_run.name.clone(),
+                agent: first_run.agent.clone(),
+                variant: first_run.variant.clone(),
+                first_success_rate: first_run.success_rate,
+                last_success_rate: last_run.success_rate,
+                success_rate_delta: last_run.success_rate - first_run.success_rate,
+                first_validation_coverage_rate: first_run.validation_coverage_rate,
+                last_validation_coverage_rate: last_run.validation_coverage_rate,
+                validation_coverage_rate_delta: last_run.validation_coverage_rate
+                    - first_run.validation_coverage_rate,
+                first_irrelevant_read_rate: first_run.irrelevant_read_rate,
+                last_irrelevant_read_rate: last_run.irrelevant_read_rate,
+                irrelevant_read_rate_delta: last_run.irrelevant_read_rate
+                    - first_run.irrelevant_read_rate,
+                first_recommendation_recall: first_run.recommendation_recall,
+                last_recommendation_recall: last_run.recommendation_recall,
+                recommendation_recall_delta: last_run.recommendation_recall
+                    - first_run.recommendation_recall,
+                first_context_precision: first_run.context_precision,
+                last_context_precision: last_run.context_precision,
+                context_precision_delta: last_run.context_precision - first_run.context_precision,
+                first_edited_file_recall: first_run.edited_file_recall,
+                last_edited_file_recall: last_run.edited_file_recall,
+                edited_file_recall_delta: last_run.edited_file_recall
+                    - first_run.edited_file_recall,
+                total_tool_calls_delta: last_run.total_tool_calls as i64
+                    - first_run.total_tool_calls as i64,
+                total_token_estimate_delta: last_run.total_token_estimate as i64
+                    - first_run.total_token_estimate as i64,
+            })
+        })
+        .collect()
+}
+
+fn source_free_matrix_label(matrix_index: usize, matrix_dir: &Path) -> String {
+    let basename = matrix_dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(safe_task_dir_name)
+        .filter(|name| !name.is_empty())
+        .unwrap_or_else(|| "matrix".to_string());
+    format!("{}-{}", matrix_index, basename)
+}
+
+fn render_markdown_matrix_history(report: &MatrixHistoryReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "# HelmBench Matrix History: `{}`\n\n",
+        report.suite_name
+    ));
+    out.push_str("## Matrices\n\n");
+    out.push_str("| Matrix | Label | Quality gate | Evidence verified |\n");
+    out.push_str("| ---: | --- | --- | --- |\n");
+    for entry in &report.matrices {
+        out.push_str(&format!(
+            "| {} | `{}` | {} | {} |\n",
+            entry.matrix_index,
+            entry.label,
+            yes_no(entry.quality_gate_passed),
+            yes_no(entry.evidence_bundle_verified)
+        ));
+    }
+
+    out.push_str("\n## First-To-Last Trends\n\n");
+    out.push_str("| Run | Variant | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | Tools | Tokens |\n");
+    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    for trend in &report.trends {
+        out.push_str(&format!(
+            "| `{}` | {} / {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+} | {:+} |\n",
+            trend.name,
+            trend.agent,
+            trend.variant,
+            matrix_pct(trend.success_rate_delta),
+            matrix_pct(trend.validation_coverage_rate_delta),
+            matrix_pct(trend.recommendation_recall_delta),
+            matrix_pct(trend.context_precision_delta),
+            matrix_pct(trend.edited_file_recall_delta),
+            matrix_pct(trend.irrelevant_read_rate_delta),
+            trend.total_tool_calls_delta,
+            trend.total_token_estimate_delta
+        ));
+    }
+
+    out.push_str("\n## Privacy\n\n");
+    out.push_str("- Source-free: `true`\n");
+    out.push_str("- Raw source logged: `false`\n");
+    out.push_str("- Raw prompts logged: `false`\n");
+    out.push_str("- Raw transcripts logged: `false`\n");
+    out.push_str("- Raw terminal logs logged: `false`\n");
+    out
+}
+
+fn matrix_pct(value: f32) -> f32 {
+    value * 100.0
+}
+
+fn yes_no(value: bool) -> &'static str {
+    if value {
+        "yes"
+    } else {
+        "no"
+    }
 }
 
 fn verify_matrix_run(matrix_dir: &Path, run: &RunMatrixManifestRun) -> Result<()> {
@@ -3631,6 +3971,37 @@ mod tests {
         let verified = verify_run_matrix(&out).expect("verify matrix");
         assert_eq!(verified.heads.len(), 1);
         assert!(verified.evidence_bundle_verified);
+
+        let out2 = temp.path().join("matrix-second");
+        let mut request2 = request.clone();
+        request2.out_dir = out2.clone();
+        run_matrix(&request2).expect("second matrix");
+        let summary_path = out2.join("reports/benchmark-summary.json");
+        let mut second_summary =
+            read_benchmark_summary(&summary_path).expect("second benchmark summary");
+        second_summary.runs[1].success_rate = 0.5;
+        second_summary.runs[1].validation_coverage_rate = 0.5;
+        second_summary.runs[1].irrelevant_read_rate = 0.25;
+        second_summary.runs[1].recommendation_recall = 0.5;
+        second_summary.runs[1].context_precision = 0.5;
+        second_summary.runs[1].edited_file_recall = 0.5;
+        second_summary.runs[1].total_tool_calls += 3;
+        second_summary.runs[1].total_token_estimate += 100;
+        write_json(&second_summary, &summary_path).expect("mutated second summary");
+
+        let history =
+            build_matrix_history_report(&[out.clone(), out2.clone()]).expect("matrix history");
+        assert_eq!(history.matrices.len(), 2);
+        assert_eq!(history.trends.len(), 2);
+        assert_eq!(history.trends[1].name, "guided");
+        assert!(history.trends[1].success_rate_delta < 0.0);
+        assert!(history.trends[1].irrelevant_read_rate_delta > 0.0);
+        assert_eq!(history.trends[1].total_tool_calls_delta, 3);
+        assert!(history.privacy.source_free);
+        let rendered = render_markdown_matrix_history(&history);
+        assert!(rendered.contains("First-To-Last Trends"));
+        assert!(rendered.contains("`guided`"));
+        assert!(!rendered.contains(temp.path().to_string_lossy().as_ref()));
 
         let mut tampered = verified;
         tampered.artifacts.dashboard_html = "../dashboard.html".to_string();
