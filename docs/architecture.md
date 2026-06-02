@@ -248,6 +248,12 @@ Autopsy flags:
 This makes trace files useful for reviewer-facing questions such as "what did
 the agent change without inspecting?" and "which validation did it skip?"
 
+`diff-autopsy` covers the weaker but common case where only a git branch or
+worktree diff is available. It collects changed paths with `git status --short`
+or `git diff --name-only`, compares them against one suite task's expected
+source/test paths, and reports overbroad changes or missing expected path
+changes without reading patch hunks.
+
 ## Design Trade-Offs
 
 ### Why source-free first?

@@ -28,6 +28,9 @@ cargo run -- evidence-bundle --help >/dev/null
 cargo run -- verify-bundle --help >/dev/null
 cargo run -- verify-matrix --help >/dev/null
 cargo run -- quality-gate --help >/dev/null
+cargo run -- autopsy --help >/dev/null
+cargo run -- diff-autopsy --help >/dev/null
+cargo run -- dashboard --help >/dev/null
 cargo run -- doctor --repo . >/dev/null
 
 cargo run -- init-demo-repo \
@@ -188,9 +191,28 @@ cargo run -- matrix-history \
   --format html \
   --out "$TMP_DIR/matrix-history.html"
 
+printf '\n# fixed redirect\n' >> "$TMP_DIR/demo-repo/src/auth/session.txt"
+printf '\n# regression coverage\n' >> "$TMP_DIR/demo-repo/tests/auth/session.test.sh"
+
+cargo run -- diff-autopsy \
+  --suite "$TMP_DIR/demo-suite.json" \
+  --repo "$TMP_DIR/demo-repo" \
+  --task-id demo-auth-redirect-001 \
+  --out "$TMP_DIR/diff-autopsy.json" \
+  --format json
+
+cargo run -- diff-autopsy \
+  --suite "$TMP_DIR/demo-suite.json" \
+  --repo "$TMP_DIR/demo-repo" \
+  --task-id demo-auth-redirect-001 \
+  --out "$TMP_DIR/diff-autopsy.md" \
+  --format markdown
+
 test -f "$TMP_DIR/report.json"
 test -f "$TMP_DIR/stream-report.json"
 test -f "$TMP_DIR/autopsy.md"
+test -f "$TMP_DIR/diff-autopsy.json"
+test -f "$TMP_DIR/diff-autopsy.md"
 test -f "$TMP_DIR/dashboard.html"
 test -f "$TMP_DIR/suite-health.json"
 test -f "$TMP_DIR/suite-health.md"

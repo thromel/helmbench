@@ -1,15 +1,15 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use helmbench::{
-    build_autopsy, build_benchmark_summary, build_report, compare_reports, evaluate_quality_gate,
-    events_from_agent_stream_jsonl, example_suite, load_agent_events, load_suite, load_traces,
-    project_root_for_cli, read_benchmark_summary, read_report, render_html_dashboard,
-    render_markdown_autopsy, render_markdown_benchmark_summary, render_markdown_compare,
-    render_markdown_quality_gate, render_markdown_report, trace_from_ctxhelm_prepare_json,
-    traces_from_agent_events, validate_agent_event, validate_comparable_reports, validate_suite,
-    write_json, AgentEvent, AgentEventKind, AgentVariant, BenchmarkRunSummary,
-    BenchmarkSummaryReport, CommandClass, PrivacyStatus, QualityGateConfig, TaskStatus,
-    TRACE_SCHEMA_VERSION,
+    build_autopsy, build_benchmark_summary, build_diff_autopsy, build_report, compare_reports,
+    evaluate_quality_gate, events_from_agent_stream_jsonl, example_suite, load_agent_events,
+    load_suite, load_traces, project_root_for_cli, read_benchmark_summary, read_report,
+    render_html_dashboard, render_markdown_autopsy, render_markdown_benchmark_summary,
+    render_markdown_compare, render_markdown_diff_autopsy, render_markdown_quality_gate,
+    render_markdown_report, trace_from_ctxhelm_prepare_json, traces_from_agent_events,
+    validate_agent_event, validate_comparable_reports, validate_suite, write_json, AgentEvent,
+    AgentEventKind, AgentVariant, BenchmarkRunSummary, BenchmarkSummaryReport, CommandClass,
+    PrivacyStatus, QualityGateConfig, TaskStatus, TRACE_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -398,6 +398,23 @@ enum Command {
         suite: PathBuf,
         #[arg(long)]
         trace_dir: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
+        format: OutputFormat,
+    },
+    /// Diagnose a source-free git diff against one benchmark task.
+    DiffAutopsy {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        repo: PathBuf,
+        #[arg(long)]
+        task_id: String,
+        #[arg(long, default_value = "HEAD")]
+        base_ref: String,
+        #[arg(long)]
+        head_ref: Option<String>,
         #[arg(long)]
         out: PathBuf,
         #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
@@ -1094,6 +1111,36 @@ fn main() -> Result<()> {
             match format {
                 OutputFormat::Json => write_json(&autopsy, &out)?,
                 OutputFormat::Markdown => write_text(&render_markdown_autopsy(&autopsy), &out)?,
+            }
+            println!("wrote {}", out.display());
+        }
+        Command::DiffAutopsy {
+            suite,
+            repo,
+            task_id,
+            base_ref,
+            head_ref,
+            out,
+            format,
+        } => {
+            let suite = load_suite(&suite)?;
+            let changed_files = if let Some(head_ref) = &head_ref {
+                git_diff_paths(&repo, &base_ref, head_ref)?
+            } else {
+                git_changed_paths(&repo)?
+            };
+            let autopsy = build_diff_autopsy(
+                &suite,
+                &task_id,
+                &changed_files,
+                &base_ref,
+                head_ref.as_deref(),
+            )?;
+            match format {
+                OutputFormat::Json => write_json(&autopsy, &out)?,
+                OutputFormat::Markdown => {
+                    write_text(&render_markdown_diff_autopsy(&autopsy), &out)?
+                }
             }
             println!("wrote {}", out.display());
         }
@@ -4444,6 +4491,48 @@ fn git_changed_paths(repo: &Path) -> Result<Vec<String>> {
             .map_or(raw_path, |(_, new_path)| new_path)
             .trim_matches('"');
         if path.starts_with(".helmbench/") {
+            continue;
+        }
+        helmbench::validate_safe_relative_path_for_cli(path)?;
+        paths.push(path.to_string());
+    }
+    paths.sort();
+    paths.dedup();
+    Ok(paths)
+}
+
+fn git_diff_paths(repo: &Path, base_ref: &str, head_ref: &str) -> Result<Vec<String>> {
+    if base_ref.trim().is_empty() {
+        anyhow::bail!("base ref must not be empty");
+    }
+    if head_ref.trim().is_empty() {
+        anyhow::bail!("head ref must not be empty");
+    }
+    let output = ProcessCommand::new("git")
+        .arg("-C")
+        .arg(repo)
+        .arg("diff")
+        .arg("--name-only")
+        .arg("--diff-filter=ACMRTUXB")
+        .arg(base_ref)
+        .arg(head_ref)
+        .output()
+        .with_context(|| {
+            format!(
+                "git diff --name-only {} {} in {}",
+                base_ref,
+                head_ref,
+                repo.display()
+            )
+        })?;
+    if !output.status.success() {
+        anyhow::bail!("git diff failed with status {:?}", output.status.code());
+    }
+    let stdout = String::from_utf8(output.stdout).context("git diff utf8")?;
+    let mut paths = Vec::new();
+    for line in stdout.lines() {
+        let path = line.trim();
+        if path.is_empty() || path.starts_with(".helmbench/") {
             continue;
         }
         helmbench::validate_safe_relative_path_for_cli(path)?;

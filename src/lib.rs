@@ -8,6 +8,7 @@ pub const SUITE_SCHEMA_VERSION: u32 = 1;
 pub const TRACE_SCHEMA_VERSION: u32 = 1;
 pub const REPORT_SCHEMA_VERSION: u32 = 1;
 pub const AUTOPSY_SCHEMA_VERSION: u32 = 1;
+pub const DIFF_AUTOPSY_SCHEMA_VERSION: u32 = 1;
 pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 1;
 pub const QUALITY_GATE_SCHEMA_VERSION: u32 = 1;
 
@@ -391,6 +392,39 @@ pub struct AutopsyTask {
     pub overbroad_edits: Vec<String>,
     pub validation_gap: bool,
     pub notes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffAutopsyReport {
+    pub schema_version: u32,
+    pub suite_name: String,
+    pub task_id: String,
+    pub base_ref: String,
+    pub head_ref: Option<String>,
+    pub changed_files: Vec<String>,
+    pub expected_files: Vec<String>,
+    pub expected_tests: Vec<String>,
+    pub expected_file_changes: Vec<String>,
+    pub expected_test_changes: Vec<String>,
+    pub expected_files_unchanged: Vec<String>,
+    pub expected_tests_unchanged: Vec<String>,
+    pub overbroad_changes: Vec<String>,
+    pub risk: AutopsyRisk,
+    pub summary: DiffAutopsySummary,
+    pub notes: Vec<String>,
+    pub privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DiffAutopsySummary {
+    pub changed_file_count: usize,
+    pub expected_file_change_count: usize,
+    pub expected_test_change_count: usize,
+    pub expected_files_unchanged_count: usize,
+    pub expected_tests_unchanged_count: usize,
+    pub overbroad_change_count: usize,
 }
 
 pub fn load_suite(path: &Path) -> Result<TaskSuite> {
@@ -904,6 +938,127 @@ pub fn build_autopsy(suite: &TaskSuite, traces: &[AgentTrace]) -> Result<Autopsy
     })
 }
 
+pub fn build_diff_autopsy(
+    suite: &TaskSuite,
+    task_id: &str,
+    changed_files: &[String],
+    base_ref: &str,
+    head_ref: Option<&str>,
+) -> Result<DiffAutopsyReport> {
+    validate_suite(suite)?;
+    if task_id.trim().is_empty() {
+        bail!("task id is required");
+    }
+    if base_ref.trim().is_empty() {
+        bail!("base ref is required");
+    }
+    let task = suite
+        .tasks
+        .iter()
+        .find(|task| task.id == task_id)
+        .with_context(|| format!("suite `{}` does not contain task `{task_id}`", suite.name))?;
+
+    let changed = changed_files
+        .iter()
+        .map(|path| {
+            validate_safe_relative_path(path)?;
+            Ok(path.clone())
+        })
+        .collect::<Result<BTreeSet<_>>>()?;
+    let expected_files = task.expected_files.iter().cloned().collect::<BTreeSet<_>>();
+    let expected_tests = task.expected_tests.iter().cloned().collect::<BTreeSet<_>>();
+    let allowed_changes = expected_files
+        .union(&expected_tests)
+        .cloned()
+        .collect::<BTreeSet<_>>();
+
+    let changed_files = changed.iter().cloned().collect::<Vec<_>>();
+    let expected_files_vec = expected_files.iter().cloned().collect::<Vec<_>>();
+    let expected_tests_vec = expected_tests.iter().cloned().collect::<Vec<_>>();
+    let expected_file_changes = changed
+        .intersection(&expected_files)
+        .cloned()
+        .collect::<Vec<_>>();
+    let expected_test_changes = changed
+        .intersection(&expected_tests)
+        .cloned()
+        .collect::<Vec<_>>();
+    let expected_files_unchanged = expected_files
+        .difference(&changed)
+        .cloned()
+        .collect::<Vec<_>>();
+    let expected_tests_unchanged = expected_tests
+        .difference(&changed)
+        .cloned()
+        .collect::<Vec<_>>();
+    let overbroad_changes = changed
+        .difference(&allowed_changes)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let mut notes = Vec::new();
+    if changed.is_empty() {
+        notes.push("Diff has no changed files.".to_string());
+    }
+    if expected_file_changes.is_empty() {
+        notes.push("Diff does not change any expected source file for this task.".to_string());
+    }
+    if !expected_tests.is_empty() && expected_test_changes.is_empty() {
+        notes.push("Diff does not change any expected test file for this task.".to_string());
+    }
+    if !overbroad_changes.is_empty() {
+        notes.push("Diff changes files outside expected source/test paths.".to_string());
+    }
+    if !expected_files_unchanged.is_empty() {
+        notes.push(
+            "Some expected source files are unchanged; confirm this is intentional.".to_string(),
+        );
+    }
+    if notes.is_empty() {
+        notes.push("No source-free diff autopsy issues detected.".to_string());
+    }
+
+    let risk = if changed.is_empty()
+        || expected_file_changes.is_empty()
+        || !overbroad_changes.is_empty()
+    {
+        AutopsyRisk::High
+    } else if (!expected_tests.is_empty() && expected_test_changes.is_empty())
+        || !expected_files_unchanged.is_empty()
+    {
+        AutopsyRisk::Medium
+    } else {
+        AutopsyRisk::Low
+    };
+
+    Ok(DiffAutopsyReport {
+        schema_version: DIFF_AUTOPSY_SCHEMA_VERSION,
+        suite_name: suite.name.clone(),
+        task_id: task.id.clone(),
+        base_ref: base_ref.to_string(),
+        head_ref: head_ref.map(str::to_string),
+        changed_files,
+        expected_files: expected_files_vec,
+        expected_tests: expected_tests_vec,
+        expected_file_changes: expected_file_changes.clone(),
+        expected_test_changes: expected_test_changes.clone(),
+        expected_files_unchanged: expected_files_unchanged.clone(),
+        expected_tests_unchanged: expected_tests_unchanged.clone(),
+        overbroad_changes: overbroad_changes.clone(),
+        risk,
+        summary: DiffAutopsySummary {
+            changed_file_count: changed.len(),
+            expected_file_change_count: expected_file_changes.len(),
+            expected_test_change_count: expected_test_changes.len(),
+            expected_files_unchanged_count: expected_files_unchanged.len(),
+            expected_tests_unchanged_count: expected_tests_unchanged.len(),
+            overbroad_change_count: overbroad_changes.len(),
+        },
+        notes,
+        privacy: PrivacyStatus::source_free(),
+    })
+}
+
 pub fn render_markdown_report(report: &RunReport) -> String {
     let mut out = String::new();
     out.push_str(&format!(
@@ -1302,6 +1457,70 @@ pub fn render_markdown_autopsy(report: &AutopsyReport) -> String {
     }
 
     out.push_str("\n## Privacy\n\n");
+    out.push_str("- Raw source logged: `false`\n- Raw prompts logged: `false`\n- Raw transcripts logged: `false`\n- Raw terminal logs logged: `false`\n");
+    out
+}
+
+pub fn render_markdown_diff_autopsy(report: &DiffAutopsyReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "# HelmBench Diff Autopsy: `{}`\n\n",
+        report.task_id
+    ));
+    out.push_str("## Summary\n\n");
+    out.push_str(&format!(
+        "- Suite: `{}`\n- Base ref: `{}`\n- Head ref: `{}`\n- Risk: `{:?}`\n- Changed files: `{}`\n- Expected source changes: `{}`\n- Expected test changes: `{}`\n- Overbroad changes: `{}`\n- Source-free: `{}`\n\n",
+        report.suite_name,
+        report.base_ref,
+        report.head_ref.as_deref().unwrap_or("worktree"),
+        report.risk,
+        report.summary.changed_file_count,
+        report.summary.expected_file_change_count,
+        report.summary.expected_test_change_count,
+        report.summary.overbroad_change_count,
+        report.privacy.source_free
+    ));
+
+    out.push_str("## Paths\n\n");
+    out.push_str(&markdown_path_list("Changed files", &report.changed_files));
+    out.push_str(&markdown_path_list(
+        "Expected source files",
+        &report.expected_files,
+    ));
+    out.push_str(&markdown_path_list(
+        "Expected test files",
+        &report.expected_tests,
+    ));
+    out.push_str(&markdown_path_list(
+        "Changed expected source files",
+        &report.expected_file_changes,
+    ));
+    out.push_str(&markdown_path_list(
+        "Changed expected test files",
+        &report.expected_test_changes,
+    ));
+    out.push_str(&markdown_path_list(
+        "Expected source files unchanged",
+        &report.expected_files_unchanged,
+    ));
+    out.push_str(&markdown_path_list(
+        "Expected test files unchanged",
+        &report.expected_tests_unchanged,
+    ));
+    out.push_str(&markdown_path_list(
+        "Overbroad changes",
+        &report.overbroad_changes,
+    ));
+
+    if !report.notes.is_empty() {
+        out.push_str("## Notes\n\n");
+        for note in &report.notes {
+            out.push_str(&format!("- {}\n", note));
+        }
+        out.push('\n');
+    }
+
+    out.push_str("## Privacy\n\n");
     out.push_str("- Raw source logged: `false`\n- Raw prompts logged: `false`\n- Raw transcripts logged: `false`\n- Raw terminal logs logged: `false`\n");
     out
 }
@@ -2980,6 +3199,43 @@ mod tests {
             .changed_without_read
             .contains(&"src/auth/middleware.ts".to_string()));
         assert!(render_markdown_autopsy(&autopsy).contains("Overbroad edits"));
+    }
+
+    #[test]
+    fn diff_autopsy_scores_changed_paths_against_task_expectations() {
+        let suite = example_suite();
+        let clean = build_diff_autopsy(
+            &suite,
+            "auth-redirect-001",
+            &[
+                "src/auth/session.ts".to_string(),
+                "src/auth/middleware.ts".to_string(),
+                "tests/auth/session.test.ts".to_string(),
+            ],
+            "main",
+            Some("feature"),
+        )
+        .expect("clean diff autopsy");
+
+        assert_eq!(clean.risk, AutopsyRisk::Low);
+        assert_eq!(clean.summary.changed_file_count, 3);
+        assert_eq!(clean.summary.expected_file_change_count, 2);
+        assert_eq!(clean.summary.expected_test_change_count, 1);
+        assert_eq!(clean.summary.overbroad_change_count, 0);
+        assert!(clean.privacy.source_free);
+
+        let risky = build_diff_autopsy(
+            &suite,
+            "auth-redirect-001",
+            &["README.md".to_string()],
+            "HEAD",
+            None,
+        )
+        .expect("risky diff autopsy");
+        assert_eq!(risky.risk, AutopsyRisk::High);
+        assert_eq!(risky.overbroad_changes, vec!["README.md"]);
+        assert!(render_markdown_diff_autopsy(&risky).contains("Overbroad changes"));
+        assert!(render_markdown_diff_autopsy(&risky).contains("worktree"));
     }
 
     #[test]

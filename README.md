@@ -48,6 +48,8 @@ This repository currently implements the core HelmBench workflow:
   gate, suite-health, autopsy, and evidence bundle artifacts
 - `matrix-history` longitudinal comparison and static HTML trend dashboards for
   verified run-matrix outputs
+- `diff-autopsy` reviewer report that compares a git worktree or branch diff
+  against one source-free benchmark task without reading patch contents
 - GitHub release workflow with packaged binaries, SHA-256 checksums, and
   provenance attestations
 - `benchmark-summary` reports that compare one baseline against multiple
@@ -292,6 +294,18 @@ cargo run -- autopsy \
   --out docs/example-autopsy.md
 ```
 
+Generate a source-free diff autopsy for a worktree or branch:
+
+```bash
+cargo run -- diff-autopsy \
+  --suite suites/example-auth-bugs.json \
+  --repo . \
+  --task-id auth-redirect-001 \
+  --base-ref origin/main \
+  --head-ref HEAD \
+  --out /tmp/helmbench-diff-autopsy.md
+```
+
 Run direct agent presets:
 
 ```bash
@@ -530,6 +544,7 @@ helmbench-cli
   verify-bundle
   verify-matrix
   autopsy
+  diff-autopsy
   dashboard
   doctor
 
@@ -542,7 +557,7 @@ adapters
   Claude Code direct launch preset
   Codex direct launch preset
   opt-in structured stdout capture for direct runs
-  Agent Diff Autopsy from source-free traces
+  Agent Diff Autopsy from source-free traces and git diffs
 
 future direct-agent adapters
   cursor
