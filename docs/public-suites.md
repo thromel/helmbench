@@ -4,9 +4,12 @@
 writes a source-free health report before the suite is trusted.
 
 The command is for larger, recruiter-readable runs where the tiny demo fixture
-is too small to prove navigation quality. The first preset is
-`refactoring-miner`, a Java/Gradle codebase with a long Git history and real
-MCP, web diff, AST diff, and git-history components.
+is too small to prove navigation quality. Current presets:
+
+- `refactoring-miner`: Java/Gradle codebase with a long Git history and real
+  MCP, web diff, AST diff, and git-history components.
+- `flask`: Python web framework with focused config, blueprint/routing,
+  templating, and CLI task areas.
 
 ## RefactoringMiner
 
@@ -46,6 +49,28 @@ Each task contains expected source files, expected test files, tags, timeout
 metadata, and a targeted Gradle `successCommand`. The suite is meant to compare
 agent navigation and validation behavior across variants such as native agent
 runs, ctxhelm plan traces, ctxhelm-guided runs, and ctxhelm pack runs.
+
+## Flask
+
+```bash
+helmbench init-public-suite \
+  --preset flask \
+  --repo ../flask \
+  --suite-out /tmp/flask-suite.json \
+  --health-out /tmp/flask-health.json \
+  --force
+```
+
+The Flask preset emits four source-free tasks:
+
+- `flask-config-loading-001`
+- `flask-blueprint-routing-001`
+- `flask-template-context-001`
+- `flask-cli-discovery-001`
+
+Each task contains Python source paths, pytest files, tags, timeout metadata,
+and a targeted `python -m pytest ...` `successCommand`. This gives HelmBench a
+smaller non-Java public suite for cross-ecosystem agent navigation checks.
 
 ## Run Pattern
 

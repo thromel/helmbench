@@ -395,6 +395,7 @@ enum TraceVariant {
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum PublicSuitePreset {
     RefactoringMiner,
+    Flask,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -1420,9 +1421,7 @@ fn init_public_suite(
     ensure_output_path_available(suite_out, force)?;
     ensure_output_path_available(health_out, force)?;
 
-    let suite = match preset {
-        PublicSuitePreset::RefactoringMiner => refactoring_miner_suite(),
-    };
+    let suite = public_suite_for_preset(preset);
     validate_suite(&suite)?;
 
     let health = public_suite_health(preset, repo, min_commits, &suite)?;
@@ -1459,7 +1458,7 @@ fn public_suite_health(
         .and_then(|name| name.to_str())
         .unwrap_or("repo")
         .to_string();
-    let checked_files = checked_files_for_suite(suite);
+    let checked_files = checked_files_for_suite(preset, suite);
     let missing_files = checked_files
         .iter()
         .filter(|path| !repo.join(path).exists())
@@ -1483,9 +1482,7 @@ fn public_suite_health(
 
     Ok(PublicSuiteHealth {
         schema_version: 1,
-        preset: match preset {
-            PublicSuitePreset::RefactoringMiner => "refactoring-miner".to_string(),
-        },
+        preset: public_suite_preset_name(preset).to_string(),
         repo_name,
         head,
         commit_count,
@@ -1498,12 +1495,32 @@ fn public_suite_health(
     })
 }
 
-fn checked_files_for_suite(suite: &helmbench::TaskSuite) -> Vec<String> {
-    let mut paths = vec![
-        "README.md".to_string(),
-        "build.gradle".to_string(),
-        "gradlew".to_string(),
-    ];
+fn public_suite_for_preset(preset: PublicSuitePreset) -> helmbench::TaskSuite {
+    match preset {
+        PublicSuitePreset::RefactoringMiner => refactoring_miner_suite(),
+        PublicSuitePreset::Flask => flask_suite(),
+    }
+}
+
+fn public_suite_preset_name(preset: PublicSuitePreset) -> &'static str {
+    match preset {
+        PublicSuitePreset::RefactoringMiner => "refactoring-miner",
+        PublicSuitePreset::Flask => "flask",
+    }
+}
+
+fn public_suite_anchor_files(preset: PublicSuitePreset) -> &'static [&'static str] {
+    match preset {
+        PublicSuitePreset::RefactoringMiner => &["README.md", "build.gradle", "gradlew"],
+        PublicSuitePreset::Flask => &["README.md", "pyproject.toml", "src/flask/__init__.py"],
+    }
+}
+
+fn checked_files_for_suite(preset: PublicSuitePreset, suite: &helmbench::TaskSuite) -> Vec<String> {
+    let mut paths = public_suite_anchor_files(preset)
+        .iter()
+        .map(|path| (*path).to_string())
+        .collect::<Vec<_>>();
     for task in &suite.tasks {
         paths.extend(task.expected_files.iter().cloned());
         paths.extend(task.expected_tests.iter().cloned());
@@ -1608,6 +1625,98 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                 success_command: Some("./gradlew test --tests org.refactoringminer.rm1.GitHistoryRefactoringMinerImplMergeCommitTest --tests org.refactoringminer.util.GitServiceImplTest".to_string()),
                 tags: vec!["public_repo".to_string(), "git_history".to_string(), "bug_fix".to_string()],
                 timeout_seconds: Some(1200),
+            },
+        ],
+    }
+}
+
+fn flask_suite() -> helmbench::TaskSuite {
+    helmbench::TaskSuite {
+        schema_version: helmbench::SUITE_SCHEMA_VERSION,
+        name: "flask-public".to_string(),
+        description:
+            "Source-free public-repo suite for Flask agent navigation, validation, and ctxhelm comparison."
+                .to_string(),
+        tasks: vec![
+            helmbench::BenchTask {
+                id: "flask-config-loading-001".to_string(),
+                prompt: "Improve configuration loading behavior while preserving file, object, envvar, and prefixed-environment contracts.".to_string(),
+                expected_files: vec![
+                    "src/flask/config.py".to_string(),
+                    "src/flask/app.py".to_string(),
+                ],
+                expected_tests: vec![
+                    "tests/test_config.py".to_string(),
+                    "tests/test_instance_config.py".to_string(),
+                ],
+                success_command: Some(
+                    "python -m pytest tests/test_config.py tests/test_instance_config.py"
+                        .to_string(),
+                ),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "python".to_string(),
+                    "config".to_string(),
+                    "bug_fix".to_string(),
+                ],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "flask-blueprint-routing-001".to_string(),
+                prompt: "Update blueprint registration or routing behavior without breaking nested blueprint and endpoint validation tests.".to_string(),
+                expected_files: vec![
+                    "src/flask/blueprints.py".to_string(),
+                    "src/flask/sansio/blueprints.py".to_string(),
+                    "src/flask/app.py".to_string(),
+                ],
+                expected_tests: vec![
+                    "tests/test_blueprints.py".to_string(),
+                    "tests/test_basic.py".to_string(),
+                ],
+                success_command: Some(
+                    "python -m pytest tests/test_blueprints.py tests/test_basic.py".to_string(),
+                ),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "python".to_string(),
+                    "routing".to_string(),
+                    "refactor".to_string(),
+                ],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "flask-template-context-001".to_string(),
+                prompt: "Fix template context or rendering behavior while keeping escaping, context processor, and loader behavior targeted.".to_string(),
+                expected_files: vec![
+                    "src/flask/templating.py".to_string(),
+                    "src/flask/helpers.py".to_string(),
+                ],
+                expected_tests: vec!["tests/test_templating.py".to_string()],
+                success_command: Some("python -m pytest tests/test_templating.py".to_string()),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "python".to_string(),
+                    "templating".to_string(),
+                    "bug_fix".to_string(),
+                ],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "flask-cli-discovery-001".to_string(),
+                prompt: "Improve CLI app discovery or command behavior without changing unrelated application runtime behavior.".to_string(),
+                expected_files: vec![
+                    "src/flask/cli.py".to_string(),
+                    "src/flask/app.py".to_string(),
+                ],
+                expected_tests: vec!["tests/test_cli.py".to_string()],
+                success_command: Some("python -m pytest tests/test_cli.py".to_string()),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "python".to_string(),
+                    "cli".to_string(),
+                    "feature".to_string(),
+                ],
+                timeout_seconds: Some(900),
             },
         ],
     }
@@ -3686,7 +3795,8 @@ mod tests {
     fn public_suite_health_accepts_clean_fixture() {
         let temp = tempfile::tempdir().expect("tempdir");
         let repo = temp.path().join("repo");
-        create_public_suite_fixture_repo(&repo).expect("fixture repo");
+        create_public_suite_fixture_repo(PublicSuitePreset::RefactoringMiner, &repo)
+            .expect("fixture repo");
         let suite = refactoring_miner_suite();
 
         let health = public_suite_health(PublicSuitePreset::RefactoringMiner, &repo, 1, &suite)
@@ -3705,7 +3815,8 @@ mod tests {
     fn public_suite_health_rejects_dirty_fixture_without_source_logs() {
         let temp = tempfile::tempdir().expect("tempdir");
         let repo = temp.path().join("repo");
-        create_public_suite_fixture_repo(&repo).expect("fixture repo");
+        create_public_suite_fixture_repo(PublicSuitePreset::RefactoringMiner, &repo)
+            .expect("fixture repo");
         std::fs::write(repo.join("UNTRACKED.md"), "dirty").expect("dirty file");
         let suite = refactoring_miner_suite();
 
@@ -3719,6 +3830,39 @@ mod tests {
             .checked_files
             .iter()
             .all(|path| !path.starts_with('/')));
+    }
+
+    #[test]
+    fn flask_public_suite_uses_python_paths_and_health_anchors() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        create_public_suite_fixture_repo(PublicSuitePreset::Flask, &repo).expect("fixture repo");
+        let suite = flask_suite();
+
+        validate_suite(&suite).expect("suite");
+        assert_eq!(suite.name, "flask-public");
+        assert_eq!(suite.tasks.len(), 4);
+        assert!(suite
+            .tasks
+            .iter()
+            .all(|task| task.tags.contains(&"python".to_string())));
+        assert!(suite.tasks.iter().any(|task| task
+            .expected_files
+            .contains(&"src/flask/config.py".to_string())));
+        assert!(suite.tasks.iter().any(|task| task
+            .expected_tests
+            .contains(&"tests/test_templating.py".to_string())));
+
+        let checked = checked_files_for_suite(PublicSuitePreset::Flask, &suite);
+        assert!(checked.contains(&"pyproject.toml".to_string()));
+        assert!(checked.contains(&"src/flask/__init__.py".to_string()));
+        assert!(!checked.contains(&"build.gradle".to_string()));
+
+        let health =
+            public_suite_health(PublicSuitePreset::Flask, &repo, 1, &suite).expect("health");
+        assert!(health.ok);
+        assert_eq!(health.preset, "flask");
+        assert!(health.missing_files.is_empty());
     }
 
     #[test]
@@ -3872,10 +4016,10 @@ mod tests {
         assert_eq!(config.semantic_dimensions, Some(64));
     }
 
-    fn create_public_suite_fixture_repo(repo: &Path) -> Result<()> {
-        let suite = refactoring_miner_suite();
+    fn create_public_suite_fixture_repo(preset: PublicSuitePreset, repo: &Path) -> Result<()> {
+        let suite = public_suite_for_preset(preset);
         std::fs::create_dir_all(repo).with_context(|| format!("create {}", repo.display()))?;
-        for path in checked_files_for_suite(&suite) {
+        for path in checked_files_for_suite(preset, &suite) {
             write_demo_file(repo, &path, "fixture\n")?;
         }
         init_git_repo(repo)

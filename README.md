@@ -35,7 +35,7 @@ This repository currently implements the core HelmBench workflow:
   tool streams into source-free traces without storing command text or tool
   payloads
 - `init-public-suite` generator for verified public-repo benchmark suites,
-  starting with RefactoringMiner
+  currently RefactoringMiner and Flask
 - `demo-run` one-command deterministic demo pipeline with reports, dashboard,
   quality gate, and evidence bundle
 - `run-matrix` benchmark coordinator that runs one baseline plus one or more
@@ -137,8 +137,8 @@ Add `ctxhelm=true` to a `--head` spec when the row should call
 `ctxhelm get-pack --format json`; HelmBench stores only source-free
 recommendation and token metadata.
 
-Generate a source-free RefactoringMiner public benchmark suite after checking
-fixture health:
+Generate a source-free public benchmark suite after checking fixture health.
+Supported presets are `refactoring-miner` and `flask`:
 
 ```bash
 cargo run -- init-public-suite \
@@ -146,6 +146,13 @@ cargo run -- init-public-suite \
   --repo ../ctxhelm-proof-fixtures/RefactoringMiner \
   --suite-out /tmp/refactoringminer-suite.json \
   --health-out /tmp/refactoringminer-health.json \
+  --force
+
+cargo run -- init-public-suite \
+  --preset flask \
+  --repo ../flask \
+  --suite-out /tmp/flask-suite.json \
+  --health-out /tmp/flask-health.json \
   --force
 ```
 
