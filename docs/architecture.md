@@ -63,6 +63,13 @@ generates source-free recommendation traces from `ctxhelm prepare-task`.
 The current Claude Code path imports source-free JSONL events produced by hooks
 or wrappers; it does not require raw transcripts.
 
+`ctxhelm-run` combines ctxhelm context generation with the local runner. It
+calls `ctxhelm prepare-task` inside each isolated task clone and records returned
+target files/tests as source-free `recommended-file` events. When `--pack` is
+set, it calls `ctxhelm get-pack --format json` but persists only source-free pack
+metadata such as token estimates and command hashes. Pack sections and snippets
+are discarded.
+
 The current `local-run` path executes an explicit adapter command inside an
 isolated clone of the target git repo. It passes source-free environment
 variables such as `HELMBENCH_TASK_ID`, `HELMBENCH_REPO`, and
@@ -147,6 +154,14 @@ ctxhelm can already emit source-free `prepare-task` plans. Converting those
 plans into HelmBench traces gives immediate measurement of recommendation
 precision and recall, while direct agent adapters can be added without changing
 the report contract.
+
+### Why discard ctxhelm pack sections?
+
+`ctxhelm get-pack` can include target snippets and other source-bearing context.
+HelmBench is an evaluation harness with a source-free report contract, so
+`ctxhelm-run --pack` records only metadata such as token estimates and command
+hashes. The benchmark can measure whether ctxhelm reduced waste without storing
+the context payload itself.
 
 ### Why import Claude Code events before launching Claude Code directly?
 

@@ -166,6 +166,25 @@ Expected files found:     2
 Validation coverage:      0.0%  # plan-only trace; no agent/test execution
 ```
 
+Run a ctxhelm-guided benchmark:
+
+```bash
+cargo run -- ctxhelm-run \
+  --suite /tmp/helmbench-demo-suite.json \
+  --repo /tmp/helmbench-demo-repo \
+  --ctxhelm-bin ctxhelm \
+  --mode bug-fix \
+  --pack \
+  --pack-budget brief \
+  --adapter-command "HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-agent.sh" \
+  --out-dir /tmp/helmbench-ctxhelm-traces
+```
+
+`ctxhelm-run` records source-free `recommended-file` events from
+`ctxhelm prepare-task`. With `--pack`, it calls `ctxhelm get-pack --format json`
+but stores only source-free pack metadata such as token estimate; raw pack
+sections and snippets are discarded.
+
 Run the checked-in local-run smoke suite:
 
 ```bash
@@ -287,6 +306,7 @@ helmbench-cli
   validate-suite
   run
   ctxhelm-trace
+  ctxhelm-run
   claude-trace
   local-run
   claude-run
@@ -299,6 +319,7 @@ helmbench-cli
 
 adapters
   ctxhelm prepare-task trace generation
+  ctxhelm-guided local run with source-free pack metadata
   Claude Code source-free event import
   explicit local adapter command runner
   Claude Code direct launch preset
@@ -313,6 +334,4 @@ future direct-agent adapters
 
 1. Add stronger Claude/Codex event capture through hooks or structured streams
    where available, without storing transcripts.
-2. Extend the ctxhelm adapter from `prepare-task` plans to MCP resource reads
-   and pack usage without raw MCP payloads.
-3. Add larger public benchmark suites over real open-source repositories.
+2. Add larger public benchmark suites over real open-source repositories.

@@ -100,6 +100,43 @@ enum Command {
         #[arg(long)]
         keep_workdirs: bool,
     },
+    /// Run ctxhelm recommendations before an isolated local adapter command.
+    CtxhelmRun {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        repo: PathBuf,
+        #[arg(long, default_value = ".helmbench/workdirs")]
+        work_dir: PathBuf,
+        #[arg(long, default_value = "traces/ctxhelm-run")]
+        out_dir: PathBuf,
+        #[arg(long, default_value = "ctxhelm")]
+        ctxhelm_bin: PathBuf,
+        #[arg(long, default_value = "bug-fix")]
+        mode: String,
+        #[arg(long, default_value = "generic")]
+        target_agent: String,
+        #[arg(long)]
+        semantic: bool,
+        #[arg(long)]
+        semantic_provider: Option<String>,
+        #[arg(long)]
+        semantic_model: Option<String>,
+        #[arg(long)]
+        semantic_dimensions: Option<u16>,
+        #[arg(long)]
+        pack: bool,
+        #[arg(long, default_value = "brief")]
+        pack_budget: String,
+        #[arg(long, default_value = "ctxhelm-local")]
+        agent: String,
+        #[arg(long, value_enum, default_value_t = TraceVariant::CtxhelmMcp)]
+        variant: TraceVariant,
+        #[arg(long)]
+        adapter_command: Option<String>,
+        #[arg(long)]
+        keep_workdirs: bool,
+    },
     /// Run Claude Code non-interactively through the isolated local runner.
     ClaudeRun {
         #[arg(long)]
@@ -418,6 +455,51 @@ fn main() -> Result<()> {
                 &agent,
                 variant.into(),
                 &setup_command,
+                None,
+                adapter_command.as_deref(),
+                keep_workdirs,
+            )?;
+        }
+        Command::CtxhelmRun {
+            suite,
+            repo,
+            work_dir,
+            out_dir,
+            ctxhelm_bin,
+            mode,
+            target_agent,
+            semantic,
+            semantic_provider,
+            semantic_model,
+            semantic_dimensions,
+            pack,
+            pack_budget,
+            agent,
+            variant,
+            adapter_command,
+            keep_workdirs,
+        } => {
+            let suite = load_suite(&suite)?;
+            let ctxhelm = CtxhelmRunConfig {
+                ctxhelm_bin,
+                mode,
+                target_agent,
+                semantic,
+                semantic_provider,
+                semantic_model,
+                semantic_dimensions,
+                include_pack: pack,
+                pack_budget,
+            };
+            run_local_suite(
+                &suite,
+                &repo,
+                &work_dir,
+                &out_dir,
+                &agent,
+                variant.into(),
+                &[],
+                Some(&ctxhelm),
                 adapter_command.as_deref(),
                 keep_workdirs,
             )?;
@@ -449,6 +531,7 @@ fn main() -> Result<()> {
                 "claude-code",
                 AgentVariant::Native,
                 &[],
+                None,
                 Some(&command),
                 keep_workdirs,
             )?;
@@ -480,6 +563,7 @@ fn main() -> Result<()> {
                 "codex",
                 AgentVariant::Native,
                 &[],
+                None,
                 Some(&command),
                 keep_workdirs,
             )?;
@@ -791,6 +875,7 @@ fn run_local_suite(
     agent: &str,
     variant: AgentVariant,
     setup_commands: &[String],
+    ctxhelm: Option<&CtxhelmRunConfig>,
     adapter_command: Option<&str>,
     keep_workdirs: bool,
 ) -> Result<()> {
@@ -826,6 +911,10 @@ fn run_local_suite(
                     timed_out_suffix(setup_result.timed_out)
                 );
             }
+        }
+
+        if let Some(ctxhelm) = ctxhelm {
+            append_ctxhelm_events(ctxhelm, task, &task_dir, &events, task_started)?;
         }
 
         let mut adapter_ok = true;
@@ -913,6 +1002,181 @@ fn run_local_suite(
             std::fs::remove_dir_all(&task_dir)
                 .with_context(|| format!("remove {}", task_dir.display()))?;
         }
+    }
+    Ok(())
+}
+
+struct CtxhelmRunConfig {
+    ctxhelm_bin: PathBuf,
+    mode: String,
+    target_agent: String,
+    semantic: bool,
+    semantic_provider: Option<String>,
+    semantic_model: Option<String>,
+    semantic_dimensions: Option<u16>,
+    include_pack: bool,
+    pack_budget: String,
+}
+
+fn append_ctxhelm_events(
+    config: &CtxhelmRunConfig,
+    task: &helmbench::BenchTask,
+    repo: &Path,
+    events: &PathBuf,
+    task_started: Instant,
+) -> Result<()> {
+    let prepare = run_ctxhelm_json(config, repo, &task.prompt, false)
+        .with_context(|| format!("ctxhelm prepare-task for `{}`", task.id))?;
+    let value =
+        serde_json::from_str::<serde_json::Value>(&prepare).context("parse ctxhelm JSON")?;
+    let mut recommended = Vec::new();
+    collect_ctxhelm_paths(&value, "targetFiles", &mut recommended)?;
+    collect_ctxhelm_paths(&value, "relatedTests", &mut recommended)?;
+    recommended.sort();
+    recommended.dedup();
+    for path in recommended {
+        append_event(
+            events,
+            &path_event(
+                &task.id,
+                AgentEventKind::RecommendedFile,
+                path,
+                Some(task_started.elapsed().as_millis() as u64),
+            )?,
+        )?;
+    }
+    append_event(
+        events,
+        &AgentEvent {
+            schema_version: TRACE_SCHEMA_VERSION,
+            task_id: task.id.clone(),
+            event_kind: AgentEventKind::Command,
+            path: None,
+            command_class: Some(CommandClass::Other),
+            command_hash: Some(command_hash("ctxhelm prepare-task")),
+            touched_tests: Vec::new(),
+            exit_status: Some(0),
+            status: None,
+            token_estimate: None,
+            elapsed_millis: None,
+            observed_at_millis: Some(task_started.elapsed().as_millis() as u64),
+            privacy: PrivacyStatus::source_free(),
+        },
+    )?;
+
+    if config.include_pack {
+        let pack = run_ctxhelm_json(config, repo, &task.prompt, true)
+            .with_context(|| format!("ctxhelm get-pack for `{}`", task.id))?;
+        let value = serde_json::from_str::<serde_json::Value>(&pack).context("parse pack JSON")?;
+        let token_estimate = value.get("tokenEstimate").and_then(|value| value.as_u64());
+        if let Some(tokens) = token_estimate {
+            append_event(
+                events,
+                &AgentEvent {
+                    schema_version: TRACE_SCHEMA_VERSION,
+                    task_id: task.id.clone(),
+                    event_kind: AgentEventKind::Usage,
+                    path: None,
+                    command_class: None,
+                    command_hash: None,
+                    touched_tests: Vec::new(),
+                    exit_status: None,
+                    status: None,
+                    token_estimate: Some(tokens),
+                    elapsed_millis: None,
+                    observed_at_millis: Some(task_started.elapsed().as_millis() as u64),
+                    privacy: PrivacyStatus::source_free(),
+                },
+            )?;
+        }
+        append_event(
+            events,
+            &AgentEvent {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: task.id.clone(),
+                event_kind: AgentEventKind::Command,
+                path: None,
+                command_class: Some(CommandClass::Other),
+                command_hash: Some(command_hash(&format!(
+                    "ctxhelm get-pack {}",
+                    config.pack_budget
+                ))),
+                touched_tests: Vec::new(),
+                exit_status: Some(0),
+                status: None,
+                token_estimate: None,
+                elapsed_millis: None,
+                observed_at_millis: Some(task_started.elapsed().as_millis() as u64),
+                privacy: PrivacyStatus::source_free(),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+fn run_ctxhelm_json(
+    config: &CtxhelmRunConfig,
+    repo: &Path,
+    task_prompt: &str,
+    pack: bool,
+) -> Result<String> {
+    let mut command = ProcessCommand::new(&config.ctxhelm_bin);
+    if pack {
+        command
+            .arg("get-pack")
+            .arg("--budget")
+            .arg(&config.pack_budget)
+            .arg("--format")
+            .arg("json");
+    } else {
+        command.arg("prepare-task");
+    }
+    command
+        .arg("--repo")
+        .arg(repo)
+        .arg("--mode")
+        .arg(&config.mode)
+        .arg("--target-agent")
+        .arg(&config.target_agent)
+        .arg("--no-trace");
+    if config.semantic {
+        command.arg("--semantic");
+    }
+    if let Some(provider) = &config.semantic_provider {
+        command.arg("--semantic-provider").arg(provider);
+    }
+    if let Some(model) = &config.semantic_model {
+        command.arg("--semantic-model").arg(model);
+    }
+    if let Some(dimensions) = config.semantic_dimensions {
+        command
+            .arg("--semantic-dimensions")
+            .arg(dimensions.to_string());
+    }
+    command.arg(task_prompt);
+    let output = command
+        .output()
+        .with_context(|| format!("run {}", config.ctxhelm_bin.display()))?;
+    if !output.status.success() {
+        anyhow::bail!("ctxhelm failed with status {:?}", output.status.code());
+    }
+    String::from_utf8(output.stdout).context("ctxhelm stdout utf8")
+}
+
+fn collect_ctxhelm_paths(
+    value: &serde_json::Value,
+    key: &str,
+    output: &mut Vec<String>,
+) -> Result<()> {
+    let Some(items) = value.get(key).and_then(|items| items.as_array()) else {
+        return Ok(());
+    };
+    for item in items {
+        let Some(path) = item.get("path").and_then(|path| path.as_str()) else {
+            continue;
+        };
+        helmbench::validate_safe_relative_path_for_cli(path)?;
+        output.push(path.to_string());
     }
     Ok(())
 }
@@ -1271,5 +1535,38 @@ mod tests {
             suite.tasks[1].expected_tests,
             vec!["tests/billing/invoice.test.sh"]
         );
+    }
+
+    #[test]
+    fn collect_ctxhelm_paths_rejects_unsafe_paths() {
+        let value = serde_json::json!({
+            "targetFiles": [
+                {"path": "src/auth/session.txt"},
+                {"path": "../secret.env"}
+            ]
+        });
+        let mut paths = Vec::new();
+        let error =
+            collect_ctxhelm_paths(&value, "targetFiles", &mut paths).expect_err("unsafe path");
+        assert!(error.to_string().contains("parent traversal"));
+    }
+
+    #[test]
+    fn run_ctxhelm_json_command_supports_pack_options() {
+        let config = CtxhelmRunConfig {
+            ctxhelm_bin: PathBuf::from("ctxhelm"),
+            mode: "bug-fix".to_string(),
+            target_agent: "generic".to_string(),
+            semantic: true,
+            semantic_provider: Some("local_hash".to_string()),
+            semantic_model: None,
+            semantic_dimensions: Some(64),
+            include_pack: true,
+            pack_budget: "brief".to_string(),
+        };
+
+        assert!(config.semantic);
+        assert_eq!(config.pack_budget, "brief");
+        assert_eq!(config.semantic_dimensions, Some(64));
     }
 }
