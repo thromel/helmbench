@@ -1066,6 +1066,10 @@ fn run_doctor(root: &Path) -> Result<()> {
         root.join(".github/workflows/ci.yml").exists(),
     );
     required_ok &= print_check(
+        "release workflow exists",
+        root.join(".github/workflows/release.yml").exists(),
+    );
+    required_ok &= print_check(
         "example suite loads",
         load_suite(&root.join("suites/example-auth-bugs.json")).is_ok(),
     );

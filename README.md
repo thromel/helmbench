@@ -42,6 +42,8 @@ This repository currently implements the core HelmBench workflow:
   local adapter variants and emits reports, comparisons, dashboard, quality
   gate, autopsy, and evidence bundle artifacts
 - `matrix-history` longitudinal comparison for verified run-matrix outputs
+- GitHub release workflow with packaged binaries, SHA-256 checksums, and
+  provenance attestations
 - `benchmark-summary` reports that compare one baseline against multiple
   source-free variant reports
 - `evidence-bundle` packaging for source-free suites, health reports, run
@@ -75,6 +77,15 @@ Check local prerequisites and optional agent integrations:
 ```bash
 cargo run -- doctor --repo .
 ```
+
+Install from source:
+
+```bash
+cargo install --git https://github.com/thromel/helmbench --locked
+```
+
+Release tarball and provenance verification instructions are in
+[Install HelmBench](docs/install.md).
 
 Create an example suite:
 
