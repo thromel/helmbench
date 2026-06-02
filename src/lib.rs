@@ -814,6 +814,10 @@ pub fn project_root_for_cli(path: Option<PathBuf>) -> Result<PathBuf> {
     }
 }
 
+pub fn validate_safe_relative_path_for_cli(path: &str) -> Result<()> {
+    validate_safe_relative_path(path)
+}
+
 fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
     let expected_files = task.expected_files.iter().cloned().collect::<BTreeSet<_>>();
     let expected_tests = task.expected_tests.iter().cloned().collect::<BTreeSet<_>>();
@@ -843,7 +847,7 @@ fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
     let relevant_recommended_file_count = recommended.intersection(&expected_evidence).count();
     let irrelevant_recommended_file_count = recommended.difference(&expected_evidence).count();
     let expected_files_edited_count = edited.intersection(&expected_files).count();
-    let validation_covered = validation_covered(task, trace, &expected_tests);
+    let validation_covered = validation_covered(trace, &expected_tests);
     let files_read_count = read.len();
     let context_precision = if files_read_count == 0 {
         0.0
@@ -892,11 +896,7 @@ fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
     }
 }
 
-fn validation_covered(
-    task: &BenchTask,
-    trace: &AgentTrace,
-    expected_tests: &BTreeSet<String>,
-) -> bool {
+fn validation_covered(trace: &AgentTrace, expected_tests: &BTreeSet<String>) -> bool {
     trace.commands.iter().any(|command| {
         let class_counts = matches!(
             command.command_class,
@@ -908,7 +908,7 @@ fn validation_covered(
                 .iter()
                 .any(|path| expected_tests.contains(path));
         let successful = command.exit_status.is_none_or(|status| status == 0);
-        successful && (touched_expected_test || (class_counts && task.success_command.is_none()))
+        successful && (touched_expected_test || class_counts)
     })
 }
 
@@ -1086,6 +1086,37 @@ mod tests {
         assert_eq!(report.tasks[0].time_to_first_relevant_file_millis, Some(20));
         assert!(report.tasks[0].validation_covered);
         assert_eq!(report.summary.total_tool_calls, 6);
+    }
+
+    #[test]
+    fn report_counts_successful_validation_command_class_without_touched_tests() {
+        let suite = example_suite();
+        let trace = AgentTrace {
+            schema_version: TRACE_SCHEMA_VERSION,
+            task_id: "auth-redirect-001".to_string(),
+            agent: "local-script".to_string(),
+            variant: AgentVariant::Native,
+            status: TaskStatus::Success,
+            recommended_files: Vec::new(),
+            files_read: vec![timed_path("src/auth/session.ts", 20)],
+            files_edited: vec![path("src/auth/session.ts")],
+            commands: vec![CommandObservation {
+                command_class: CommandClass::Test,
+                command_hash: Some("cmd:targeted".to_string()),
+                touched_tests: Vec::new(),
+                exit_status: Some(0),
+                elapsed_millis: Some(1000),
+            }],
+            tool_call_count: 3,
+            token_estimate: None,
+            elapsed_millis: Some(1200),
+            time_to_first_relevant_file_millis: None,
+            privacy: PrivacyStatus::source_free(),
+        };
+
+        let report = build_report(&suite, &[trace]).expect("report");
+        assert!(report.tasks[0].validation_covered);
+        assert_eq!(report.summary.validation_coverage_rate, 1.0);
     }
 
     #[test]

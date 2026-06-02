@@ -26,12 +26,15 @@ This repository currently implements the first MVP slice:
   source-free recommendation traces
 - `claude-trace` importer that converts sanitized Claude Code event JSONL into
   source-free read/edit/test traces
+- `local-run` runner that clones a git repo per task, runs a source-free adapter
+  command, executes validation, infers edited files from git diff, and emits
+  trace JSON
 - recommendation precision and recall metrics for context-plan evaluation
 
 It does **not** yet launch Claude Code, Codex, Cursor, or other agents directly.
 The current runner ingests source-free traces, can generate ctxhelm plan traces,
-and can convert source-free Claude Code events. Direct process-launch adapters
-come next.
+can convert source-free Claude Code events, and can execute explicit local
+adapter commands. Direct Claude/Codex process adapters come next.
 
 ## Quickstart
 
@@ -111,6 +114,29 @@ Recommended files:        8
 Expected files found:     2
 Validation coverage:      0.0%  # plan-only trace; no agent/test execution
 ```
+
+Run the checked-in local-run smoke suite:
+
+```bash
+cargo build
+chmod +x scripts/demo-local-agent.sh
+
+cargo run -- local-run \
+  --suite suites/local-run-smoke.json \
+  --repo . \
+  --agent demo-local-agent \
+  --variant native \
+  --adapter-command "HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-local-agent.sh" \
+  --out-dir traces/local-run-smoke
+
+cargo run -- run \
+  --suite suites/local-run-smoke.json \
+  --trace-dir traces/local-run-smoke \
+  --out reports/local-run-smoke.json
+```
+
+`local-run` clones the repo into `.helmbench/workdirs/<task-id>` by default and
+removes the workdir after writing the trace unless `--keep-workdirs` is set.
 
 The repo includes `.ctxhelmignore` so generated reports and traces do not
 pollute ctxhelm recommendation quality.
@@ -193,6 +219,7 @@ helmbench-cli
   run
   ctxhelm-trace
   claude-trace
+  local-run
   record-event
   compare
   doctor
@@ -200,6 +227,7 @@ helmbench-cli
 adapters
   ctxhelm prepare-task trace generation
   Claude Code source-free event import
+  explicit local adapter command runner
 
 future direct-agent adapters
   claude-code
@@ -209,8 +237,8 @@ future direct-agent adapters
 
 ## Next Milestones
 
-1. Add a Claude Code adapter that records source-free file-read/edit/test
-   summaries.
+1. Add a Claude Code adapter that drives `local-run` with Claude Code commands
+   and source-free hooks.
 2. Extend the ctxhelm adapter from `prepare-task` plans to MCP resource reads
    and pack usage without raw MCP payloads.
 3. Add a static HTML dashboard from generated report JSON.

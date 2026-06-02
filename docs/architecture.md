@@ -58,6 +58,20 @@ generates source-free recommendation traces from `ctxhelm prepare-task`.
 The current Claude Code path imports source-free JSONL events produced by hooks
 or wrappers; it does not require raw transcripts.
 
+The current `local-run` path executes an explicit adapter command inside an
+isolated clone of the target git repo. It passes source-free environment
+variables such as `HELMBENCH_TASK_ID`, `HELMBENCH_REPO`, and
+`HELMBENCH_EVENTS`, then:
+
+1. lets the adapter append source-free events with `record-event`;
+2. infers edited files from `git status --short`;
+3. runs the task `successCommand` when present;
+4. records command class, command hash, exit status, and final status; and
+5. writes a normal HelmBench trace JSON.
+
+This is still not a Claude/Codex launcher. It is the isolation and observation
+foundation those launchers will use.
+
 ## Metrics
 
 The core report computes:
@@ -103,6 +117,15 @@ installation and permissions. A source-free event importer gives us the durable
 contract first: hooks or wrappers can emit `file_read`, `file_edit`, `command`,
 `usage`, and `status` events, and HelmBench can score them without storing raw
 model output.
+
+### Why add local-run before direct Claude/Codex adapters?
+
+Direct agent automation has two separate problems: process orchestration and
+behavior observation. `local-run` solves the stable part first: per-task repo
+isolation, event-file plumbing, validation command execution, edited-file
+detection, and trace emission. Claude Code and Codex adapters can now focus on
+starting the agent and emitting source-free events instead of each reinventing
+runner mechanics.
 
 ### Why not pass/fail only?
 

@@ -1,5 +1,7 @@
 /target
 /.DS_Store
+/.helmbench
+/traces
 /reports/*.json
 !/reports/example-native.json
 !/reports/example-ctxhelm.json

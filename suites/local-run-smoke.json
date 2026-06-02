@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "name": "local-run-smoke",
+  "description": "Runnable HelmBench smoke suite for the local-run adapter.",
+  "tasks": [
+    {
+      "id": "demo-auth-001",
+      "prompt": "Fix the demo auth redirect fixture.",
+      "expectedFiles": [
+        "examples/demo-app/auth.txt"
+      ],
+      "expectedTests": [
+        "examples/demo-app/auth.test"
+      ],
+      "successCommand": "grep -q fixed examples/demo-app/auth.txt",
+      "tags": [
+        "demo",
+        "local-run"
+      ],
+      "timeoutSeconds": 60
+    }
+  ]
+}
