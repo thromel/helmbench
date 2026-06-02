@@ -86,10 +86,10 @@ enum Command {
         preset: PublicSuitePreset,
         #[arg(long)]
         repo: PathBuf,
-        #[arg(long, default_value = "suites/refactoringminer-public.json")]
-        suite_out: PathBuf,
-        #[arg(long, default_value = ".helmbench/public-suite-health.json")]
-        health_out: PathBuf,
+        #[arg(long)]
+        suite_out: Option<PathBuf>,
+        #[arg(long)]
+        health_out: Option<PathBuf>,
         #[arg(long, default_value_t = 1000)]
         min_commits: u64,
         #[arg(long)]
@@ -549,6 +549,8 @@ fn main() -> Result<()> {
             min_commits,
             force,
         } => {
+            let suite_out = suite_out.unwrap_or_else(|| default_public_suite_out(preset));
+            let health_out = health_out.unwrap_or_else(|| default_public_health_out(preset));
             init_public_suite(preset, &repo, &suite_out, &health_out, min_commits, force)?;
             println!("wrote {}", suite_out.display());
             println!("wrote {}", health_out.display());
@@ -1507,6 +1509,20 @@ fn public_suite_preset_name(preset: PublicSuitePreset) -> &'static str {
         PublicSuitePreset::RefactoringMiner => "refactoring-miner",
         PublicSuitePreset::Flask => "flask",
     }
+}
+
+fn default_public_suite_out(preset: PublicSuitePreset) -> PathBuf {
+    PathBuf::from(format!(
+        "suites/{}-public.json",
+        public_suite_preset_name(preset)
+    ))
+}
+
+fn default_public_health_out(preset: PublicSuitePreset) -> PathBuf {
+    PathBuf::from(format!(
+        ".helmbench/{}-public-suite-health.json",
+        public_suite_preset_name(preset)
+    ))
 }
 
 fn public_suite_anchor_files(preset: PublicSuitePreset) -> &'static [&'static str] {
@@ -3863,6 +3879,26 @@ mod tests {
         assert!(health.ok);
         assert_eq!(health.preset, "flask");
         assert!(health.missing_files.is_empty());
+    }
+
+    #[test]
+    fn public_suite_defaults_are_preset_specific() {
+        assert_eq!(
+            default_public_suite_out(PublicSuitePreset::RefactoringMiner),
+            PathBuf::from("suites/refactoring-miner-public.json")
+        );
+        assert_eq!(
+            default_public_health_out(PublicSuitePreset::RefactoringMiner),
+            PathBuf::from(".helmbench/refactoring-miner-public-suite-health.json")
+        );
+        assert_eq!(
+            default_public_suite_out(PublicSuitePreset::Flask),
+            PathBuf::from("suites/flask-public.json")
+        );
+        assert_eq!(
+            default_public_health_out(PublicSuitePreset::Flask),
+            PathBuf::from(".helmbench/flask-public-suite-health.json")
+        );
     }
 
     #[test]

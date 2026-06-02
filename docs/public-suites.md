@@ -36,6 +36,14 @@ The health report records only metadata:
 It does not store raw source, prompts beyond suite task prompts, transcripts,
 terminal logs, or absolute repository paths.
 
+When `--suite-out` or `--health-out` are omitted, HelmBench writes
+preset-specific defaults:
+
+- `suites/refactoring-miner-public.json`
+- `.helmbench/refactoring-miner-public-suite-health.json`
+- `suites/flask-public.json`
+- `.helmbench/flask-public-suite-health.json`
+
 ## Included Tasks
 
 The RefactoringMiner preset currently emits four source-free tasks:

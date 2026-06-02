@@ -156,6 +156,10 @@ cargo run -- init-public-suite \
   --force
 ```
 
+When `--suite-out` or `--health-out` are omitted, HelmBench writes
+preset-specific defaults such as `suites/flask-public.json` and
+`.helmbench/flask-public-suite-health.json`.
+
 Validate a suite:
 
 ```bash
@@ -493,4 +497,6 @@ future direct-agent adapters
 
 ## Next Milestones
 
-1. Add more public benchmark presets beyond RefactoringMiner.
+1. Add Cursor direct-run preset when a stable non-interactive launch contract is available.
+2. Add more public benchmark presets with source-free fixture health checks.
+3. Add longitudinal matrix comparison for repeated runs over time.
