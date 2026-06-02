@@ -60,6 +60,12 @@ This runs formatting, tests, clippy, CLI help checks, the reproducible demo
 benchmark, dashboard generation, benchmark summary generation, evidence bundle
 generation, and whitespace checks. GitHub Actions runs the same script.
 
+Check local prerequisites and optional agent integrations:
+
+```bash
+cargo run -- doctor --repo .
+```
+
 Create an example suite:
 
 ```bash

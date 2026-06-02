@@ -20,6 +20,7 @@ cargo run -- --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
 cargo run -- benchmark-summary --help >/dev/null
 cargo run -- evidence-bundle --help >/dev/null
+cargo run -- doctor --repo . >/dev/null
 
 cargo run -- init-demo-repo \
   --repo-out "$TMP_DIR/demo-repo" \

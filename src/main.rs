@@ -818,18 +818,7 @@ fn main() -> Result<()> {
         }
         Command::Doctor { repo } => {
             let root = project_root_for_cli(repo)?;
-            println!("helmbench doctor");
-            println!("- repo: {}", root.display());
-            println!("- source-free reports: enforced");
-            println!("- supported variants:");
-            for variant in [
-                AgentVariant::Native,
-                AgentVariant::CtxhelmPlan,
-                AgentVariant::CtxhelmMcp,
-                AgentVariant::CtxhelmPack,
-            ] {
-                println!("  - {:?}", variant);
-            }
+            run_doctor(&root)?;
         }
     }
     Ok(())
@@ -840,6 +829,86 @@ fn write_text(content: &str, path: &PathBuf) -> Result<()> {
         std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     }
     std::fs::write(path, content).with_context(|| format!("write {}", path.display()))
+}
+
+fn run_doctor(root: &Path) -> Result<()> {
+    println!("helmbench doctor");
+    println!("- repo: {}", root.display());
+    println!("- privacy: source-free reports enforced");
+
+    let mut required_ok = true;
+    required_ok &= print_check("git available", command_available("git"));
+    required_ok &= print_check("cargo available", command_available("cargo"));
+    required_ok &= print_check("repo is a git checkout", git_repo_ok(root));
+    required_ok &= print_check("Cargo.toml exists", root.join("Cargo.toml").exists());
+    required_ok &= print_check(
+        "verification script exists",
+        root.join("scripts/verify.sh").exists(),
+    );
+    required_ok &= print_check(
+        "CI workflow exists",
+        root.join(".github/workflows/ci.yml").exists(),
+    );
+    required_ok &= print_check(
+        "example suite loads",
+        load_suite(&root.join("suites/example-auth-bugs.json")).is_ok(),
+    );
+    required_ok &= print_check(
+        "example native report is source-free",
+        read_report(&root.join("reports/example-native.json")).is_ok(),
+    );
+    required_ok &= print_check(
+        "example ctxhelm report is source-free",
+        read_report(&root.join("reports/example-ctxhelm.json")).is_ok(),
+    );
+
+    println!("- optional integrations:");
+    print_optional("ctxhelm available", command_available("ctxhelm"));
+    print_optional("claude available", command_available("claude"));
+    print_optional("codex available", command_available("codex"));
+
+    println!("- supported variants:");
+    for variant in [
+        AgentVariant::Native,
+        AgentVariant::CtxhelmPlan,
+        AgentVariant::CtxhelmMcp,
+        AgentVariant::CtxhelmPack,
+    ] {
+        println!("  - {:?}", variant);
+    }
+
+    if !required_ok {
+        anyhow::bail!("doctor found missing required HelmBench prerequisites");
+    }
+    Ok(())
+}
+
+fn print_check(label: &str, ok: bool) -> bool {
+    println!("- {}: {}", label, if ok { "ok" } else { "error" });
+    ok
+}
+
+fn print_optional(label: &str, ok: bool) {
+    println!("  - {}: {}", label, if ok { "ok" } else { "warn" });
+}
+
+fn command_available(command: &str) -> bool {
+    ProcessCommand::new(command)
+        .arg("--version")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+fn git_repo_ok(root: &Path) -> bool {
+    ProcessCommand::new("git")
+        .arg("-C")
+        .arg(root)
+        .arg("rev-parse")
+        .arg("--is-inside-work-tree")
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2292,6 +2361,11 @@ mod tests {
         assert!(artifacts.iter().all(|artifact| artifact["contentHash"]
             .as_str()
             .is_some_and(|hash| hash.starts_with("fnv64:"))));
+    }
+
+    #[test]
+    fn doctor_accepts_current_checkout() {
+        run_doctor(Path::new(env!("CARGO_MANIFEST_DIR"))).expect("doctor");
     }
 
     #[test]
