@@ -22,9 +22,13 @@ This repository currently implements the first MVP slice:
 - report comparison
 - Markdown and JSON output
 - privacy checks that reject raw-source/raw-transcript traces
+- `ctxhelm-trace` adapter that calls `ctxhelm prepare-task` and emits
+  source-free recommendation traces
+- recommendation precision and recall metrics for context-plan evaluation
 
 It does **not** yet launch Claude Code, Codex, Cursor, or other agents directly.
-The current runner ingests source-free traces. Agent adapters come next.
+The current runner ingests source-free traces and can generate ctxhelm plan
+traces. Direct coding-agent adapters come next.
 
 ## Quickstart
 
@@ -63,6 +67,36 @@ cargo run -- compare \
   --format markdown
 ```
 
+Generate a ctxhelm recommendation trace over the HelmBench repo:
+
+```bash
+cargo run -- ctxhelm-trace \
+  --suite suites/helmbench-meta.json \
+  --repo . \
+  --ctxhelm-bin /path/to/ctxhelm \
+  --mode feature \
+  --target-agent claude-code \
+  --out-dir examples/traces/ctxhelm-plan-meta
+
+cargo run -- run \
+  --suite suites/helmbench-meta.json \
+  --trace-dir examples/traces/ctxhelm-plan-meta \
+  --out reports/example-ctxhelm-plan-meta.json
+```
+
+Current checked-in ctxhelm-plan example over `suites/helmbench-meta.json`:
+
+```text
+Recommendation recall:    100.0%
+Recommendation precision: 25.0%
+Recommended files:        8
+Expected files found:     2
+Validation coverage:      0.0%  # plan-only trace; no agent/test execution
+```
+
+The repo includes `.ctxhelmignore` so generated reports and traces do not
+pollute ctxhelm recommendation quality.
+
 ## What HelmBench Measures
 
 | Metric | Meaning |
@@ -70,6 +104,8 @@ cargo run -- compare \
 | Task success | Whether the trace reports success, failure, or skip. |
 | Files read | Source-free paths the agent inspected. |
 | Irrelevant file reads | Files read that were not in the expected evidence set. |
+| Recommendation precision | Expected evidence paths divided by recommended paths. |
+| Recommendation recall | Recommended expected evidence divided by all expected evidence. |
 | Context precision | Relevant reads divided by all reads. |
 | Edited-file recall | Expected target files edited divided by expected files. |
 | Validation coverage | Whether expected tests or validation command classes were run successfully. |
@@ -114,22 +150,25 @@ helmbench-cli
   init-suite
   validate-suite
   run
+  ctxhelm-trace
   compare
   doctor
 
-future adapters
+adapters
+  ctxhelm prepare-task trace generation
+
+future direct-agent adapters
   claude-code
   codex
   cursor
-  ctxhelm
 ```
 
 ## Next Milestones
 
 1. Add a Claude Code adapter that records source-free file-read/edit/test
    summaries.
-2. Add a ctxhelm adapter that captures `prepare_task`, MCP resource reads, and
-   pack usage without raw MCP payloads.
+2. Extend the ctxhelm adapter from `prepare-task` plans to MCP resource reads
+   and pack usage without raw MCP payloads.
 3. Add a static HTML dashboard from generated report JSON.
 4. Add public benchmark suites over small reproducible repositories.
 5. Add Agent Diff Autopsy for agent-created PRs.

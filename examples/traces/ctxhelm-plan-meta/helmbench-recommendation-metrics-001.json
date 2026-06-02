@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "taskId": "helmbench-recommendation-metrics-001",
+  "agent": "ctxhelm",
+  "variant": "ctxhelm_plan",
+  "status": "skipped",
+  "recommendedFiles": [
+    {
+      "path": "src/lib.rs",
+      "pathHash": "path:2fba4152af2c3a3a",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main.rs",
+      "pathHash": "path:df9f8d2d8eb12e9c",
+      "observedAtMillis": null
+    },
+    {
+      "path": "README.md",
+      "pathHash": "path:3f15cf6f633a5d62",
+      "observedAtMillis": null
+    },
+    {
+      "path": "docs/architecture.md",
+      "pathHash": "path:8bf427124d6c1eff",
+      "observedAtMillis": null
+    },
+    {
+      "path": "suites/helmbench-meta.json",
+      "pathHash": "path:31ab2101ba63ab0b",
+      "observedAtMillis": null
+    },
+    {
+      "path": "AGENTS.md",
+      "pathHash": "path:78a740c6ccf6937a",
+      "observedAtMillis": null
+    },
+    {
+      "path": ".ctxhelmignore",
+      "pathHash": "path:b3b49dec463be318",
+      "observedAtMillis": null
+    },
+    {
+      "path": "Cargo.toml",
+      "pathHash": "path:0d0b235fe2a94b47",
+      "observedAtMillis": null
+    }
+  ],
+  "filesRead": [],
+  "filesEdited": [],
+  "commands": [],
+  "toolCallCount": 9,
+  "tokenEstimate": null,
+  "elapsedMillis": 209,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

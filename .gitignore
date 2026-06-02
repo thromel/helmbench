@@ -3,3 +3,4 @@
 /reports/*.json
 !/reports/example-native.json
 !/reports/example-ctxhelm.json
+!/reports/example-ctxhelm-plan-meta.json

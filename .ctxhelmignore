@@ -1,0 +1,4 @@
+target/
+reports/
+examples/traces/
+docs/example-compare.md

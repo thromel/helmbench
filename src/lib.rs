@@ -148,6 +148,8 @@ pub struct ReportSummary {
     pub total_files_read: usize,
     pub total_irrelevant_file_reads: usize,
     pub irrelevant_read_rate: f32,
+    pub average_recommendation_precision: f32,
+    pub average_recommendation_recall: f32,
     pub average_context_precision: f32,
     pub average_edited_file_recall: f32,
     pub validation_coverage_rate: f32,
@@ -164,6 +166,10 @@ pub struct TaskReport {
     pub expected_file_count: usize,
     pub expected_test_count: usize,
     pub recommended_file_count: usize,
+    pub relevant_recommended_file_count: usize,
+    pub irrelevant_recommended_file_count: usize,
+    pub recommendation_precision: f32,
+    pub recommendation_recall: f32,
     pub files_read_count: usize,
     pub relevant_files_read_count: usize,
     pub irrelevant_file_read_count: usize,
@@ -189,6 +195,8 @@ pub struct CompareReport {
     pub task_count_delta: isize,
     pub success_rate_delta: f32,
     pub irrelevant_read_rate_delta: f32,
+    pub average_recommendation_precision_delta: f32,
+    pub average_recommendation_recall_delta: f32,
     pub average_context_precision_delta: f32,
     pub average_edited_file_recall_delta: f32,
     pub validation_coverage_rate_delta: f32,
@@ -336,6 +344,10 @@ pub fn compare_reports(base: &RunReport, head: &RunReport) -> CompareReport {
         success_rate_delta: head.summary.success_rate - base.summary.success_rate,
         irrelevant_read_rate_delta: head.summary.irrelevant_read_rate
             - base.summary.irrelevant_read_rate,
+        average_recommendation_precision_delta: head.summary.average_recommendation_precision
+            - base.summary.average_recommendation_precision,
+        average_recommendation_recall_delta: head.summary.average_recommendation_recall
+            - base.summary.average_recommendation_recall,
         average_context_precision_delta: head.summary.average_context_precision
             - base.summary.average_context_precision,
         average_edited_file_recall_delta: head.summary.average_edited_file_recall
@@ -357,11 +369,13 @@ pub fn render_markdown_report(report: &RunReport) -> String {
     ));
     out.push_str("## Summary\n\n");
     out.push_str(&format!(
-        "- Suite: `{}`\n- Tasks: `{}`\n- Success rate: `{:.1}%`\n- Irrelevant read rate: `{:.1}%`\n- Context precision: `{:.1}%`\n- Edited-file recall: `{:.1}%`\n- Validation coverage: `{:.1}%`\n- Tool calls: `{}`\n- Token estimate: `{}`\n- Source-free: `{}`\n\n",
+        "- Suite: `{}`\n- Tasks: `{}`\n- Success rate: `{:.1}%`\n- Irrelevant read rate: `{:.1}%`\n- Recommendation precision: `{:.1}%`\n- Recommendation recall: `{:.1}%`\n- Context precision: `{:.1}%`\n- Edited-file recall: `{:.1}%`\n- Validation coverage: `{:.1}%`\n- Tool calls: `{}`\n- Token estimate: `{}`\n- Source-free: `{}`\n\n",
         report.suite_name,
         report.summary.task_count,
         pct(report.summary.success_rate),
         pct(report.summary.irrelevant_read_rate),
+        pct(report.summary.average_recommendation_precision),
+        pct(report.summary.average_recommendation_recall),
         pct(report.summary.average_context_precision),
         pct(report.summary.average_edited_file_recall),
         pct(report.summary.validation_coverage_rate),
@@ -370,13 +384,15 @@ pub fn render_markdown_report(report: &RunReport) -> String {
         report.privacy.source_free
     ));
     out.push_str("## Tasks\n\n");
-    out.push_str("| Task | Status | Reads | Irrelevant reads | Context precision | Validation | Tool calls |\n");
-    out.push_str("| --- | --- | ---: | ---: | ---: | --- | ---: |\n");
+    out.push_str("| Task | Status | Recommendations | Rec recall | Reads | Irrelevant reads | Context precision | Validation | Tool calls |\n");
+    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |\n");
     for task in &report.tasks {
         out.push_str(&format!(
-            "| `{}` | {:?} | {} | {} | {:.1}% | {} | {} |\n",
+            "| `{}` | {:?} | {} | {:.1}% | {} | {} | {:.1}% | {} | {} |\n",
             task.task_id,
             task.status,
+            task.recommended_file_count,
+            pct(task.recommendation_recall),
             task.files_read_count,
             task.irrelevant_file_read_count,
             pct(task.context_precision),
@@ -403,6 +419,14 @@ pub fn render_markdown_compare(compare: &CompareReport) -> String {
     out.push_str(&format!(
         "| Irrelevant read rate | {:+.1}% |\n",
         pct(compare.irrelevant_read_rate_delta)
+    ));
+    out.push_str(&format!(
+        "| Recommendation precision | {:+.1}% |\n",
+        pct(compare.average_recommendation_precision_delta)
+    ));
+    out.push_str(&format!(
+        "| Recommendation recall | {:+.1}% |\n",
+        pct(compare.average_recommendation_recall_delta)
     ));
     out.push_str(&format!(
         "| Context precision | {:+.1}% |\n",
@@ -450,6 +474,47 @@ pub fn read_report(path: &Path) -> Result<RunReport> {
     Ok(report)
 }
 
+pub fn trace_from_ctxhelm_prepare_json(
+    task: &BenchTask,
+    json: &str,
+    agent: &str,
+    variant: AgentVariant,
+    elapsed_millis: Option<u64>,
+) -> Result<AgentTrace> {
+    let value = serde_json::from_str::<serde_json::Value>(json).context("parse ctxhelm JSON")?;
+    let mut recommended = Vec::new();
+    collect_path_observations(&value, "targetFiles", &mut recommended)?;
+    collect_path_observations(&value, "relatedTests", &mut recommended)?;
+    dedupe_observations(&mut recommended);
+    let tool_call_count = usize::from(value.get("taskId").is_some())
+        + value
+            .get("targetFiles")
+            .and_then(|items| items.as_array())
+            .map_or(0, Vec::len)
+        + value
+            .get("relatedTests")
+            .and_then(|items| items.as_array())
+            .map_or(0, Vec::len);
+    let trace = AgentTrace {
+        schema_version: TRACE_SCHEMA_VERSION,
+        task_id: task.id.clone(),
+        agent: agent.to_string(),
+        variant,
+        status: TaskStatus::Skipped,
+        recommended_files: recommended,
+        files_read: Vec::new(),
+        files_edited: Vec::new(),
+        commands: Vec::new(),
+        tool_call_count: tool_call_count as u32,
+        token_estimate: None,
+        elapsed_millis,
+        time_to_first_relevant_file_millis: None,
+        privacy: PrivacyStatus::source_free(),
+    };
+    validate_trace(&trace)?;
+    Ok(trace)
+}
+
 pub fn example_suite() -> TaskSuite {
     TaskSuite {
         schema_version: SUITE_SCHEMA_VERSION,
@@ -470,6 +535,33 @@ pub fn example_suite() -> TaskSuite {
     }
 }
 
+fn collect_path_observations(
+    value: &serde_json::Value,
+    key: &str,
+    output: &mut Vec<PathObservation>,
+) -> Result<()> {
+    let Some(items) = value.get(key).and_then(|items| items.as_array()) else {
+        return Ok(());
+    };
+    for item in items {
+        let Some(path) = item.get("path").and_then(|path| path.as_str()) else {
+            continue;
+        };
+        validate_safe_relative_path(path).with_context(|| format!("ctxhelm path `{path}`"))?;
+        output.push(PathObservation {
+            path: path.to_string(),
+            path_hash: Some(format!("path:{}", stable_hash(path))),
+            observed_at_millis: None,
+        });
+    }
+    Ok(())
+}
+
+fn dedupe_observations(observations: &mut Vec<PathObservation>) {
+    let mut seen = BTreeSet::new();
+    observations.retain(|observation| seen.insert(observation.path.clone()));
+}
+
 pub fn project_root_for_cli(path: Option<PathBuf>) -> Result<PathBuf> {
     match path {
         Some(path) => Ok(path),
@@ -480,6 +572,17 @@ pub fn project_root_for_cli(path: Option<PathBuf>) -> Result<PathBuf> {
 fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
     let expected_files = task.expected_files.iter().cloned().collect::<BTreeSet<_>>();
     let expected_tests = task.expected_tests.iter().cloned().collect::<BTreeSet<_>>();
+    let expected_evidence = task
+        .expected_files
+        .iter()
+        .chain(task.expected_tests.iter())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let recommended = trace
+        .recommended_files
+        .iter()
+        .map(|obs| obs.path.clone())
+        .collect::<BTreeSet<_>>();
     let read = trace
         .files_read
         .iter()
@@ -492,6 +595,8 @@ fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
         .collect::<BTreeSet<_>>();
     let relevant_files_read = read.intersection(&expected_files).count();
     let irrelevant_file_read_count = read.difference(&expected_files).count();
+    let relevant_recommended_file_count = recommended.intersection(&expected_evidence).count();
+    let irrelevant_recommended_file_count = recommended.difference(&expected_evidence).count();
     let expected_files_edited_count = edited.intersection(&expected_files).count();
     let validation_covered = validation_covered(task, trace, &expected_tests);
     let files_read_count = read.len();
@@ -505,12 +610,26 @@ fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
     } else {
         expected_files_edited_count as f32 / expected_files.len() as f32
     };
+    let recommendation_precision = if recommended.is_empty() {
+        0.0
+    } else {
+        relevant_recommended_file_count as f32 / recommended.len() as f32
+    };
+    let recommendation_recall = if expected_evidence.is_empty() {
+        0.0
+    } else {
+        relevant_recommended_file_count as f32 / expected_evidence.len() as f32
+    };
     TaskReport {
         task_id: task.id.clone(),
         status: trace.status.clone(),
         expected_file_count: expected_files.len(),
         expected_test_count: expected_tests.len(),
         recommended_file_count: unique_count(&trace.recommended_files),
+        relevant_recommended_file_count,
+        irrelevant_recommended_file_count,
+        recommendation_precision,
+        recommendation_recall,
         files_read_count,
         relevant_files_read_count: relevant_files_read,
         irrelevant_file_read_count,
@@ -562,6 +681,10 @@ fn summarize(tasks: &[TaskReport]) -> ReportSummary {
         .iter()
         .map(|task| task.irrelevant_file_read_count)
         .sum::<usize>();
+    let average_recommendation_precision =
+        average(tasks.iter().map(|task| task.recommendation_precision));
+    let average_recommendation_recall =
+        average(tasks.iter().map(|task| task.recommendation_recall));
     let average_context_precision = average(tasks.iter().map(|task| task.context_precision));
     let average_edited_file_recall = average(tasks.iter().map(|task| task.edited_file_recall));
     let validation_coverage_rate = if task_count == 0 {
@@ -591,6 +714,8 @@ fn summarize(tasks: &[TaskReport]) -> ReportSummary {
         } else {
             total_irrelevant_file_reads as f32 / total_files_read as f32
         },
+        average_recommendation_precision,
+        average_recommendation_recall,
         average_context_precision,
         average_edited_file_recall,
         validation_coverage_rate,
@@ -655,6 +780,15 @@ fn pct(value: f32) -> f32 {
     value * 100.0
 }
 
+fn stable_hash(value: &str) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in value.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("{hash:016x}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -707,6 +841,55 @@ mod tests {
         assert_eq!(report.tasks[0].time_to_first_relevant_file_millis, Some(20));
         assert!(report.tasks[0].validation_covered);
         assert_eq!(report.summary.total_tool_calls, 6);
+    }
+
+    #[test]
+    fn ctxhelm_prepare_json_becomes_source_free_recommendation_trace() {
+        let suite = example_suite();
+        let task = &suite.tasks[0];
+        let json = r#"{
+          "taskId": "task-1",
+          "targetFiles": [
+            {"path": "src/auth/session.ts"},
+            {"path": "src/auth/middleware.ts"}
+          ],
+          "relatedTests": [
+            {"path": "tests/auth/session.test.ts"}
+          ]
+        }"#;
+
+        let trace = trace_from_ctxhelm_prepare_json(
+            task,
+            json,
+            "ctxhelm",
+            AgentVariant::CtxhelmPlan,
+            Some(42),
+        )
+        .expect("ctxhelm trace");
+        assert_eq!(trace.task_id, "auth-redirect-001");
+        assert_eq!(trace.status, TaskStatus::Skipped);
+        assert_eq!(trace.recommended_files.len(), 3);
+        assert!(trace.privacy.source_free);
+
+        let report = build_report(&suite, &[trace]).expect("report");
+        assert_eq!(report.tasks[0].relevant_recommended_file_count, 3);
+        assert_eq!(report.tasks[0].recommendation_precision, 1.0);
+        assert_eq!(report.tasks[0].recommendation_recall, 1.0);
+        assert_eq!(report.summary.average_recommendation_recall, 1.0);
+    }
+
+    #[test]
+    fn ctxhelm_prepare_json_rejects_unsafe_recommended_path() {
+        let suite = example_suite();
+        let error = trace_from_ctxhelm_prepare_json(
+            &suite.tasks[0],
+            r#"{"targetFiles":[{"path":"../secret.env"}]}"#,
+            "ctxhelm",
+            AgentVariant::CtxhelmPlan,
+            None,
+        )
+        .expect_err("unsafe path should fail");
+        assert!(error.to_string().contains("ctxhelm path"));
     }
 
     #[test]

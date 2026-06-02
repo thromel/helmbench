@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "suiteName": "helmbench-meta",
+  "agent": "ctxhelm",
+  "variant": "ctxhelm_plan",
+  "summary": {
+    "taskCount": 1,
+    "successCount": 0,
+    "successRate": 0.0,
+    "totalFilesRead": 0,
+    "totalIrrelevantFileReads": 0,
+    "irrelevantReadRate": 0.0,
+    "averageRecommendationPrecision": 0.25,
+    "averageRecommendationRecall": 1.0,
+    "averageContextPrecision": 0.0,
+    "averageEditedFileRecall": 0.0,
+    "validationCoverageRate": 0.0,
+    "averageTimeToFirstRelevantFileMillis": null,
+    "totalToolCalls": 9,
+    "totalTokenEstimate": 0
+  },
+  "tasks": [
+    {
+      "taskId": "helmbench-recommendation-metrics-001",
+      "status": "skipped",
+      "expectedFileCount": 2,
+      "expectedTestCount": 1,
+      "recommendedFileCount": 8,
+      "relevantRecommendedFileCount": 2,
+      "irrelevantRecommendedFileCount": 6,
+      "recommendationPrecision": 0.25,
+      "recommendationRecall": 1.0,
+      "filesReadCount": 0,
+      "relevantFilesReadCount": 0,
+      "irrelevantFileReadCount": 0,
+      "filesEditedCount": 0,
+      "expectedFilesEditedCount": 0,
+      "contextPrecision": 0.0,
+      "editedFileRecall": 0.0,
+      "validationCovered": false,
+      "toolCallCount": 9,
+      "tokenEstimate": 0,
+      "elapsedMillis": 209,
+      "timeToFirstRelevantFileMillis": null
+    }
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

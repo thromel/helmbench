@@ -38,6 +38,10 @@ A trace records only evaluation-safe metadata:
 
 It does not record raw code or model transcripts.
 
+Generated reports and traces should be excluded from the repository context
+engine used under test. This repo includes `.ctxhelmignore` so ctxhelm does not
+rank HelmBench's own benchmark artifacts as task evidence.
+
 ## Variants
 
 Initial variants:
@@ -49,13 +53,16 @@ Initial variants:
 - `other`
 
 The first MVP ingests manually produced or synthetic traces. Later adapters will
-run agents and produce traces automatically.
+run agents and produce traces automatically. The current ctxhelm adapter already
+generates source-free recommendation traces from `ctxhelm prepare-task`.
 
 ## Metrics
 
 The core report computes:
 
 - success rate
+- recommendation precision
+- recommendation recall
 - total files read
 - irrelevant file reads
 - irrelevant read rate
@@ -79,6 +86,13 @@ counts, and classes so reports are safe to commit and share.
 Direct agent adapters require brittle CLI/process instrumentation. Trace
 ingestion makes the metric contract testable first, then adapters can target the
 contract.
+
+### Why add ctxhelm recommendation traces before direct Claude Code traces?
+
+ctxhelm can already emit source-free `prepare-task` plans. Converting those
+plans into HelmBench traces gives immediate measurement of recommendation
+precision and recall, while direct agent adapters can be added without changing
+the report contract.
 
 ### Why not pass/fail only?
 

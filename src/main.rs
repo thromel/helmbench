@@ -2,10 +2,12 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use helmbench::{
     build_report, compare_reports, example_suite, load_suite, load_traces, project_root_for_cli,
-    read_report, render_markdown_compare, render_markdown_report, validate_suite, write_json,
-    AgentVariant,
+    read_report, render_markdown_compare, render_markdown_report, trace_from_ctxhelm_prepare_json,
+    validate_suite, write_json, AgentVariant,
 };
 use std::path::PathBuf;
+use std::process::Command as ProcessCommand;
+use std::time::Instant;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -37,6 +39,23 @@ enum Command {
         out: PathBuf,
         #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
         format: OutputFormat,
+    },
+    /// Generate source-free traces by calling ctxhelm prepare-task for each suite task.
+    CtxhelmTrace {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        repo: PathBuf,
+        #[arg(long, default_value = "ctxhelm")]
+        ctxhelm_bin: PathBuf,
+        #[arg(long, default_value = "explain")]
+        mode: String,
+        #[arg(long, default_value = "generic")]
+        target_agent: String,
+        #[arg(long)]
+        semantic: bool,
+        #[arg(long, default_value = "traces/ctxhelm-plan")]
+        out_dir: PathBuf,
     },
     /// Compare two source-free run reports.
     Compare {
@@ -93,6 +112,57 @@ fn main() -> Result<()> {
                 OutputFormat::Markdown => write_text(&render_markdown_report(&report), &out)?,
             }
             println!("wrote {}", out.display());
+        }
+        Command::CtxhelmTrace {
+            suite,
+            repo,
+            ctxhelm_bin,
+            mode,
+            target_agent,
+            semantic,
+            out_dir,
+        } => {
+            let suite = load_suite(&suite)?;
+            std::fs::create_dir_all(&out_dir)
+                .with_context(|| format!("create {}", out_dir.display()))?;
+            for task in &suite.tasks {
+                let started = Instant::now();
+                let mut command = ProcessCommand::new(&ctxhelm_bin);
+                command
+                    .arg("prepare-task")
+                    .arg("--repo")
+                    .arg(&repo)
+                    .arg("--mode")
+                    .arg(&mode)
+                    .arg("--target-agent")
+                    .arg(&target_agent)
+                    .arg("--no-trace");
+                if semantic {
+                    command.arg("--semantic");
+                }
+                command.arg(&task.prompt);
+                let output = command
+                    .output()
+                    .with_context(|| format!("run {}", ctxhelm_bin.display()))?;
+                if !output.status.success() {
+                    anyhow::bail!(
+                        "ctxhelm prepare-task failed for `{}` with status {:?}",
+                        task.id,
+                        output.status.code()
+                    );
+                }
+                let stdout = String::from_utf8(output.stdout).context("ctxhelm stdout utf8")?;
+                let trace = trace_from_ctxhelm_prepare_json(
+                    task,
+                    &stdout,
+                    "ctxhelm",
+                    AgentVariant::CtxhelmPlan,
+                    Some(started.elapsed().as_millis() as u64),
+                )?;
+                let out = out_dir.join(format!("{}.json", task.id));
+                write_json(&trace, &out)?;
+                println!("wrote {}", out.display());
+            }
         }
         Command::Compare {
             base,

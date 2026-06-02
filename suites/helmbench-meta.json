@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "name": "helmbench-meta",
+  "description": "Source-free suite for evaluating HelmBench development tasks against the HelmBench repository.",
+  "tasks": [
+    {
+      "id": "helmbench-recommendation-metrics-001",
+      "prompt": "Add recommendation precision and recall metrics to HelmBench reports and expose a ctxhelm trace adapter.",
+      "expectedFiles": [
+        "src/lib.rs",
+        "src/main.rs"
+      ],
+      "expectedTests": [
+        "src/lib.rs"
+      ],
+      "successCommand": "cargo test",
+      "tags": [
+        "feature",
+        "metrics",
+        "adapter"
+      ],
+      "timeoutSeconds": 600
+    }
+  ]
+}
