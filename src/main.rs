@@ -2930,7 +2930,7 @@ fn run_demo_pipeline_with_adapter(
         &docs_dir.join("compare.md"),
     )?;
 
-    let summary = build_benchmark_summary(&native_report, &[guided_report.clone()])?;
+    let summary = build_benchmark_summary(&native_report, std::slice::from_ref(&guided_report))?;
     let summary_json_path = reports_dir.join("benchmark-summary.json");
     write_json(&summary, &summary_json_path)?;
     write_text(
