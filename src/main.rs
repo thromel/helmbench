@@ -1576,6 +1576,7 @@ struct RunMatrixSpec {
     safe_name: String,
     agent: String,
     variant: AgentVariant,
+    ctxhelm: Option<CtxhelmRunConfig>,
     adapter_command: Option<String>,
 }
 
@@ -1740,7 +1741,7 @@ fn run_matrix_spec(
         &spec.agent,
         spec.variant.clone(),
         setup_commands,
-        None,
+        spec.ctxhelm.as_ref(),
         spec.adapter_command.as_deref(),
         keep_workdirs,
     )
@@ -1765,6 +1766,16 @@ fn parse_run_matrix_spec(raw: &str) -> Result<RunMatrixSpec> {
     let mut agent = None;
     let mut variant = None;
     let mut command = None;
+    let mut use_ctxhelm = false;
+    let mut ctxhelm_bin = PathBuf::from("ctxhelm");
+    let mut mode = "explain".to_string();
+    let mut target_agent = "generic".to_string();
+    let mut semantic = false;
+    let mut semantic_provider = None;
+    let mut semantic_model = None;
+    let mut semantic_dimensions = None;
+    let mut pack = false;
+    let mut pack_budget = "brief".to_string();
 
     for part in raw.split(',') {
         let part = part.trim();
@@ -1780,6 +1791,47 @@ fn parse_run_matrix_spec(raw: &str) -> Result<RunMatrixSpec> {
             "name" => name = Some(value.to_string()),
             "agent" => agent = Some(value.to_string()),
             "variant" => variant = Some(parse_agent_variant(value)?),
+            "ctxhelm" => use_ctxhelm = parse_bool_field("ctxhelm", value)?,
+            "ctxhelm_bin" => {
+                use_ctxhelm = true;
+                ctxhelm_bin = PathBuf::from(value);
+            }
+            "mode" => {
+                use_ctxhelm = true;
+                mode = value.to_string();
+            }
+            "target_agent" => {
+                use_ctxhelm = true;
+                target_agent = value.to_string();
+            }
+            "semantic" => {
+                use_ctxhelm = true;
+                semantic = parse_bool_field("semantic", value)?;
+            }
+            "semantic_provider" => {
+                use_ctxhelm = true;
+                semantic_provider = non_empty_string(value);
+            }
+            "semantic_model" => {
+                use_ctxhelm = true;
+                semantic_model = non_empty_string(value);
+            }
+            "semantic_dimensions" => {
+                use_ctxhelm = true;
+                semantic_dimensions = Some(
+                    value
+                        .parse::<u16>()
+                        .with_context(|| format!("parse semantic_dimensions `{value}`"))?,
+                );
+            }
+            "pack" => {
+                use_ctxhelm = true;
+                pack = parse_bool_field("pack", value)?;
+            }
+            "pack_budget" => {
+                use_ctxhelm = true;
+                pack_budget = value.to_string();
+            }
             "command" => {
                 if !value.is_empty() {
                     command = Some(value.to_string());
@@ -1803,8 +1855,31 @@ fn parse_run_matrix_spec(raw: &str) -> Result<RunMatrixSpec> {
         safe_name,
         agent,
         variant: variant.context("run spec requires variant=<variant>")?,
+        ctxhelm: use_ctxhelm.then_some(CtxhelmRunConfig {
+            ctxhelm_bin,
+            mode,
+            target_agent,
+            semantic,
+            semantic_provider,
+            semantic_model,
+            semantic_dimensions,
+            include_pack: pack,
+            pack_budget,
+        }),
         adapter_command: command,
     })
+}
+
+fn parse_bool_field(name: &str, value: &str) -> Result<bool> {
+    match value {
+        "true" | "1" | "yes" => Ok(true),
+        "false" | "0" | "no" => Ok(false),
+        _ => anyhow::bail!("{name} must be true or false, got `{value}`"),
+    }
+}
+
+fn non_empty_string(value: &str) -> Option<String> {
+    (!value.trim().is_empty()).then(|| value.to_string())
 }
 
 fn validate_run_matrix_specs(baseline: &RunMatrixSpec, heads: &[RunMatrixSpec]) -> Result<()> {
@@ -2287,6 +2362,7 @@ fn run_local_suite(
     Ok(())
 }
 
+#[derive(Debug, Clone)]
 struct CtxhelmRunConfig {
     ctxhelm_bin: PathBuf,
     mode: String,
@@ -2872,11 +2948,15 @@ mod tests {
         let adapter = temp.path().join("fake-demo-agent.sh");
         std::fs::write(&adapter, FAKE_DEMO_AGENT).expect("adapter");
         set_executable(&adapter).expect("chmod adapter");
+        let ctxhelm = temp.path().join("fake-ctxhelm.sh");
+        std::fs::write(&ctxhelm, FAKE_CTXHELM).expect("ctxhelm");
+        set_executable(&ctxhelm).expect("chmod ctxhelm");
 
         let out = temp.path().join("matrix");
         let head = format!(
-            "name=guided,agent=demo-guided,variant=ctxhelm_mcp,command=sh {}",
-            shell_escape(&adapter.to_string_lossy())
+            "name=guided,agent=demo-guided,variant=ctxhelm_mcp,ctxhelm=true,ctxhelm_bin={},pack=true,pack_budget=brief,command=sh {}",
+            ctxhelm.to_string_lossy(),
+            shell_escape(&adapter.to_string_lossy()),
         );
         run_matrix(
             &suite_path,
@@ -2916,6 +2996,19 @@ mod tests {
         let gate = std::fs::read_to_string(out.join("reports/quality-gate.json")).expect("gate");
         let gate = serde_json::from_str::<serde_json::Value>(&gate).expect("json");
         assert_eq!(gate["passed"], true);
+
+        let traces = load_traces(&out.join("traces/guided")).expect("guided traces");
+        assert!(traces.iter().all(|trace| trace.token_estimate == Some(321)));
+        assert!(traces
+            .iter()
+            .all(|trace| trace.commands.iter().any(|command| {
+                command.command_hash == Some(command_hash("ctxhelm prepare-task"))
+            })));
+        assert!(traces
+            .iter()
+            .all(|trace| trace.commands.iter().any(|command| {
+                command.command_hash == Some(command_hash("ctxhelm get-pack brief"))
+            })));
     }
 
     #[test]
@@ -3164,5 +3257,21 @@ esac
 mkdir -p "$(dirname "$HELMBENCH_EVENTS")"
 printf '{"schemaVersion":1,"taskId":"%s","eventKind":"recommended_file","path":"%s","observedAtMillis":5}\n' "$HELMBENCH_TASK_ID" "$path" >> "$HELMBENCH_EVENTS"
 printf '{"schemaVersion":1,"taskId":"%s","eventKind":"file_read","path":"%s","observedAtMillis":15}\n' "$HELMBENCH_TASK_ID" "$path" >> "$HELMBENCH_EVENTS"
+"#;
+
+    const FAKE_CTXHELM: &str = r#"#!/usr/bin/env sh
+set -eu
+
+case "${1:-}" in
+  prepare-task)
+    printf '{"targetFiles":[{"path":"src/auth/session.txt"}],"relatedTests":[{"path":"auth.test"}]}\n'
+    ;;
+  get-pack)
+    printf '{"tokenEstimate":321,"sections":[]}\n'
+    ;;
+  *)
+    exit 2
+    ;;
+esac
 "#;
 }

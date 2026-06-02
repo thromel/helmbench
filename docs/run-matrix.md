@@ -22,6 +22,17 @@ Run specs use comma-separated `key=value` fields:
 - `agent`: source-free agent label for reports;
 - `variant`: one of `native`, `ctxhelm_plan`, `ctxhelm_mcp`, `ctxhelm_pack`,
   or `other`;
+- `ctxhelm`: optional `true`/`false`; when true, HelmBench calls ctxhelm before
+  the adapter command and records source-free recommendation events;
+- `ctxhelm_bin`: optional ctxhelm binary path, default `ctxhelm`;
+- `mode`: optional ctxhelm mode, default `explain`;
+- `target_agent`: optional ctxhelm target agent, default `generic`;
+- `semantic`: optional `true`/`false` switch passed to ctxhelm;
+- `semantic_provider`, `semantic_model`, `semantic_dimensions`: optional
+  semantic retrieval settings passed through to ctxhelm;
+- `pack`: optional `true`/`false`; when true, HelmBench calls
+  `ctxhelm get-pack --format json` and stores only source-free pack metadata;
+- `pack_budget`: optional pack budget, default `brief`;
 - `command`: optional adapter command executed inside each isolated task clone.
 
 The baseline command can be omitted. In that case HelmBench still clones the
@@ -60,3 +71,19 @@ helmbench verify-bundle \
 
 Use `--fail-on-regression` when this command runs in CI and should exit
 non-zero if the default quality gate fails.
+
+## ctxhelm Row
+
+```bash
+helmbench run-matrix \
+  --suite /tmp/refactoringminer-suite.json \
+  --repo /tmp/RefactoringMiner \
+  --out-dir /tmp/refactoringminer-matrix \
+  --baseline "name=native,agent=claude-code,variant=native,command=claude --print" \
+  --head "name=ctxhelm,agent=claude-code,variant=ctxhelm_mcp,ctxhelm=true,mode=bug-fix,target_agent=claude-code,pack=true,pack_budget=brief,command=claude --print" \
+  --force
+```
+
+The ctxhelm row records `recommended_file` events from `ctxhelm prepare-task`.
+If `pack=true`, it also records token metadata from `ctxhelm get-pack` without
+persisting pack sections, snippets, raw source, or raw prompts.

@@ -93,6 +93,11 @@ foundation the Claude/Codex launch presets use.
 baseline and variant results share identical clone, validation, trace, and
 privacy behavior.
 
+When a matrix row sets `ctxhelm=true`, HelmBench calls ctxhelm before the
+adapter command and records the returned target files/tests as source-free
+recommendation events. With `pack=true`, it also calls `ctxhelm get-pack` and
+records only source-free pack metadata such as token estimates.
+
 `claude-run` and `codex-run` are thin launch presets over `local-run`. They
 start the installed agent CLI non-interactively, suppress raw stdout/stderr, and
 inject instructions that ask the agent to emit source-free `record-event` calls.

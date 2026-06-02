@@ -113,6 +113,11 @@ cargo run -- verify-bundle \
   --bundle /tmp/helmbench-matrix/evidence
 ```
 
+Add `ctxhelm=true` to a `--head` spec when the row should call
+`ctxhelm prepare-task` before the adapter. Add `pack=true` to also call
+`ctxhelm get-pack --format json`; HelmBench stores only source-free
+recommendation and token metadata.
+
 Generate a source-free RefactoringMiner public benchmark suite after checking
 fixture health:
 
