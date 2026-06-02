@@ -36,6 +36,8 @@ This repository currently implements the core HelmBench workflow:
   payloads
 - `init-public-suite` generator for verified public-repo benchmark suites,
   currently RefactoringMiner and Flask
+- `suite-health` checks any source-free suite against a local git repo before
+  benchmark results are trusted
 - `demo-run` one-command deterministic demo pipeline with reports, dashboard,
   quality gate, and evidence bundle
 - `run-matrix` benchmark coordinator that runs one baseline plus one or more
@@ -182,6 +184,21 @@ Validate a suite:
 ```bash
 cargo run -- validate-suite suites/example-auth-bugs.json
 ```
+
+Check that a suite is healthy against a repo before running agents:
+
+```bash
+cargo run -- suite-health \
+  --suite /tmp/helmbench-demo-suite.json \
+  --repo /tmp/helmbench-demo-repo \
+  --out /tmp/helmbench-suite-health.md \
+  --format markdown
+```
+
+`suite-health` verifies the repo is a git checkout, commit depth satisfies the
+configured minimum, expected files/tests exist, success commands are present,
+and the checkout is clean unless `--allow-dirty` is set. The report is
+source-free and can be included in evidence bundles.
 
 Build reports from source-free traces:
 
@@ -479,6 +496,7 @@ helmbench-cli
   demo-run
   run-matrix
   init-public-suite
+  suite-health
   validate-suite
   run
   ctxhelm-trace
@@ -518,4 +536,4 @@ future direct-agent adapters
 
 1. Add Cursor direct-run preset when a stable non-interactive launch contract is available.
 2. Add more public benchmark presets with source-free fixture health checks.
-3. Add signed release artifacts and installation docs for public use.
+3. Add richer longitudinal dashboards over verified matrix-history artifacts.

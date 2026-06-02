@@ -105,6 +105,21 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Check that a source-free task suite is usable against a local git repo.
+    SuiteHealth {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        repo: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+        format: OutputFormat,
+        #[arg(long, default_value_t = 1)]
+        min_commits: u64,
+        #[arg(long)]
+        allow_dirty: bool,
+    },
     /// Validate a HelmBench suite contract.
     ValidateSuite { suite: PathBuf },
     /// Build a run report from source-free trace JSON files.
@@ -581,6 +596,28 @@ fn main() -> Result<()> {
             init_public_suite(preset, &repo, &suite_out, &health_out, min_commits, force)?;
             println!("wrote {}", suite_out.display());
             println!("wrote {}", health_out.display());
+        }
+        Command::SuiteHealth {
+            suite,
+            repo,
+            out,
+            format,
+            min_commits,
+            allow_dirty,
+        } => {
+            let suite = load_suite(&suite)?;
+            let health = suite_health_report(None, &repo, min_commits, allow_dirty, &suite, &[])?;
+            match format {
+                OutputFormat::Json => write_json(&health, &out)?,
+                OutputFormat::Markdown => write_text(&render_markdown_suite_health(&health), &out)?,
+            }
+            if !health.ok {
+                anyhow::bail!(
+                    "suite health check failed; wrote source-free health report to {}",
+                    out.display()
+                );
+            }
+            println!("wrote {}", out.display());
         }
         Command::ValidateSuite { suite } => {
             let suite = load_suite(&suite)?;
@@ -1136,15 +1173,25 @@ fn git_repo_ok(root: &Path) -> bool {
 struct PublicSuiteHealth {
     schema_version: u32,
     preset: String,
+    suite_name: String,
+    task_count: usize,
     repo_name: String,
     head: Option<String>,
     commit_count: Option<u64>,
     min_commits: u64,
+    allow_dirty: bool,
     dirty: bool,
     fsck_ok: bool,
+    validation_ready: bool,
+    expected_file_count: usize,
+    expected_test_count: usize,
     checked_files: Vec<String>,
     missing_files: Vec<String>,
+    missing_expected_files: Vec<String>,
+    missing_expected_tests: Vec<String>,
+    tasks_missing_success_command: Vec<String>,
     ok: bool,
+    privacy: PrivacyStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1376,6 +1423,20 @@ fn validate_public_suite_health(path: &Path) -> Result<()> {
     let raw = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     let health = serde_json::from_str::<PublicSuiteHealth>(&raw)
         .with_context(|| format!("parse health {}", path.display()))?;
+    if health.schema_version != 1 {
+        anyhow::bail!(
+            "unsupported health schema version {}",
+            health.schema_version
+        );
+    }
+    if !health.privacy.source_free
+        || health.privacy.raw_source_logged
+        || health.privacy.raw_prompt_logged
+        || health.privacy.raw_transcript_logged
+        || health.privacy.raw_terminal_logged
+    {
+        anyhow::bail!("health report is not source-free");
+    }
     if health.repo_name.contains('/') || health.repo_name.contains('\\') {
         anyhow::bail!("health repoName must not contain path separators");
     }
@@ -1383,6 +1444,8 @@ fn validate_public_suite_health(path: &Path) -> Result<()> {
         .checked_files
         .iter()
         .chain(health.missing_files.iter())
+        .chain(health.missing_expected_files.iter())
+        .chain(health.missing_expected_tests.iter())
     {
         helmbench::validate_safe_relative_path_for_cli(checked)?;
     }
@@ -1486,17 +1549,74 @@ fn public_suite_health(
     min_commits: u64,
     suite: &helmbench::TaskSuite,
 ) -> Result<PublicSuiteHealth> {
+    suite_health_report(
+        Some(public_suite_preset_name(preset)),
+        repo,
+        min_commits,
+        false,
+        suite,
+        public_suite_anchor_files(preset),
+    )
+}
+
+fn suite_health_report(
+    preset: Option<&str>,
+    repo: &Path,
+    min_commits: u64,
+    allow_dirty: bool,
+    suite: &helmbench::TaskSuite,
+    anchor_files: &[&str],
+) -> Result<PublicSuiteHealth> {
     let repo_name = repo
         .file_name()
         .and_then(|name| name.to_str())
         .unwrap_or("repo")
         .to_string();
-    let checked_files = checked_files_for_suite(preset, suite);
+    let checked_files = checked_files_for_suite_with_anchors(anchor_files, suite);
     let missing_files = checked_files
         .iter()
         .filter(|path| !repo.join(path).exists())
         .cloned()
         .collect::<Vec<_>>();
+    let missing_expected_files = suite
+        .tasks
+        .iter()
+        .flat_map(|task| task.expected_files.iter())
+        .filter(|path| !repo.join(path).exists())
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let missing_expected_tests = suite
+        .tasks
+        .iter()
+        .flat_map(|task| task.expected_tests.iter())
+        .filter(|path| !repo.join(path).exists())
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect::<Vec<_>>();
+    let tasks_missing_success_command = suite
+        .tasks
+        .iter()
+        .filter(|task| {
+            task.success_command
+                .as_deref()
+                .is_none_or(|command| command.trim().is_empty())
+        })
+        .map(|task| task.id.clone())
+        .collect::<Vec<_>>();
+    let expected_file_count = suite
+        .tasks
+        .iter()
+        .map(|task| task.expected_files.len())
+        .sum::<usize>();
+    let expected_test_count = suite
+        .tasks
+        .iter()
+        .map(|task| task.expected_tests.len())
+        .sum::<usize>();
+    let validation_ready = tasks_missing_success_command.is_empty();
 
     let head = git_output(repo, &["rev-parse", "HEAD"]).ok();
     let commit_count = git_output(repo, &["rev-list", "--count", "HEAD"])
@@ -1509,22 +1629,35 @@ fn public_suite_health(
     let ok = repo.join(".git").exists()
         && head.is_some()
         && commit_count.is_some_and(|count| count >= min_commits)
-        && !dirty
+        && (!dirty || allow_dirty)
         && fsck_ok
-        && missing_files.is_empty();
+        && validation_ready
+        && missing_files.is_empty()
+        && missing_expected_files.is_empty()
+        && missing_expected_tests.is_empty();
 
     Ok(PublicSuiteHealth {
         schema_version: 1,
-        preset: public_suite_preset_name(preset).to_string(),
+        preset: preset.unwrap_or("custom").to_string(),
+        suite_name: suite.name.clone(),
+        task_count: suite.tasks.len(),
         repo_name,
         head,
         commit_count,
         min_commits,
+        allow_dirty,
         dirty,
         fsck_ok,
+        validation_ready,
+        expected_file_count,
+        expected_test_count,
         checked_files,
         missing_files,
+        missing_expected_files,
+        missing_expected_tests,
+        tasks_missing_success_command,
         ok,
+        privacy: PrivacyStatus::source_free(),
     })
 }
 
@@ -1563,8 +1696,16 @@ fn public_suite_anchor_files(preset: PublicSuitePreset) -> &'static [&'static st
     }
 }
 
+#[cfg(test)]
 fn checked_files_for_suite(preset: PublicSuitePreset, suite: &helmbench::TaskSuite) -> Vec<String> {
-    let mut paths = public_suite_anchor_files(preset)
+    checked_files_for_suite_with_anchors(public_suite_anchor_files(preset), suite)
+}
+
+fn checked_files_for_suite_with_anchors(
+    anchor_files: &[&str],
+    suite: &helmbench::TaskSuite,
+) -> Vec<String> {
+    let mut paths = anchor_files
         .iter()
         .map(|path| (*path).to_string())
         .collect::<Vec<_>>();
@@ -1575,6 +1716,78 @@ fn checked_files_for_suite(preset: PublicSuitePreset, suite: &helmbench::TaskSui
     paths.sort();
     paths.dedup();
     paths
+}
+
+fn render_markdown_suite_health(health: &PublicSuiteHealth) -> String {
+    let mut out = String::new();
+    out.push_str("# Suite Health\n\n");
+    out.push_str(&format!("Suite: `{}`\n\n", health.suite_name));
+    out.push_str(&format!(
+        "Status: **{}**\n\n",
+        if health.ok { "healthy" } else { "unhealthy" }
+    ));
+    out.push_str("| Field | Value |\n| --- | --- |\n");
+    out.push_str(&format!("| Preset | `{}` |\n", health.preset));
+    out.push_str(&format!("| Repo | `{}` |\n", health.repo_name));
+    out.push_str(&format!("| Tasks | {} |\n", health.task_count));
+    out.push_str(&format!(
+        "| Expected files / tests | {} / {} |\n",
+        health.expected_file_count, health.expected_test_count
+    ));
+    out.push_str(&format!(
+        "| Commit count | {} |\n",
+        health
+            .commit_count
+            .map(|count| count.to_string())
+            .unwrap_or_else(|| "unknown".to_string())
+    ));
+    out.push_str(&format!("| Minimum commits | {} |\n", health.min_commits));
+    out.push_str(&format!("| Dirty checkout | {} |\n", yes_no(health.dirty)));
+    out.push_str(&format!(
+        "| Dirty allowed | {} |\n",
+        yes_no(health.allow_dirty)
+    ));
+    out.push_str(&format!("| Git fsck ok | {} |\n", yes_no(health.fsck_ok)));
+    out.push_str(&format!(
+        "| Validation commands ready | {} |\n",
+        yes_no(health.validation_ready)
+    ));
+    out.push_str("\n## Missing Evidence\n\n");
+    append_markdown_list(&mut out, "Missing files", &health.missing_files);
+    append_markdown_list(
+        &mut out,
+        "Missing expected source files",
+        &health.missing_expected_files,
+    );
+    append_markdown_list(
+        &mut out,
+        "Missing expected tests",
+        &health.missing_expected_tests,
+    );
+    append_markdown_list(
+        &mut out,
+        "Tasks missing success commands",
+        &health.tasks_missing_success_command,
+    );
+    out.push_str("\n## Privacy\n\n");
+    out.push_str("- Source-free: `true`\n");
+    out.push_str("- Raw source logged: `false`\n");
+    out.push_str("- Raw prompts logged: `false`\n");
+    out.push_str("- Raw transcripts logged: `false`\n");
+    out.push_str("- Raw terminal logs logged: `false`\n");
+    out
+}
+
+fn append_markdown_list(out: &mut String, title: &str, values: &[String]) {
+    out.push_str(&format!("### {title}\n\n"));
+    if values.is_empty() {
+        out.push_str("- None\n\n");
+    } else {
+        for value in values {
+            out.push_str(&format!("- `{value}`\n"));
+        }
+        out.push('\n');
+    }
 }
 
 fn git_output(repo: &Path, args: &[&str]) -> Result<String> {
@@ -4257,6 +4470,68 @@ mod tests {
     }
 
     #[test]
+    fn suite_health_accepts_generic_demo_suite() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        let suite_path = temp.path().join("suite.json");
+        init_demo_repo(&repo, &suite_path, false).expect("demo repo");
+        let suite = load_suite(&suite_path).expect("suite");
+
+        let health = suite_health_report(None, &repo, 1, false, &suite, &[]).expect("suite health");
+
+        assert!(health.ok);
+        assert_eq!(health.preset, "custom");
+        assert_eq!(health.suite_name, "demo-tiny-repo");
+        assert_eq!(health.task_count, 2);
+        assert_eq!(health.expected_file_count, 2);
+        assert_eq!(health.expected_test_count, 2);
+        assert!(health.validation_ready);
+        assert!(health.missing_expected_files.is_empty());
+        assert!(health.missing_expected_tests.is_empty());
+        assert!(health.tasks_missing_success_command.is_empty());
+        assert!(health.privacy.source_free);
+
+        let rendered = render_markdown_suite_health(&health);
+        assert!(rendered.contains("Status: **healthy**"));
+        assert!(rendered.contains("Raw source logged: `false`"));
+    }
+
+    #[test]
+    fn suite_health_reports_missing_evidence_without_source_logs() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).expect("repo");
+        write_demo_file(&repo, "README.md", "fixture\n").expect("readme");
+        init_git_repo(&repo).expect("git repo");
+        let suite = helmbench::TaskSuite {
+            schema_version: helmbench::SUITE_SCHEMA_VERSION,
+            name: "bad-suite".to_string(),
+            description: String::new(),
+            tasks: vec![helmbench::BenchTask {
+                id: "missing-target".to_string(),
+                prompt: "Fix the missing target.".to_string(),
+                expected_files: vec!["src/missing.rs".to_string()],
+                expected_tests: vec!["tests/missing.rs".to_string()],
+                success_command: None,
+                tags: Vec::new(),
+                timeout_seconds: None,
+            }],
+        };
+
+        let health = suite_health_report(None, &repo, 1, false, &suite, &[]).expect("suite health");
+
+        assert!(!health.ok);
+        assert_eq!(health.missing_expected_files, vec!["src/missing.rs"]);
+        assert_eq!(health.missing_expected_tests, vec!["tests/missing.rs"]);
+        assert_eq!(health.tasks_missing_success_command, vec!["missing-target"]);
+        assert!(health
+            .missing_files
+            .iter()
+            .all(|path| !path.starts_with('/')));
+        assert!(health.privacy.source_free);
+    }
+
+    #[test]
     fn public_suite_defaults_are_preset_specific() {
         assert_eq!(
             default_public_suite_out(PublicSuitePreset::RefactoringMiner),
@@ -4287,15 +4562,25 @@ mod tests {
             &PublicSuiteHealth {
                 schema_version: 1,
                 preset: "test".to_string(),
+                suite_name: suite.name.clone(),
+                task_count: suite.tasks.len(),
                 repo_name: "repo".to_string(),
                 head: Some("abc123".to_string()),
                 commit_count: Some(1),
                 min_commits: 1,
+                allow_dirty: false,
                 dirty: false,
                 fsck_ok: true,
+                validation_ready: true,
+                expected_file_count: 1,
+                expected_test_count: 1,
                 checked_files: vec!["README.md".to_string()],
                 missing_files: Vec::new(),
+                missing_expected_files: Vec::new(),
+                missing_expected_tests: Vec::new(),
+                tasks_missing_success_command: Vec::new(),
                 ok: true,
+                privacy: PrivacyStatus::source_free(),
             },
             &health_path,
         )

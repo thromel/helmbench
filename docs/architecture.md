@@ -31,6 +31,12 @@ one baseline plus one or more local adapter variants over the same suite, then
 writes per-run reports, pairwise comparisons, a benchmark summary, quality
 gate, baseline autopsy, dashboard, and verifiable evidence bundle.
 
+`suite-health` is the preflight check for custom benchmark suites. It verifies
+that expected files and tests exist in the target repo, every task has a
+validation command, git metadata is readable, and the checkout is clean unless
+explicitly allowed. The resulting health report is source-free and can be
+included in evidence bundles.
+
 ## Source-Free Trace Model
 
 A trace records only evaluation-safe metadata:
@@ -178,9 +184,9 @@ preserve or improve agent behavior on a suite.
 ## Evidence Bundle
 
 `evidence-bundle` packages the source-free proof for a benchmark run. It
-validates the suite and reports, optionally validates a public-suite health
-report, generates JSON and Markdown benchmark summaries, copies the artifacts
-into a bundle directory, and writes `manifest.json`.
+validates the suite and reports, optionally validates a suite health report,
+generates JSON and Markdown benchmark summaries, copies the artifacts into a
+bundle directory, and writes `manifest.json`.
 
 `verify-bundle` is the inverse proof check. It reads `manifest.json`, rejects
 non-source-free privacy flags, validates every artifact path as a safe relative

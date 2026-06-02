@@ -22,6 +22,7 @@ cargo run -- validate-matrix --help >/dev/null
 cargo run -- run-matrix --help >/dev/null
 cargo run -- matrix-history --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
+cargo run -- suite-health --help >/dev/null
 cargo run -- benchmark-summary --help >/dev/null
 cargo run -- evidence-bundle --help >/dev/null
 cargo run -- verify-bundle --help >/dev/null
@@ -39,6 +40,17 @@ cargo run -- demo-run \
   --force
 
 cargo run -- validate-suite "$TMP_DIR/demo-suite.json"
+
+cargo run -- suite-health \
+  --suite "$TMP_DIR/demo-suite.json" \
+  --repo "$TMP_DIR/demo-repo" \
+  --out "$TMP_DIR/suite-health.json"
+
+cargo run -- suite-health \
+  --suite "$TMP_DIR/demo-suite.json" \
+  --repo "$TMP_DIR/demo-repo" \
+  --out "$TMP_DIR/suite-health.md" \
+  --format markdown
 
 cargo run -- local-run \
   --suite "$TMP_DIR/demo-suite.json" \
@@ -160,6 +172,8 @@ cargo run -- matrix-history \
 test -f "$TMP_DIR/report.json"
 test -f "$TMP_DIR/autopsy.md"
 test -f "$TMP_DIR/dashboard.html"
+test -f "$TMP_DIR/suite-health.json"
+test -f "$TMP_DIR/suite-health.md"
 test -f "$TMP_DIR/benchmark-summary.md"
 test -f "$TMP_DIR/benchmark-summary.json"
 test -f "$TMP_DIR/quality-gate.md"
