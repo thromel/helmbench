@@ -59,6 +59,14 @@ cargo run -- local-run \
   --out-dir "$TMP_DIR/traces" \
   --adapter-command "HELMBENCH_BIN=$ROOT/target/debug/helmbench sh scripts/demo-agent.sh"
 
+cargo run -- local-run \
+  --suite "$TMP_DIR/demo-suite.json" \
+  --repo "$TMP_DIR/demo-repo" \
+  --work-dir "$TMP_DIR/stream-workdirs" \
+  --out-dir "$TMP_DIR/stream-traces" \
+  --adapter-command "sh $ROOT/scripts/demo-stream-agent.sh" \
+  --capture-stream
+
 cargo run -- run-matrix \
   --suite "$TMP_DIR/demo-suite.json" \
   --repo "$TMP_DIR/demo-repo" \
@@ -100,6 +108,11 @@ cargo run -- run \
   --suite "$TMP_DIR/demo-suite.json" \
   --trace-dir "$TMP_DIR/traces" \
   --out "$TMP_DIR/report.json"
+
+cargo run -- run \
+  --suite "$TMP_DIR/demo-suite.json" \
+  --trace-dir "$TMP_DIR/stream-traces" \
+  --out "$TMP_DIR/stream-report.json"
 
 cargo run -- autopsy \
   --suite "$TMP_DIR/demo-suite.json" \
@@ -176,6 +189,7 @@ cargo run -- matrix-history \
   --out "$TMP_DIR/matrix-history.html"
 
 test -f "$TMP_DIR/report.json"
+test -f "$TMP_DIR/stream-report.json"
 test -f "$TMP_DIR/autopsy.md"
 test -f "$TMP_DIR/dashboard.html"
 test -f "$TMP_DIR/suite-health.json"

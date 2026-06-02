@@ -34,6 +34,9 @@ This repository currently implements the core HelmBench workflow:
 - `stream-trace` importer that converts structured Claude/Codex-style JSONL
   tool streams into source-free traces without storing command text or tool
   payloads
+- opt-in `--capture-stream` mode for local, ctxhelm-guided, Claude, Codex, and
+  matrix runs that parses structured stdout in memory and persists only
+  source-free events
 - `init-public-suite` generator for verified public-repo benchmark suites,
   currently RefactoringMiner and Flask
 - `suite-health` checks any source-free suite against a local git repo before
@@ -308,6 +311,10 @@ ask the agent to emit source-free `record-event` calls. HelmBench still infers
 edited files from git status and records validation from the suite
 `successCommand`.
 
+When an agent can emit structured JSONL tool metadata on stdout, add
+`--capture-stream` to parse that stream in memory and persist only source-free
+events.
+
 Convert sanitized Claude Code events into traces:
 
 ```bash
@@ -533,6 +540,7 @@ adapters
   explicit local adapter command runner
   Claude Code direct launch preset
   Codex direct launch preset
+  opt-in structured stdout capture for direct runs
   Agent Diff Autopsy from source-free traces
 
 future direct-agent adapters

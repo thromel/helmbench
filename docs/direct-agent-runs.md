@@ -9,6 +9,8 @@ The presets are intentionally thin:
   `HELMBENCH_EVENTS`;
 - suppress raw agent stdout/stderr;
 - ask the agent to emit source-free `record-event` calls;
+- optionally capture structured stdout JSONL, convert it to source-free events,
+  and discard the raw stream;
 - infer edited files from `git status`;
 - run the task `successCommand`;
 - write normal HelmBench trace JSON.
@@ -32,6 +34,8 @@ Options:
 - `--claude-arg`: extra argument passed to Claude Code. Repeatable.
 - `--dangerously-skip-permissions`: pass Claude Code's non-interactive
   permission bypass flag. Use only with isolated benchmark clones.
+- `--capture-stream`: capture stdout as structured JSONL tool metadata,
+  convert it to source-free events, and discard the raw stream.
 - `--keep-workdirs`: preserve cloned task workdirs for debugging.
 
 ## Codex
@@ -52,6 +56,8 @@ Options:
 - `--codex-arg`: extra argument passed to `codex exec`. Repeatable.
 - `--dangerously-bypass-approvals-and-sandbox`: pass Codex's unrestricted mode.
   Use only with externally sandboxed benchmark clones.
+- `--capture-stream`: capture stdout as structured JSONL tool metadata,
+  convert it to source-free events, and discard the raw stream.
 - `--keep-workdirs`: preserve cloned task workdirs for debugging.
 
 ## Telemetry Limits
@@ -63,6 +69,12 @@ Direct launch presets can always record:
 - final task status;
 - elapsed timing.
 
-They can record reads and recommendations only when the agent follows the
-injected `record-event` instruction. This is a deliberate privacy trade-off:
-HelmBench does not scrape raw transcripts just to recover richer telemetry.
+They can record reads and recommendations in two ways:
+
+- the agent follows the injected `record-event` instruction;
+- `--capture-stream` is enabled and the agent emits structured JSONL tool
+  metadata on stdout.
+
+This is a deliberate privacy trade-off: HelmBench does not scrape raw
+transcripts just to recover richer telemetry. In capture mode, stdout is parsed
+in memory with a bounded buffer and is not written to disk.

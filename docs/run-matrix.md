@@ -51,6 +51,7 @@ Config format:
       "ctxhelm": true,
       "pack": true,
       "packBudget": "brief",
+      "captureStream": true,
       "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
     }
   ]
@@ -79,7 +80,10 @@ Run specs use comma-separated `key=value` fields:
 - `pack`: optional `true`/`false`; when true, HelmBench calls
   `ctxhelm get-pack --format json` and stores only source-free pack metadata;
 - `pack_budget`: optional pack budget, default `brief`;
-- `command`: optional adapter command executed inside each isolated task clone.
+- `command`: optional adapter command executed inside each isolated task clone;
+- `capture_stream`: optional `true`/`false`; when true, HelmBench captures
+  adapter stdout as structured JSONL, converts it to source-free events, and
+  discards the raw stream. In JSON config this field is `captureStream`.
 
 The baseline command can be omitted. In that case HelmBench still clones the
 repo, runs the task validation command, infers edited files, and records a

@@ -114,6 +114,12 @@ parses those streams in memory, extracts safe file-read/file-edit/command
 metadata, hashes command text, and writes normal source-free HelmBench traces.
 Raw streams should be treated as local temporary artifacts.
 
+`--capture-stream` applies the same parser during `local-run`, `ctxhelm-run`,
+`claude-run`, `codex-run`, and `run-matrix` rows. It captures stdout with a
+bounded in-memory buffer, converts structured tool metadata into source-free
+events, and discards the raw stream. This provides better direct-agent
+observation without persisting transcripts.
+
 ## Metrics
 
 The core report computes:
@@ -297,6 +303,13 @@ Some agents expose tool-use streams but cannot be forced to call
 `record-event`. `stream-trace` gives HelmBench a middle path: consume structured
 tool metadata locally, persist only paths, command classes, command hashes, test
 touches, and statuses, and discard raw tool payloads.
+
+### Why add capture-stream mode?
+
+Some direct agent runs can emit machine-readable tool events on stdout but
+cannot conveniently call `record-event`. Capture mode lets HelmBench observe
+those runs without storing stdout. It is opt-in because raw stdout may contain
+source-bearing content if the agent is not configured carefully.
 
 ### Why not pass/fail only?
 

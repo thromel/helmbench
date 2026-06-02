@@ -6,6 +6,11 @@ HelmBench traces.
 It is useful when an agent can emit structured events but not explicit
 `helmbench record-event` calls.
 
+For direct local, Claude, Codex, or matrix runs, `--capture-stream` can perform
+the same conversion during the run. HelmBench captures stdout in memory,
+extracts source-free metadata, appends normal events, and discards the raw
+stream instead of writing it to disk.
+
 ## Command
 
 ```bash
@@ -52,6 +57,9 @@ It does not store command text.
 The input stream may contain source-bearing data depending on the agent. Treat
 raw streams as local, temporary artifacts. HelmBench outputs only source-free
 trace JSON.
+
+When `--capture-stream` is used by a direct runner, the raw stream is bounded,
+parsed in memory, and not persisted.
 
 If a stream contains absolute paths, pass `--repo-root`; paths under that root
 are normalized to relative paths. Absolute paths outside `--repo-root` are

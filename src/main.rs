@@ -13,8 +13,9 @@ use helmbench::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command as ProcessCommand;
+use std::process::{Command as ProcessCommand, Stdio};
 use std::time::{Duration, Instant};
 
 #[derive(Debug, Parser)]
@@ -199,6 +200,8 @@ enum Command {
         #[arg(long)]
         adapter_command: Option<String>,
         #[arg(long)]
+        capture_stream: bool,
+        #[arg(long)]
         keep_workdirs: bool,
     },
     /// Run ctxhelm recommendations before an isolated local adapter command.
@@ -236,6 +239,8 @@ enum Command {
         #[arg(long)]
         adapter_command: Option<String>,
         #[arg(long)]
+        capture_stream: bool,
+        #[arg(long)]
         keep_workdirs: bool,
     },
     /// Run Claude Code non-interactively through the isolated local runner.
@@ -257,6 +262,8 @@ enum Command {
         #[arg(long)]
         dangerously_skip_permissions: bool,
         #[arg(long)]
+        capture_stream: bool,
+        #[arg(long)]
         keep_workdirs: bool,
     },
     /// Run Codex non-interactively through the isolated local runner.
@@ -277,6 +284,8 @@ enum Command {
         codex_arg: Vec<String>,
         #[arg(long)]
         dangerously_bypass_approvals_and_sandbox: bool,
+        #[arg(long)]
+        capture_stream: bool,
         #[arg(long)]
         keep_workdirs: bool,
     },
@@ -780,6 +789,7 @@ fn main() -> Result<()> {
             variant,
             setup_command,
             adapter_command,
+            capture_stream,
             keep_workdirs,
         } => {
             let suite = load_suite(&suite)?;
@@ -793,6 +803,7 @@ fn main() -> Result<()> {
                 &setup_command,
                 None,
                 adapter_command.as_deref(),
+                capture_stream,
                 keep_workdirs,
             )?;
         }
@@ -813,6 +824,7 @@ fn main() -> Result<()> {
             agent,
             variant,
             adapter_command,
+            capture_stream,
             keep_workdirs,
         } => {
             let suite = load_suite(&suite)?;
@@ -837,6 +849,7 @@ fn main() -> Result<()> {
                 &[],
                 Some(&ctxhelm),
                 adapter_command.as_deref(),
+                capture_stream,
                 keep_workdirs,
             )?;
         }
@@ -849,6 +862,7 @@ fn main() -> Result<()> {
             model,
             claude_arg,
             dangerously_skip_permissions,
+            capture_stream,
             keep_workdirs,
         } => {
             let suite = load_suite(&suite)?;
@@ -858,6 +872,7 @@ fn main() -> Result<()> {
                 model.as_deref(),
                 &claude_arg,
                 dangerously_skip_permissions,
+                !capture_stream,
             );
             run_local_suite(
                 &suite,
@@ -869,6 +884,7 @@ fn main() -> Result<()> {
                 &[],
                 None,
                 Some(&command),
+                capture_stream,
                 keep_workdirs,
             )?;
         }
@@ -881,6 +897,7 @@ fn main() -> Result<()> {
             model,
             codex_arg,
             dangerously_bypass_approvals_and_sandbox,
+            capture_stream,
             keep_workdirs,
         } => {
             let suite = load_suite(&suite)?;
@@ -890,6 +907,7 @@ fn main() -> Result<()> {
                 model.as_deref(),
                 &codex_arg,
                 dangerously_bypass_approvals_and_sandbox,
+                !capture_stream,
             );
             run_local_suite(
                 &suite,
@@ -901,6 +919,7 @@ fn main() -> Result<()> {
                 &[],
                 None,
                 Some(&command),
+                capture_stream,
                 keep_workdirs,
             )?;
         }
@@ -2002,6 +2021,7 @@ struct RunMatrixSpec {
     variant: AgentVariant,
     ctxhelm: Option<CtxhelmRunConfig>,
     adapter_command: Option<String>,
+    capture_stream: bool,
 }
 
 struct RunMatrixResult {
@@ -2036,6 +2056,7 @@ struct RunMatrixManifestRun {
     trace_dir: String,
     ctxhelm_enabled: bool,
     pack_enabled: bool,
+    stream_capture_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2173,6 +2194,8 @@ struct RunMatrixConfigSpec {
     pack_budget: Option<String>,
     #[serde(default, alias = "adapterCommand")]
     command: Option<String>,
+    #[serde(default)]
+    capture_stream: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2310,6 +2333,7 @@ fn run_matrix_spec_from_config(config: &RunMatrixConfigSpec) -> Result<RunMatrix
                 .unwrap_or_else(|| "brief".to_string()),
         }),
         adapter_command: config.command.clone(),
+        capture_stream: config.capture_stream,
     })
 }
 
@@ -2513,6 +2537,7 @@ fn run_matrix_manifest_run(out_dir: &Path, result: &RunMatrixResult) -> RunMatri
             .ctxhelm
             .as_ref()
             .is_some_and(|ctxhelm| ctxhelm.include_pack),
+        stream_capture_enabled: result.spec.capture_stream,
     }
 }
 
@@ -3211,6 +3236,7 @@ fn run_matrix_spec(
         setup_commands,
         spec.ctxhelm.as_ref(),
         spec.adapter_command.as_deref(),
+        spec.capture_stream,
         keep_workdirs,
     )
     .with_context(|| format!("run matrix spec `{}`", spec.name))?;
@@ -3244,6 +3270,7 @@ fn parse_run_matrix_spec(raw: &str) -> Result<RunMatrixSpec> {
     let mut semantic_dimensions = None;
     let mut pack = false;
     let mut pack_budget = "brief".to_string();
+    let mut capture_stream = false;
 
     for part in raw.split(',') {
         let part = part.trim();
@@ -3305,6 +3332,9 @@ fn parse_run_matrix_spec(raw: &str) -> Result<RunMatrixSpec> {
                     command = Some(value.to_string());
                 }
             }
+            "capture_stream" => {
+                capture_stream = parse_bool_field(key, value)?;
+            }
             other => anyhow::bail!("unsupported run spec field `{other}`"),
         }
     }
@@ -3335,6 +3365,7 @@ fn parse_run_matrix_spec(raw: &str) -> Result<RunMatrixSpec> {
             pack_budget,
         }),
         adapter_command: command,
+        capture_stream,
     })
 }
 
@@ -3415,6 +3446,7 @@ fn run_demo_pipeline_with_adapter(
         None,
         None,
         false,
+        false,
     )?;
     let native_report = build_report(&suite, &load_traces(&native_traces)?)?;
     let native_report_path = reports_dir.join("native.json");
@@ -3442,6 +3474,7 @@ fn run_demo_pipeline_with_adapter(
         &[],
         None,
         Some(&adapter_command),
+        false,
         false,
     )?;
     let guided_report = build_report(&suite, &load_traces(&guided_traces)?)?;
@@ -3701,6 +3734,7 @@ fn run_local_suite(
     setup_commands: &[String],
     ctxhelm: Option<&CtxhelmRunConfig>,
     adapter_command: Option<&str>,
+    capture_stream: bool,
     keep_workdirs: bool,
 ) -> Result<()> {
     let repo =
@@ -3752,7 +3786,31 @@ fn run_local_suite(
                 ("HELMBENCH_EVENTS", path_as_str(&events)?),
                 ("HELMBENCH_SUITE_NAME", suite.name.as_str()),
             ];
-            let result = run_shell(&rendered, &task_dir, &env, task.timeout_seconds)?;
+            let result = if capture_stream {
+                let result =
+                    run_shell_capture_stdout(&rendered, &task_dir, &env, task.timeout_seconds)?;
+                if result.stdout_truncated {
+                    anyhow::bail!(
+                        "captured stream for `{}` exceeded the source-free parse buffer",
+                        task.id
+                    );
+                }
+                append_stream_capture_events(
+                    task,
+                    &task_dir,
+                    &events,
+                    &result.stdout,
+                    task_started,
+                )?;
+                ShellResult {
+                    success: result.success,
+                    exit_status: result.exit_status,
+                    elapsed_millis: result.elapsed_millis,
+                    timed_out: result.timed_out,
+                }
+            } else {
+                run_shell(&rendered, &task_dir, &env, task.timeout_seconds)?
+            };
             adapter_ok = result.success;
         }
 
@@ -4029,6 +4087,7 @@ fn claude_adapter_command(
     model: Option<&str>,
     extra_args: &[String],
     dangerously_skip_permissions: bool,
+    suppress_output: bool,
 ) -> String {
     let mut parts = vec![
         format!(
@@ -4052,8 +4111,10 @@ fn claude_adapter_command(
     }
     parts.extend(extra_args.iter().map(|arg| shell_escape(arg)));
     parts.push("\"$HELMBENCH_TASK_PROMPT\"".to_string());
-    parts.push(">/dev/null".to_string());
-    parts.push("2>/dev/null".to_string());
+    if suppress_output {
+        parts.push(">/dev/null".to_string());
+        parts.push("2>/dev/null".to_string());
+    }
     parts.join(" ")
 }
 
@@ -4063,6 +4124,7 @@ fn codex_adapter_command(
     model: Option<&str>,
     extra_args: &[String],
     dangerously_bypass_approvals_and_sandbox: bool,
+    suppress_output: bool,
 ) -> String {
     let mut parts = vec![
         format!(
@@ -4087,8 +4149,10 @@ fn codex_adapter_command(
     parts.push("\"$(printf '%s\\n\\nTask:\\n%s'".to_string());
     parts.push(shell_escape(AGENT_EVENT_INSTRUCTIONS));
     parts.push("\"$HELMBENCH_TASK_PROMPT\")\"".to_string());
-    parts.push(">/dev/null".to_string());
-    parts.push("2>/dev/null".to_string());
+    if suppress_output {
+        parts.push(">/dev/null".to_string());
+        parts.push("2>/dev/null".to_string());
+    }
     parts.join(" ")
 }
 
@@ -4168,11 +4232,126 @@ fn run_shell(
     }
 }
 
+fn run_shell_capture_stdout(
+    command: &str,
+    cwd: &Path,
+    env: &[(&str, &str)],
+    timeout_seconds: Option<u64>,
+) -> Result<ShellCaptureResult> {
+    const MAX_CAPTURE_BYTES: usize = 1024 * 1024;
+
+    let started = Instant::now();
+    let mut process = ProcessCommand::new("sh");
+    process
+        .arg("-lc")
+        .arg(command)
+        .current_dir(cwd)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null());
+    for (key, value) in env {
+        process.env(key, value);
+    }
+    let mut child = process
+        .spawn()
+        .with_context(|| format!("run shell command in {}", cwd.display()))?;
+    let mut stdout = child
+        .stdout
+        .take()
+        .context("capture stdout pipe from shell command")?;
+    let reader = std::thread::spawn(move || {
+        let mut captured = Vec::new();
+        let mut buffer = [0u8; 8192];
+        let mut truncated = false;
+        loop {
+            match stdout.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(count) => {
+                    let remaining = MAX_CAPTURE_BYTES.saturating_sub(captured.len());
+                    if remaining > 0 {
+                        captured.extend_from_slice(&buffer[..count.min(remaining)]);
+                    }
+                    if count > remaining {
+                        truncated = true;
+                    }
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        Ok::<_, std::io::Error>((captured, truncated))
+    });
+
+    let mut timed_out = false;
+    let status = loop {
+        if let Some(status) = child
+            .try_wait()
+            .with_context(|| format!("wait for shell command in {}", cwd.display()))?
+        {
+            break status;
+        }
+        if timeout_seconds.is_some_and(|seconds| started.elapsed() >= Duration::from_secs(seconds))
+        {
+            timed_out = true;
+            child
+                .kill()
+                .with_context(|| format!("kill timed-out command in {}", cwd.display()))?;
+            break child
+                .wait()
+                .with_context(|| format!("wait for killed shell command in {}", cwd.display()))?;
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    };
+
+    let (stdout, truncated) = reader
+        .join()
+        .map_err(|_| anyhow::anyhow!("stdout capture thread panicked"))?
+        .context("read captured stdout")?;
+    let stdout = String::from_utf8_lossy(&stdout).into_owned();
+    Ok(ShellCaptureResult {
+        success: status.success() && !timed_out,
+        exit_status: status.code(),
+        elapsed_millis: started.elapsed().as_millis() as u64,
+        timed_out,
+        stdout,
+        stdout_truncated: truncated,
+    })
+}
+
+fn append_stream_capture_events(
+    task: &helmbench::BenchTask,
+    repo: &Path,
+    events: &PathBuf,
+    stdout: &str,
+    task_started: Instant,
+) -> Result<()> {
+    if stdout.trim().is_empty() {
+        return Ok(());
+    }
+    let stream_events =
+        events_from_agent_stream_jsonl(&task.id, stdout, Some(repo), &task.expected_tests)
+            .with_context(|| format!("parse captured stream for `{}`", task.id))?;
+    for mut event in stream_events {
+        if event.observed_at_millis.is_none() {
+            event.observed_at_millis = Some(task_started.elapsed().as_millis() as u64);
+        }
+        append_event(events, &event)?;
+    }
+    Ok(())
+}
+
 struct ShellResult {
     success: bool,
     exit_status: Option<i32>,
     elapsed_millis: u64,
     timed_out: bool,
+}
+
+struct ShellCaptureResult {
+    success: bool,
+    exit_status: Option<i32>,
+    elapsed_millis: u64,
+    timed_out: bool,
+    stdout: String,
+    stdout_truncated: bool,
 }
 
 fn timed_out_suffix(timed_out: bool) -> &'static str {
@@ -4315,6 +4494,7 @@ mod tests {
             Some("sonnet"),
             &["--debug".to_string()],
             true,
+            true,
         );
         assert!(command.contains("claude"));
         assert!(command.contains("--print"));
@@ -4333,6 +4513,7 @@ mod tests {
             None,
             &[],
             false,
+            true,
         );
         assert!(command.contains("'codex' exec"));
         assert!(command.contains("--cd \"$HELMBENCH_REPO\""));
@@ -4340,6 +4521,31 @@ mod tests {
         assert!(command.contains("record-event"));
         assert!(command.contains("HELMBENCH_TASK_PROMPT"));
         assert!(command.contains(">/dev/null 2>/dev/null"));
+    }
+
+    #[test]
+    fn direct_agent_commands_can_leave_stdout_for_stream_capture() {
+        let claude = claude_adapter_command(
+            Path::new("/tmp/helmbench"),
+            Path::new("claude"),
+            None,
+            &[],
+            false,
+            false,
+        );
+        assert!(!claude.contains(">/dev/null"));
+        assert!(claude.contains("--output-format text"));
+
+        let codex = codex_adapter_command(
+            Path::new("/tmp/helmbench"),
+            Path::new("codex"),
+            None,
+            &[],
+            false,
+            false,
+        );
+        assert!(!codex.contains(">/dev/null"));
+        assert!(codex.contains("'codex' exec"));
     }
 
     #[test]
@@ -4360,6 +4566,43 @@ mod tests {
             suite.tasks[1].expected_tests,
             vec!["tests/billing/invoice.test.sh"]
         );
+    }
+
+    #[test]
+    fn local_run_can_capture_structured_stdout_stream() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        let suite_path = temp.path().join("suite.json");
+        init_demo_repo(&repo, &suite_path, false).expect("demo repo");
+        let suite = load_suite(&suite_path).expect("suite");
+        let adapter = temp.path().join("stream-agent.sh");
+        std::fs::write(&adapter, FAKE_STREAM_AGENT).expect("adapter");
+        set_executable(&adapter).expect("chmod adapter");
+        let out_dir = temp.path().join("traces");
+
+        run_local_suite(
+            &suite,
+            &repo,
+            &temp.path().join("workdirs"),
+            &out_dir,
+            "stream-agent",
+            AgentVariant::Native,
+            &[],
+            None,
+            Some(&format!("sh {}", shell_escape(&adapter.to_string_lossy()))),
+            true,
+            false,
+        )
+        .expect("local run");
+
+        let traces = load_traces(&out_dir).expect("traces");
+        assert_eq!(traces.len(), 2);
+        assert!(traces.iter().all(|trace| !trace.files_read.is_empty()));
+        assert!(traces.iter().all(|trace| trace.privacy.source_free));
+        assert!(traces.iter().any(|trace| trace
+            .files_read
+            .iter()
+            .any(|path| path.path == "src/auth/session.txt")));
     }
 
     #[test]
@@ -5070,6 +5313,26 @@ esac
 mkdir -p "$(dirname "$HELMBENCH_EVENTS")"
 printf '{"schemaVersion":1,"taskId":"%s","eventKind":"recommended_file","path":"%s","observedAtMillis":5}\n' "$HELMBENCH_TASK_ID" "$path" >> "$HELMBENCH_EVENTS"
 printf '{"schemaVersion":1,"taskId":"%s","eventKind":"file_read","path":"%s","observedAtMillis":15}\n' "$HELMBENCH_TASK_ID" "$path" >> "$HELMBENCH_EVENTS"
+"#;
+
+    const FAKE_STREAM_AGENT: &str = r#"#!/usr/bin/env sh
+set -eu
+
+case "$HELMBENCH_TASK_ID" in
+  demo-auth-redirect-001)
+    path=src/auth/session.txt
+    printf '{"tool":"Read","input":{"path":"%s"}}\n' "$path"
+    printf 'expired sessions redirect to /login\nactive sessions redirect to /dashboard\n' > "$path"
+    ;;
+  demo-billing-rounding-001)
+    path=src/billing/invoice.txt
+    printf '{"tool":"Read","input":{"path":"%s"}}\n' "$path"
+    printf 'invoice rounding mode: round half up\ncurrency: USD\n' > "$path"
+    ;;
+  *)
+    exit 2
+    ;;
+esac
 "#;
 
     const FAKE_CTXHELM: &str = r#"#!/usr/bin/env sh
