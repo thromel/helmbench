@@ -163,9 +163,9 @@ and reports first-to-last deltas for success, validation coverage,
 recommendation recall, context precision, edited-file recall, irrelevant reads,
 tool calls, and token estimates.
 
-The report intentionally does not echo absolute matrix paths. It uses
-source-free sequence labels so a published history artifact can show trend
-evidence without leaking local checkout locations.
+The Markdown, JSON, and static HTML reports intentionally do not echo absolute
+matrix paths. They use source-free sequence labels so a published history
+artifact can show trend evidence without leaking local checkout locations.
 
 ## Quality Gate
 

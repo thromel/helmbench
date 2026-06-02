@@ -87,8 +87,8 @@ enum Command {
         matrix: Vec<PathBuf>,
         #[arg(long)]
         out: Option<PathBuf>,
-        #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
-        format: OutputFormat,
+        #[arg(long, value_enum, default_value_t = MatrixHistoryFormat::Markdown)]
+        format: MatrixHistoryFormat,
     },
     /// Generate a source-free suite from a known public repository fixture.
     InitPublicSuite {
@@ -411,6 +411,13 @@ enum OutputFormat {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
+enum MatrixHistoryFormat {
+    Json,
+    Markdown,
+    Html,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
 enum TraceVariant {
     Native,
     CtxhelmMcp,
@@ -573,8 +580,9 @@ fn main() -> Result<()> {
         } => {
             let history = build_matrix_history_report(&matrix)?;
             let rendered = match format {
-                OutputFormat::Json => serde_json::to_string_pretty(&history)?,
-                OutputFormat::Markdown => render_markdown_matrix_history(&history),
+                MatrixHistoryFormat::Json => serde_json::to_string_pretty(&history)?,
+                MatrixHistoryFormat::Markdown => render_markdown_matrix_history(&history),
+                MatrixHistoryFormat::Html => render_html_matrix_history(&history),
             };
             if let Some(out) = out {
                 write_text(&rendered, &out)?;
@@ -2820,8 +2828,154 @@ fn render_markdown_matrix_history(report: &MatrixHistoryReport) -> String {
     out
 }
 
+fn render_html_matrix_history(report: &MatrixHistoryReport) -> String {
+    let mut out = String::new();
+    out.push_str("<!doctype html>\n<html lang=\"en\">\n<head>\n");
+    out.push_str("<meta charset=\"utf-8\">\n");
+    out.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
+    out.push_str("<title>HelmBench Matrix History</title>\n");
+    out.push_str("<style>\n");
+    out.push_str(MATRIX_HISTORY_CSS);
+    out.push_str("\n</style>\n</head>\n<body>\n");
+    out.push_str("<main class=\"shell\">\n");
+    out.push_str("<header class=\"hero\">\n");
+    out.push_str("<div><p class=\"eyebrow\">Source-free longitudinal evaluation</p>\n");
+    out.push_str(&format!(
+        "<h1>Matrix History</h1>\n<p class=\"lede\">Suite <strong>{}</strong> across {} verified matrix runs.</p></div>\n",
+        matrix_html_escape(&report.suite_name),
+        report.matrices.len()
+    ));
+    out.push_str("<div class=\"privacy-badge\">Source-free</div>\n</header>\n");
+
+    out.push_str("<section class=\"summary-grid\" aria-label=\"Trend summary\">\n");
+    for trend in &report.trends {
+        out.push_str("<article class=\"run-card\">\n");
+        out.push_str(&format!(
+            "<div class=\"run-title\"><span>{}</span><code>{:?}</code></div>\n",
+            matrix_html_escape(&trend.name),
+            trend.variant
+        ));
+        out.push_str(&format!(
+            "<p class=\"suite\">Agent: <strong>{}</strong></p>\n",
+            matrix_html_escape(&trend.agent)
+        ));
+        out.push_str("<div class=\"metric-row\">\n");
+        out.push_str(&history_metric_tile(
+            "Success",
+            matrix_pct(trend.last_success_rate),
+            history_delta(trend.success_rate_delta, true),
+        ));
+        out.push_str(&history_metric_tile(
+            "Validation",
+            matrix_pct(trend.last_validation_coverage_rate),
+            history_delta(trend.validation_coverage_rate_delta, true),
+        ));
+        out.push_str(&history_metric_tile(
+            "Context precision",
+            matrix_pct(trend.last_context_precision),
+            history_delta(trend.context_precision_delta, true),
+        ));
+        out.push_str(&history_metric_tile(
+            "Irrelevant reads",
+            matrix_pct(trend.last_irrelevant_read_rate),
+            history_delta(trend.irrelevant_read_rate_delta, false),
+        ));
+        out.push_str("</div>\n</article>\n");
+    }
+    out.push_str("</section>\n");
+
+    out.push_str("<section class=\"panel\">\n");
+    out.push_str("<h2>First-To-Last Trends</h2>\n");
+    out.push_str("<div class=\"table-wrap\"><table>\n");
+    out.push_str("<thead><tr><th>Run</th><th>Variant</th><th>Success</th><th>Validation</th><th>Recommendation recall</th><th>Context precision</th><th>Edited recall</th><th>Irrelevant reads</th><th>Tools</th><th>Tokens</th></tr></thead>\n<tbody>\n");
+    for trend in &report.trends {
+        out.push_str(&format!(
+            "<tr><td><strong>{}</strong><br>{}</td><td><code>{:?}</code></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{:+}</td><td>{:+}</td></tr>\n",
+            matrix_html_escape(&trend.name),
+            matrix_html_escape(&trend.agent),
+            trend.variant,
+            history_delta(trend.success_rate_delta, true),
+            history_delta(trend.validation_coverage_rate_delta, true),
+            history_delta(trend.recommendation_recall_delta, true),
+            history_delta(trend.context_precision_delta, true),
+            history_delta(trend.edited_file_recall_delta, true),
+            history_delta(trend.irrelevant_read_rate_delta, false),
+            trend.total_tool_calls_delta,
+            trend.total_token_estimate_delta
+        ));
+    }
+    out.push_str("</tbody></table></div>\n</section>\n");
+
+    out.push_str("<section class=\"panel\">\n");
+    out.push_str("<h2>Verified Matrices</h2>\n");
+    out.push_str("<div class=\"table-wrap\"><table>\n");
+    out.push_str("<thead><tr><th>Matrix</th><th>Quality gate</th><th>Evidence</th><th>Runs</th></tr></thead>\n<tbody>\n");
+    for entry in &report.matrices {
+        let runs = entry
+            .runs
+            .iter()
+            .map(|run| {
+                format!(
+                    "{} ({:?}): {:.1}% success, {:.1}% validation",
+                    matrix_html_escape(&run.name),
+                    run.variant,
+                    matrix_pct(run.success_rate),
+                    matrix_pct(run.validation_coverage_rate)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("<br>");
+        out.push_str(&format!(
+            "<tr><td><strong>{}</strong><br><code>{}</code></td><td>{}</td><td>{}</td><td>{}</td></tr>\n",
+            entry.matrix_index,
+            matrix_html_escape(&entry.label),
+            yes_no(entry.quality_gate_passed),
+            yes_no(entry.evidence_bundle_verified),
+            runs
+        ));
+    }
+    out.push_str("</tbody></table></div>\n</section>\n");
+
+    out.push_str("<section class=\"privacy\">\n");
+    out.push_str("<h2>Privacy Contract</h2>\n");
+    out.push_str("<p>This dashboard is generated from verified source-free matrix summaries. It does not include raw source, prompts, transcripts, terminal logs, MCP payloads, or absolute local matrix paths.</p>\n");
+    out.push_str("</section>\n</main>\n</body>\n</html>\n");
+    out
+}
+
+fn history_metric_tile(label: &str, value: f32, delta: String) -> String {
+    format!(
+        "<div class=\"metric\"><span>{}</span><strong>{:.1}%</strong><em>{}</em></div>\n",
+        matrix_html_escape(label),
+        value,
+        delta
+    )
+}
+
+fn history_delta(value: f32, higher_is_better: bool) -> String {
+    let class = if value.abs() < f32::EPSILON {
+        "flat"
+    } else if (value > 0.0 && higher_is_better) || (value < 0.0 && !higher_is_better) {
+        "good"
+    } else {
+        "bad"
+    };
+    format!(
+        "<span class=\"delta {class}\">{:+.1}%</span>",
+        matrix_pct(value)
+    )
+}
+
 fn matrix_pct(value: f32) -> f32 {
     value * 100.0
+}
+
+fn matrix_html_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 fn yes_no(value: bool) -> &'static str {
@@ -2831,6 +2985,167 @@ fn yes_no(value: bool) -> &'static str {
         "no"
     }
 }
+
+const MATRIX_HISTORY_CSS: &str = r#"
+:root {
+  color-scheme: light;
+  --bg: #f6f7f2;
+  --ink: #17211b;
+  --muted: #647068;
+  --line: #d7ddd1;
+  --panel: #ffffff;
+  --accent: #245c4f;
+  --accent-2: #3759a8;
+  --good: #116d3f;
+  --bad: #a13f2d;
+  --flat: #6b6f76;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.shell {
+  width: min(1180px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  padding: 8px 0 28px;
+}
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 4.2rem);
+  line-height: 1;
+  letter-spacing: 0;
+}
+.lede {
+  max-width: 720px;
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+.privacy-badge {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 10px 12px;
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.run-card,
+.panel,
+.privacy {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.run-card {
+  padding: 16px;
+}
+.run-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  font-weight: 800;
+}
+code {
+  color: var(--accent-2);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+.suite {
+  margin: 8px 0 14px;
+  color: var(--muted);
+}
+.metric-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.metric {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  min-height: 88px;
+}
+.metric span,
+.metric em {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-style: normal;
+}
+.metric strong {
+  display: block;
+  margin: 5px 0;
+  font-size: 1.45rem;
+}
+.delta.good { color: var(--good); font-weight: 800; }
+.delta.bad { color: var(--bad); font-weight: 800; }
+.delta.flat { color: var(--flat); font-weight: 800; }
+.panel,
+.privacy {
+  padding: 18px;
+  margin-top: 18px;
+}
+h2 {
+  margin: 0 0 14px;
+  font-size: 1.12rem;
+}
+.table-wrap {
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 900px;
+}
+th,
+td {
+  border-top: 1px solid var(--line);
+  padding: 10px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.privacy p {
+  margin: 0;
+  color: var(--muted);
+}
+@media (max-width: 760px) {
+  .hero { display: block; }
+  .privacy-badge { display: inline-block; margin-top: 16px; }
+  .metric-row { grid-template-columns: 1fr; }
+}
+"#;
 
 fn verify_matrix_run(matrix_dir: &Path, run: &RunMatrixManifestRun) -> Result<()> {
     if run.name.trim().is_empty() {
@@ -4219,6 +4534,12 @@ mod tests {
         assert!(rendered.contains("First-To-Last Trends"));
         assert!(rendered.contains("`guided`"));
         assert!(!rendered.contains(temp.path().to_string_lossy().as_ref()));
+        let html = render_html_matrix_history(&history);
+        assert!(html.contains("<title>HelmBench Matrix History</title>"));
+        assert!(html.contains("Matrix History"));
+        assert!(html.contains("Source-free"));
+        assert!(html.contains("guided"));
+        assert!(!html.contains(temp.path().to_string_lossy().as_ref()));
 
         let mut tampered = verified;
         tampered.artifacts.dashboard_html = "../dashboard.html".to_string();

@@ -169,6 +169,12 @@ cargo run -- matrix-history \
   --format json \
   --out "$TMP_DIR/matrix-history.json"
 
+cargo run -- matrix-history \
+  --matrix "$TMP_DIR/matrix" \
+  --matrix "$TMP_DIR/matrix-config" \
+  --format html \
+  --out "$TMP_DIR/matrix-history.html"
+
 test -f "$TMP_DIR/report.json"
 test -f "$TMP_DIR/autopsy.md"
 test -f "$TMP_DIR/dashboard.html"
@@ -179,6 +185,7 @@ test -f "$TMP_DIR/benchmark-summary.json"
 test -f "$TMP_DIR/quality-gate.md"
 test -f "$TMP_DIR/matrix-history.md"
 test -f "$TMP_DIR/matrix-history.json"
+test -f "$TMP_DIR/matrix-history.html"
 test -f "$TMP_DIR/evidence/manifest.json"
 test -f "$TMP_DIR/full-demo/evidence/manifest.json"
 test -f "$TMP_DIR/full-demo/docs/dashboard.html"
