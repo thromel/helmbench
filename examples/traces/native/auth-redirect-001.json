@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "taskId": "auth-redirect-001",
+  "agent": "claude-code",
+  "variant": "native",
+  "status": "failure",
+  "recommendedFiles": [],
+  "filesRead": [
+    {
+      "path": "README.md",
+      "pathHash": "path:readme",
+      "observedAtMillis": 500
+    },
+    {
+      "path": "docs/auth.md",
+      "pathHash": "path:docs-auth",
+      "observedAtMillis": 1200
+    },
+    {
+      "path": "src/routes/login.ts",
+      "pathHash": "path:login",
+      "observedAtMillis": 1900
+    },
+    {
+      "path": "src/auth/session.ts",
+      "pathHash": "path:session",
+      "observedAtMillis": 2600
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "src/auth/session.ts",
+      "pathHash": "path:session",
+      "observedAtMillis": 5000
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:generic-test",
+      "touchedTests": [],
+      "exitStatus": 1,
+      "elapsedMillis": 3000
+    }
+  ],
+  "toolCallCount": 14,
+  "tokenEstimate": 6400,
+  "elapsedMillis": 9000,
+  "timeToFirstRelevantFileMillis": 2600,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

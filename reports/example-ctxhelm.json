@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "suiteName": "example-auth-bugs",
+  "agent": "claude-code",
+  "variant": "ctxhelm_mcp",
+  "summary": {
+    "taskCount": 1,
+    "successCount": 1,
+    "successRate": 1.0,
+    "totalFilesRead": 3,
+    "totalIrrelevantFileReads": 1,
+    "irrelevantReadRate": 0.33333334,
+    "averageContextPrecision": 0.6666667,
+    "averageEditedFileRecall": 1.0,
+    "validationCoverageRate": 1.0,
+    "averageTimeToFirstRelevantFileMillis": 600.0,
+    "totalToolCalls": 9,
+    "totalTokenEstimate": 4100
+  },
+  "tasks": [
+    {
+      "taskId": "auth-redirect-001",
+      "status": "success",
+      "expectedFileCount": 2,
+      "expectedTestCount": 1,
+      "recommendedFileCount": 3,
+      "filesReadCount": 3,
+      "relevantFilesReadCount": 2,
+      "irrelevantFileReadCount": 1,
+      "filesEditedCount": 2,
+      "expectedFilesEditedCount": 2,
+      "contextPrecision": 0.6666667,
+      "editedFileRecall": 1.0,
+      "validationCovered": true,
+      "toolCallCount": 9,
+      "tokenEstimate": 4100,
+      "elapsedMillis": 6200,
+      "timeToFirstRelevantFileMillis": 600
+    }
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

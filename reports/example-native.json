@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "suiteName": "example-auth-bugs",
+  "agent": "claude-code",
+  "variant": "native",
+  "summary": {
+    "taskCount": 1,
+    "successCount": 0,
+    "successRate": 0.0,
+    "totalFilesRead": 4,
+    "totalIrrelevantFileReads": 3,
+    "irrelevantReadRate": 0.75,
+    "averageContextPrecision": 0.25,
+    "averageEditedFileRecall": 0.5,
+    "validationCoverageRate": 0.0,
+    "averageTimeToFirstRelevantFileMillis": 2600.0,
+    "totalToolCalls": 14,
+    "totalTokenEstimate": 6400
+  },
+  "tasks": [
+    {
+      "taskId": "auth-redirect-001",
+      "status": "failure",
+      "expectedFileCount": 2,
+      "expectedTestCount": 1,
+      "recommendedFileCount": 0,
+      "filesReadCount": 4,
+      "relevantFilesReadCount": 1,
+      "irrelevantFileReadCount": 3,
+      "filesEditedCount": 1,
+      "expectedFilesEditedCount": 1,
+      "contextPrecision": 0.25,
+      "editedFileRecall": 0.5,
+      "validationCovered": false,
+      "toolCallCount": 14,
+      "tokenEstimate": 6400,
+      "elapsedMillis": 9000,
+      "timeToFirstRelevantFileMillis": 2600
+    }
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

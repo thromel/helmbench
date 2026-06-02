@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "taskId": "auth-redirect-001",
+  "agent": "claude-code",
+  "variant": "ctxhelm_mcp",
+  "status": "success",
+  "recommendedFiles": [
+    {
+      "path": "src/auth/session.ts",
+      "pathHash": "path:session",
+      "observedAtMillis": 120
+    },
+    {
+      "path": "src/auth/middleware.ts",
+      "pathHash": "path:middleware",
+      "observedAtMillis": 120
+    },
+    {
+      "path": "tests/auth/session.test.ts",
+      "pathHash": "path:test",
+      "observedAtMillis": 120
+    }
+  ],
+  "filesRead": [
+    {
+      "path": "src/auth/session.ts",
+      "pathHash": "path:session",
+      "observedAtMillis": 600
+    },
+    {
+      "path": "src/auth/middleware.ts",
+      "pathHash": "path:middleware",
+      "observedAtMillis": 900
+    },
+    {
+      "path": "tests/auth/session.test.ts",
+      "pathHash": "path:test",
+      "observedAtMillis": 1200
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "src/auth/session.ts",
+      "pathHash": "path:session",
+      "observedAtMillis": 2500
+    },
+    {
+      "path": "src/auth/middleware.ts",
+      "pathHash": "path:middleware",
+      "observedAtMillis": 2800
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:targeted-auth-test",
+      "touchedTests": [
+        "tests/auth/session.test.ts"
+      ],
+      "exitStatus": 0,
+      "elapsedMillis": 1800
+    }
+  ],
+  "toolCallCount": 9,
+  "tokenEstimate": 4100,
+  "elapsedMillis": 6200,
+  "timeToFirstRelevantFileMillis": 600,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

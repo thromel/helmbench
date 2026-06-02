@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "name": "example-auth-bugs",
+  "description": "Small source-free fixture suite for HelmBench smoke tests.",
+  "tasks": [
+    {
+      "id": "auth-redirect-001",
+      "prompt": "Fix the bug where expired sessions redirect incorrectly.",
+      "expectedFiles": [
+        "src/auth/session.ts",
+        "src/auth/middleware.ts"
+      ],
+      "expectedTests": [
+        "tests/auth/session.test.ts"
+      ],
+      "successCommand": "pnpm vitest run tests/auth/session.test.ts",
+      "tags": [
+        "bug_fix",
+        "auth"
+      ],
+      "timeoutSeconds": 600
+    }
+  ]
+}
