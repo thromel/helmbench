@@ -11,6 +11,7 @@ use helmbench::{
     TRACE_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::time::{Duration, Instant};
@@ -287,6 +288,11 @@ enum Command {
         out_dir: PathBuf,
         #[arg(long)]
         force: bool,
+    },
+    /// Verify a source-free evidence bundle manifest and artifact hashes.
+    VerifyBundle {
+        #[arg(long)]
+        bundle: PathBuf,
     },
     /// Fail if a benchmark summary violates source-free quality thresholds.
     QualityGate {
@@ -829,6 +835,13 @@ fn main() -> Result<()> {
             )?;
             println!("wrote {}", out_dir.display());
         }
+        Command::VerifyBundle { bundle } => {
+            verify_evidence_bundle(&bundle)?;
+            println!(
+                "bundle `{}` is valid: source-free manifest and artifact hashes ok",
+                bundle.display()
+            );
+        }
         Command::QualityGate {
             summary,
             out,
@@ -1005,7 +1018,7 @@ struct PublicSuiteHealth {
     ok: bool,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EvidenceBundleManifest {
     schema_version: u32,
@@ -1016,7 +1029,7 @@ struct EvidenceBundleManifest {
     privacy: PrivacyStatus,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct EvidenceBundleArtifact {
     kind: String,
@@ -1025,6 +1038,97 @@ struct EvidenceBundleArtifact {
     byte_count: u64,
     content_hash: String,
     source_free_checked: bool,
+}
+
+fn verify_evidence_bundle(bundle: &Path) -> Result<()> {
+    let manifest_path = bundle.join("manifest.json");
+    let raw = std::fs::read_to_string(&manifest_path)
+        .with_context(|| format!("read {}", manifest_path.display()))?;
+    let manifest = serde_json::from_str::<EvidenceBundleManifest>(&raw)
+        .with_context(|| format!("parse {}", manifest_path.display()))?;
+
+    if manifest.schema_version != 1 {
+        anyhow::bail!(
+            "unsupported evidence bundle schemaVersion {}; expected 1",
+            manifest.schema_version
+        );
+    }
+    if manifest.suite_name.trim().is_empty() {
+        anyhow::bail!("evidence bundle suiteName must not be empty");
+    }
+    if manifest.baseline_agent.trim().is_empty() {
+        anyhow::bail!("evidence bundle baselineAgent must not be empty");
+    }
+    if manifest.artifacts.is_empty() {
+        anyhow::bail!("evidence bundle must contain at least one artifact");
+    }
+    if !manifest.privacy.source_free
+        || manifest.privacy.raw_source_logged
+        || manifest.privacy.raw_prompt_logged
+        || manifest.privacy.raw_transcript_logged
+        || manifest.privacy.raw_terminal_logged
+    {
+        anyhow::bail!("evidence bundle manifest is not source-free");
+    }
+
+    let mut seen_paths = BTreeSet::new();
+    for artifact in &manifest.artifacts {
+        if artifact.kind.trim().is_empty() {
+            anyhow::bail!("evidence bundle artifact kind must not be empty");
+        }
+        helmbench::validate_safe_relative_path_for_cli(&artifact.path)
+            .with_context(|| format!("validate artifact path `{}`", artifact.path))?;
+        if !seen_paths.insert(artifact.path.clone()) {
+            anyhow::bail!(
+                "duplicate evidence bundle artifact path `{}`",
+                artifact.path
+            );
+        }
+        if artifact.source_name.contains('/') || artifact.source_name.contains('\\') {
+            anyhow::bail!(
+                "evidence bundle artifact `{}` has unsafe sourceName `{}`",
+                artifact.path,
+                artifact.source_name
+            );
+        }
+        if !artifact.source_free_checked {
+            anyhow::bail!(
+                "evidence bundle artifact `{}` was not source-free checked",
+                artifact.path
+            );
+        }
+        if !artifact.content_hash.starts_with("fnv64:") {
+            anyhow::bail!(
+                "evidence bundle artifact `{}` has unsupported contentHash `{}`",
+                artifact.path,
+                artifact.content_hash
+            );
+        }
+
+        let artifact_path = bundle.join(&artifact.path);
+        let bytes = std::fs::read(&artifact_path)
+            .with_context(|| format!("read artifact {}", artifact_path.display()))?;
+        let byte_count = bytes.len() as u64;
+        if byte_count != artifact.byte_count {
+            anyhow::bail!(
+                "evidence bundle artifact `{}` byte count mismatch: manifest {}, actual {}",
+                artifact.path,
+                artifact.byte_count,
+                byte_count
+            );
+        }
+        let actual_hash = content_hash(&bytes);
+        if actual_hash != artifact.content_hash {
+            anyhow::bail!(
+                "evidence bundle artifact `{}` hash mismatch: manifest {}, actual {}",
+                artifact.path,
+                artifact.content_hash,
+                actual_hash
+            );
+        }
+    }
+
+    Ok(())
 }
 
 fn write_evidence_bundle(
@@ -2438,6 +2542,7 @@ mod tests {
         assert!(out.join("docs/native-autopsy.md").exists());
         assert!(out.join("docs/dashboard.html").exists());
         assert!(out.join("evidence/manifest.json").exists());
+        verify_evidence_bundle(&out.join("evidence")).expect("verify evidence bundle");
 
         let gate = std::fs::read_to_string(out.join("reports/quality-gate.json")).expect("gate");
         let gate = serde_json::from_str::<serde_json::Value>(&gate).expect("json");
@@ -2607,6 +2712,16 @@ mod tests {
         assert!(artifacts.iter().all(|artifact| artifact["contentHash"]
             .as_str()
             .is_some_and(|hash| hash.starts_with("fnv64:"))));
+
+        verify_evidence_bundle(&out_dir).expect("verify bundle");
+
+        std::fs::write(out_dir.join("reports/head-1.json"), b"tampered").expect("tamper");
+        let err = verify_evidence_bundle(&out_dir).expect_err("tampered bundle should fail");
+        assert!(
+            err.to_string().contains("byte count mismatch")
+                || err.to_string().contains("hash mismatch"),
+            "{err}"
+        );
     }
 
     #[test]

@@ -74,10 +74,14 @@ helmbench evidence-bundle \
   --head-report /tmp/refactoringminer-ctxhelm-plan-report.json \
   --out-dir /tmp/refactoringminer-evidence \
   --force
+
+helmbench verify-bundle \
+  --bundle /tmp/refactoringminer-evidence
 ```
 
 The bundle contains copied suite/report/health artifacts, generated benchmark
-summary JSON and Markdown, and a manifest with content hashes.
+summary JSON and Markdown, and a manifest with content hashes. `verify-bundle`
+recomputes those hashes and rejects unsafe or non-source-free manifests.
 
 For full agent runs, use `claude-run`, `codex-run`, `local-run`, or
 `ctxhelm-run` with the same suite. HelmBench clones the repository per task, so

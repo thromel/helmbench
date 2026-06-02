@@ -23,6 +23,13 @@ Important outputs:
 - `/tmp/helmbench-demo-run/docs/dashboard.html`
 - `/tmp/helmbench-demo-run/evidence/manifest.json`
 
+Verify the demo evidence bundle:
+
+```bash
+helmbench verify-bundle \
+  --bundle /tmp/helmbench-demo-run/evidence
+```
+
 ## Create The Demo Repo
 
 `init-demo-repo` is the lower-level fixture generator used by `demo-run`.

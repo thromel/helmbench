@@ -21,6 +21,7 @@ cargo run -- demo-run --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
 cargo run -- benchmark-summary --help >/dev/null
 cargo run -- evidence-bundle --help >/dev/null
+cargo run -- verify-bundle --help >/dev/null
 cargo run -- quality-gate --help >/dev/null
 cargo run -- doctor --repo . >/dev/null
 
@@ -85,6 +86,12 @@ cargo run -- evidence-bundle \
   --head-report reports/example-claude-code.json \
   --out-dir "$TMP_DIR/evidence" \
   --force
+
+cargo run -- verify-bundle \
+  --bundle "$TMP_DIR/evidence"
+
+cargo run -- verify-bundle \
+  --bundle "$TMP_DIR/full-demo/evidence"
 
 test -f "$TMP_DIR/report.json"
 test -f "$TMP_DIR/autopsy.md"

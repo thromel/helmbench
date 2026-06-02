@@ -42,6 +42,8 @@ This repository currently implements the core HelmBench workflow:
   source-free variant reports
 - `evidence-bundle` packaging for source-free suites, health reports, run
   reports, benchmark summaries, and artifact hashes
+- `verify-bundle` validation for source-free evidence manifests, safe artifact
+  paths, byte counts, and content hashes
 - `quality-gate` checks that fail CI when benchmark-summary deltas regress
 - recommendation precision and recall metrics for context-plan evaluation
 
@@ -61,7 +63,8 @@ Run the local verification contract:
 
 This runs formatting, tests, clippy, CLI help checks, the reproducible demo
 benchmark, dashboard generation, benchmark summary generation, evidence bundle
-generation, and whitespace checks. GitHub Actions runs the same script.
+generation and verification, and whitespace checks. GitHub Actions runs the
+same script.
 
 Check local prerequisites and optional agent integrations:
 
@@ -163,6 +166,13 @@ cargo run -- evidence-bundle \
   --head-report reports/example-claude-code.json \
   --out-dir /tmp/helmbench-evidence \
   --force
+```
+
+Verify a published evidence bundle:
+
+```bash
+cargo run -- verify-bundle \
+  --bundle /tmp/helmbench-evidence
 ```
 
 Render a static source-free dashboard:
@@ -412,6 +422,7 @@ helmbench-cli
   benchmark-summary
   quality-gate
   evidence-bundle
+  verify-bundle
   autopsy
   dashboard
   doctor

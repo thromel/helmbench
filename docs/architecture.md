@@ -151,6 +151,12 @@ validates the suite and reports, optionally validates a public-suite health
 report, generates JSON and Markdown benchmark summaries, copies the artifacts
 into a bundle directory, and writes `manifest.json`.
 
+`verify-bundle` is the inverse proof check. It reads `manifest.json`, rejects
+non-source-free privacy flags, validates every artifact path as a safe relative
+path, rejects duplicate artifact paths, recomputes byte counts and content
+hashes, and fails on any mismatch. This lets a reviewer or CI job validate a
+published bundle without access to the source repository.
+
 The manifest records only:
 
 - suite name;
