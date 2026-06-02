@@ -364,6 +364,36 @@ pub fn load_agent_events(path: &Path) -> Result<Vec<AgentEvent>> {
     Ok(events)
 }
 
+pub fn events_from_agent_stream_jsonl(
+    task_id: &str,
+    jsonl: &str,
+    repo_root: Option<&Path>,
+    expected_tests: &[String],
+) -> Result<Vec<AgentEvent>> {
+    if task_id.trim().is_empty() {
+        bail!("stream task id is required");
+    }
+    let mut events = Vec::new();
+    let mut seen = BTreeSet::new();
+    for (index, line) in jsonl.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let value = serde_json::from_str::<serde_json::Value>(line)
+            .with_context(|| format!("parse stream line {}", index + 1))?;
+        collect_stream_events(
+            task_id,
+            &value,
+            repo_root,
+            expected_tests,
+            index as u64,
+            &mut seen,
+            &mut events,
+        )?;
+    }
+    Ok(events)
+}
+
 pub fn validate_agent_event(event: &AgentEvent) -> Result<()> {
     if event.schema_version != TRACE_SCHEMA_VERSION {
         bail!(
@@ -1105,6 +1135,293 @@ fn collect_path_observations(
     Ok(())
 }
 
+fn collect_stream_events(
+    task_id: &str,
+    value: &serde_json::Value,
+    repo_root: Option<&Path>,
+    expected_tests: &[String],
+    observed_at_millis: u64,
+    seen: &mut BTreeSet<String>,
+    events: &mut Vec<AgentEvent>,
+) -> Result<()> {
+    if let Some(object) = value.as_object() {
+        if let Some(tool_name) = stream_tool_name(object) {
+            let input = object
+                .get("input")
+                .or_else(|| object.get("parameters"))
+                .or_else(|| object.get("args"))
+                .or_else(|| object.get("arguments"))
+                .unwrap_or(value);
+            collect_tool_event(
+                task_id,
+                tool_name,
+                input,
+                repo_root,
+                expected_tests,
+                observed_at_millis,
+                seen,
+                events,
+            )?;
+        } else if let Some(kind) = object
+            .get("eventKind")
+            .or_else(|| object.get("event_kind"))
+            .and_then(|value| value.as_str())
+        {
+            collect_explicit_stream_event(
+                task_id,
+                kind,
+                value,
+                repo_root,
+                observed_at_millis,
+                seen,
+                events,
+            )?;
+        }
+        for child in object.values() {
+            collect_stream_events(
+                task_id,
+                child,
+                repo_root,
+                expected_tests,
+                observed_at_millis,
+                seen,
+                events,
+            )?;
+        }
+    } else if let Some(items) = value.as_array() {
+        for child in items {
+            collect_stream_events(
+                task_id,
+                child,
+                repo_root,
+                expected_tests,
+                observed_at_millis,
+                seen,
+                events,
+            )?;
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn collect_tool_event(
+    task_id: &str,
+    tool_name: &str,
+    input: &serde_json::Value,
+    repo_root: Option<&Path>,
+    expected_tests: &[String],
+    observed_at_millis: u64,
+    seen: &mut BTreeSet<String>,
+    events: &mut Vec<AgentEvent>,
+) -> Result<()> {
+    let normalized_name = normalize_tool_name(tool_name);
+    if is_read_tool(&normalized_name) {
+        if let Some(path) = stream_path(input, repo_root) {
+            push_unique_path_event(
+                task_id,
+                AgentEventKind::FileRead,
+                path,
+                observed_at_millis,
+                seen,
+                events,
+            )?;
+        }
+    } else if is_edit_tool(&normalized_name) {
+        if let Some(path) = stream_path(input, repo_root) {
+            push_unique_path_event(
+                task_id,
+                AgentEventKind::FileEdit,
+                path,
+                observed_at_millis,
+                seen,
+                events,
+            )?;
+        }
+    } else if is_command_tool(&normalized_name) {
+        if let Some(command) = stream_command(input) {
+            let event = AgentEvent {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: task_id.to_string(),
+                event_kind: AgentEventKind::Command,
+                path: None,
+                command_class: Some(classify_command_text(command)),
+                command_hash: Some(format!("cmd:{}", stable_hash(command))),
+                touched_tests: expected_tests
+                    .iter()
+                    .filter(|path| command.contains(path.as_str()))
+                    .cloned()
+                    .collect(),
+                exit_status: stream_exit_status(input),
+                status: None,
+                token_estimate: None,
+                elapsed_millis: None,
+                observed_at_millis: Some(observed_at_millis),
+                privacy: PrivacyStatus::source_free(),
+            };
+            validate_agent_event(&event)?;
+            let key = format!(
+                "command:{}:{}",
+                event.command_hash.as_deref().unwrap_or_default(),
+                observed_at_millis
+            );
+            if seen.insert(key) {
+                events.push(event);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn collect_explicit_stream_event(
+    task_id: &str,
+    kind: &str,
+    value: &serde_json::Value,
+    repo_root: Option<&Path>,
+    observed_at_millis: u64,
+    seen: &mut BTreeSet<String>,
+    events: &mut Vec<AgentEvent>,
+) -> Result<()> {
+    let event_kind = match kind {
+        "recommended_file" | "recommended-file" | "recommendedFile" => {
+            Some(AgentEventKind::RecommendedFile)
+        }
+        "file_read" | "file-read" | "fileRead" => Some(AgentEventKind::FileRead),
+        "file_edit" | "file-edit" | "fileEdit" => Some(AgentEventKind::FileEdit),
+        _ => None,
+    };
+    if let Some(event_kind) = event_kind {
+        if let Some(path) = stream_path(value, repo_root) {
+            push_unique_path_event(task_id, event_kind, path, observed_at_millis, seen, events)?;
+        }
+    }
+    Ok(())
+}
+
+fn stream_tool_name(object: &serde_json::Map<String, serde_json::Value>) -> Option<&str> {
+    object
+        .get("name")
+        .or_else(|| object.get("toolName"))
+        .or_else(|| object.get("tool_name"))
+        .or_else(|| object.get("tool"))
+        .and_then(|value| value.as_str())
+}
+
+fn stream_path(value: &serde_json::Value, repo_root: Option<&Path>) -> Option<String> {
+    let path = value
+        .get("file_path")
+        .or_else(|| value.get("filePath"))
+        .or_else(|| value.get("filepath"))
+        .or_else(|| value.get("path"))
+        .and_then(|value| value.as_str())?;
+    normalize_stream_path(path, repo_root)
+}
+
+fn normalize_stream_path(path: &str, repo_root: Option<&Path>) -> Option<String> {
+    let path = Path::new(path);
+    let relative = if path.is_absolute() {
+        let root = repo_root?;
+        path.strip_prefix(root).ok()?.to_string_lossy().to_string()
+    } else {
+        path.to_string_lossy().to_string()
+    };
+    validate_safe_relative_path(&relative).ok()?;
+    Some(relative)
+}
+
+fn stream_command(value: &serde_json::Value) -> Option<&str> {
+    value
+        .get("command")
+        .or_else(|| value.get("cmd"))
+        .or_else(|| value.get("shellCommand"))
+        .and_then(|value| value.as_str())
+}
+
+fn stream_exit_status(value: &serde_json::Value) -> Option<i32> {
+    value
+        .get("exit_status")
+        .or_else(|| value.get("exitStatus"))
+        .or_else(|| value.get("status"))
+        .and_then(|value| value.as_i64())
+        .and_then(|value| i32::try_from(value).ok())
+}
+
+fn push_unique_path_event(
+    task_id: &str,
+    event_kind: AgentEventKind,
+    path: String,
+    observed_at_millis: u64,
+    seen: &mut BTreeSet<String>,
+    events: &mut Vec<AgentEvent>,
+) -> Result<()> {
+    let key = format!("{event_kind:?}:{path}");
+    if !seen.insert(key) {
+        return Ok(());
+    }
+    let event = AgentEvent {
+        schema_version: TRACE_SCHEMA_VERSION,
+        task_id: task_id.to_string(),
+        event_kind,
+        path: Some(path),
+        command_class: None,
+        command_hash: None,
+        touched_tests: Vec::new(),
+        exit_status: None,
+        status: None,
+        token_estimate: None,
+        elapsed_millis: None,
+        observed_at_millis: Some(observed_at_millis),
+        privacy: PrivacyStatus::source_free(),
+    };
+    validate_agent_event(&event)?;
+    events.push(event);
+    Ok(())
+}
+
+fn normalize_tool_name(name: &str) -> String {
+    name.chars()
+        .filter(|ch| ch.is_ascii_alphanumeric())
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+fn is_read_tool(name: &str) -> bool {
+    matches!(name, "read" | "view" | "open")
+}
+
+fn is_edit_tool(name: &str) -> bool {
+    matches!(
+        name,
+        "edit" | "multiedit" | "write" | "create" | "applypatch"
+    )
+}
+
+fn is_command_tool(name: &str) -> bool {
+    matches!(
+        name,
+        "bash" | "shell" | "exec" | "runcommand" | "executecommand" | "terminal"
+    )
+}
+
+fn classify_command_text(command: &str) -> CommandClass {
+    let lower = command.to_ascii_lowercase();
+    if lower.contains("test")
+        || lower.contains("vitest")
+        || lower.contains("pytest")
+        || lower.contains("cargo test")
+    {
+        CommandClass::Test
+    } else if lower.contains("typecheck") || lower.contains("tsc") {
+        CommandClass::Typecheck
+    } else if lower.contains("lint") || lower.contains("clippy") {
+        CommandClass::Lint
+    } else if lower.contains("build") {
+        CommandClass::Build
+    } else {
+        CommandClass::Other
+    }
+}
+
 fn trace_from_task_events(
     task: &BenchTask,
     events: &[&AgentEvent],
@@ -1769,6 +2086,75 @@ mod tests {
         assert_eq!(report.summary.success_rate, 1.0);
         assert_eq!(report.summary.validation_coverage_rate, 1.0);
         assert_eq!(report.tasks[0].irrelevant_file_read_count, 1);
+    }
+
+    #[test]
+    fn stream_jsonl_becomes_source_free_events_without_raw_commands() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let root = temp.path();
+        let absolute = root.join("src/auth/session.ts");
+        let jsonl = format!(
+            "{}\n{}\n{}\n{}\n",
+            serde_json::json!({
+                "type": "tool_use",
+                "name": "Read",
+                "input": {"file_path": absolute}
+            }),
+            serde_json::json!({
+                "type": "tool_use",
+                "name": "Edit",
+                "input": {"file_path": "src/auth/session.ts"}
+            }),
+            serde_json::json!({
+                "type": "tool_call",
+                "tool_name": "Bash",
+                "input": {
+                    "command": "pnpm vitest run tests/auth/session.test.ts",
+                    "exit_status": 0
+                }
+            }),
+            serde_json::json!({
+                "eventKind": "recommended_file",
+                "path": "src/auth/middleware.ts"
+            })
+        );
+
+        let events = events_from_agent_stream_jsonl(
+            "auth-redirect-001",
+            &jsonl,
+            Some(root),
+            &["tests/auth/session.test.ts".to_string()],
+        )
+        .expect("stream events");
+        assert_eq!(events.len(), 4);
+        assert!(events.iter().any(|event| {
+            event.event_kind == AgentEventKind::FileRead
+                && event.path.as_deref() == Some("src/auth/session.ts")
+        }));
+        assert!(events.iter().any(|event| {
+            event.event_kind == AgentEventKind::FileEdit
+                && event.path.as_deref() == Some("src/auth/session.ts")
+        }));
+        let command = events
+            .iter()
+            .find(|event| event.event_kind == AgentEventKind::Command)
+            .expect("command");
+        assert_eq!(command.command_class, Some(CommandClass::Test));
+        assert_eq!(command.exit_status, Some(0));
+        assert_eq!(
+            command.touched_tests,
+            vec!["tests/auth/session.test.ts".to_string()]
+        );
+        assert!(command
+            .command_hash
+            .as_deref()
+            .is_some_and(|hash| hash.starts_with("cmd:")));
+        assert!(serde_json::to_string(&events)
+            .expect("json")
+            .contains("session.test.ts"));
+        assert!(!serde_json::to_string(&events)
+            .expect("json")
+            .contains("pnpm vitest run"));
     }
 
     #[test]

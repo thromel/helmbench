@@ -89,6 +89,11 @@ start the installed agent CLI non-interactively, suppress raw stdout/stderr, and
 inject instructions that ask the agent to emit source-free `record-event` calls.
 HelmBench still owns edited-file inference and validation recording.
 
+`stream-trace` covers agents that can emit structured JSONL tool streams. It
+parses those streams in memory, extracts safe file-read/file-edit/command
+metadata, hashes command text, and writes normal source-free HelmBench traces.
+Raw streams should be treated as local temporary artifacts.
+
 ## Metrics
 
 The core report computes:
@@ -188,6 +193,13 @@ therefore avoid transcript parsing. They launch the agent, ask it to emit
 source-free events, infer edits from git status, and record validation results.
 Later adapters can add deeper tool-stream capture only if that stream can be
 sanitized before it is persisted.
+
+### Why import structured streams?
+
+Some agents expose tool-use streams but cannot be forced to call
+`record-event`. `stream-trace` gives HelmBench a middle path: consume structured
+tool metadata locally, persist only paths, command classes, command hashes, test
+touches, and statuses, and discard raw tool payloads.
 
 ### Why not pass/fail only?
 

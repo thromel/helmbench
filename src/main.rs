@@ -1,11 +1,12 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use helmbench::{
-    build_autopsy, build_report, compare_reports, example_suite, load_agent_events, load_suite,
-    load_traces, project_root_for_cli, read_report, render_html_dashboard, render_markdown_autopsy,
-    render_markdown_compare, render_markdown_report, trace_from_ctxhelm_prepare_json,
-    traces_from_agent_events, validate_agent_event, validate_suite, write_json, AgentEvent,
-    AgentEventKind, AgentVariant, CommandClass, PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
+    build_autopsy, build_report, compare_reports, events_from_agent_stream_jsonl, example_suite,
+    load_agent_events, load_suite, load_traces, project_root_for_cli, read_report,
+    render_html_dashboard, render_markdown_autopsy, render_markdown_compare,
+    render_markdown_report, trace_from_ctxhelm_prepare_json, traces_from_agent_events,
+    validate_agent_event, validate_suite, write_json, AgentEvent, AgentEventKind, AgentVariant,
+    CommandClass, PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
 };
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
@@ -77,6 +78,25 @@ enum Command {
         #[arg(long, value_enum, default_value_t = TraceVariant::Native)]
         variant: TraceVariant,
         #[arg(long, default_value = "traces/claude-code")]
+        out_dir: PathBuf,
+    },
+    /// Convert a structured agent JSONL stream into source-free HelmBench traces.
+    StreamTrace {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        stream: PathBuf,
+        #[arg(long)]
+        task_id: String,
+        #[arg(long, default_value = "agent-stream")]
+        agent: String,
+        #[arg(long, value_enum, default_value_t = TraceVariant::Native)]
+        variant: TraceVariant,
+        #[arg(long)]
+        repo_root: Option<PathBuf>,
+        #[arg(long, value_enum, default_value_t = CliTaskStatus::Skipped)]
+        status: CliTaskStatus,
+        #[arg(long, default_value = "traces/agent-stream")]
         out_dir: PathBuf,
     },
     /// Run a source-free local adapter command in isolated per-task repo clones.
@@ -427,6 +447,59 @@ fn main() -> Result<()> {
             let suite = load_suite(&suite)?;
             let events = load_agent_events(&events)?;
             let traces = traces_from_agent_events(&suite, &events, "claude-code", variant.into())?;
+            std::fs::create_dir_all(&out_dir)
+                .with_context(|| format!("create {}", out_dir.display()))?;
+            for trace in traces {
+                let out = out_dir.join(format!("{}.json", trace.task_id));
+                write_json(&trace, &out)?;
+                println!("wrote {}", out.display());
+            }
+        }
+        Command::StreamTrace {
+            suite,
+            stream,
+            task_id,
+            agent,
+            variant,
+            repo_root,
+            status,
+            out_dir,
+        } => {
+            let suite = load_suite(&suite)?;
+            let task = suite
+                .tasks
+                .iter()
+                .find(|task| task.id == task_id)
+                .with_context(|| format!("suite task `{}`", task_id))?;
+            let raw = std::fs::read_to_string(&stream)
+                .with_context(|| format!("read {}", stream.display()))?;
+            let repo_root = repo_root
+                .as_deref()
+                .map(std::fs::canonicalize)
+                .transpose()
+                .context("resolve repo root")?;
+            let mut events = events_from_agent_stream_jsonl(
+                &task_id,
+                &raw,
+                repo_root.as_deref(),
+                &task.expected_tests,
+            )?;
+            events.push(AgentEvent {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: task_id.clone(),
+                event_kind: AgentEventKind::Status,
+                path: None,
+                command_class: None,
+                command_hash: None,
+                touched_tests: Vec::new(),
+                exit_status: None,
+                status: Some(status.into()),
+                token_estimate: None,
+                elapsed_millis: None,
+                observed_at_millis: Some(events.len() as u64),
+                privacy: PrivacyStatus::source_free(),
+            });
+            let traces = traces_from_agent_events(&suite, &events, &agent, variant.into())?;
             std::fs::create_dir_all(&out_dir)
                 .with_context(|| format!("create {}", out_dir.display()))?;
             for trace in traces {

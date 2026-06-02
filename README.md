@@ -31,6 +31,9 @@ This repository currently implements the first MVP slice:
   trace JSON
 - `claude-run` and `codex-run` launch presets that run agents non-interactively
   inside isolated clones using the same source-free event contract
+- `stream-trace` importer that converts structured Claude/Codex-style JSONL
+  tool streams into source-free traces without storing command text or tool
+  payloads
 - recommendation precision and recall metrics for context-plan evaluation
 
 It does **not** yet parse raw Claude Code, Codex, Cursor, or other agent
@@ -137,6 +140,19 @@ cargo run -- run \
   --suite suites/example-auth-bugs.json \
   --trace-dir examples/traces/claude-code \
   --out reports/example-claude-code.json
+```
+
+Convert a structured agent JSONL stream into traces:
+
+```bash
+cargo run -- stream-trace \
+  --suite suites/example-auth-bugs.json \
+  --stream examples/streams/claude-code/auth-redirect-001.jsonl \
+  --task-id auth-redirect-001 \
+  --agent claude-code \
+  --variant native \
+  --status success \
+  --out-dir examples/traces/stream-claude
 ```
 
 Generate a ctxhelm recommendation trace over the HelmBench repo:
@@ -308,6 +324,7 @@ helmbench-cli
   ctxhelm-trace
   ctxhelm-run
   claude-trace
+  stream-trace
   local-run
   claude-run
   codex-run
@@ -321,6 +338,7 @@ adapters
   ctxhelm prepare-task trace generation
   ctxhelm-guided local run with source-free pack metadata
   Claude Code source-free event import
+  structured agent stream import
   explicit local adapter command runner
   Claude Code direct launch preset
   Codex direct launch preset
@@ -332,6 +350,4 @@ future direct-agent adapters
 
 ## Next Milestones
 
-1. Add stronger Claude/Codex event capture through hooks or structured streams
-   where available, without storing transcripts.
-2. Add larger public benchmark suites over real open-source repositories.
+1. Add larger public benchmark suites over real open-source repositories.
