@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "suiteName": "example-auth-bugs",
+  "agent": "claude-code",
+  "variant": "ctxhelm_mcp",
+  "summary": {
+    "taskCount": 1,
+    "successCount": 1,
+    "successRate": 1.0,
+    "totalFilesRead": 4,
+    "totalIrrelevantFileReads": 2,
+    "irrelevantReadRate": 0.5,
+    "averageRecommendationPrecision": 1.0,
+    "averageRecommendationRecall": 1.0,
+    "averageContextPrecision": 0.5,
+    "averageEditedFileRecall": 1.0,
+    "validationCoverageRate": 1.0,
+    "averageTimeToFirstRelevantFileMillis": 550.0,
+    "totalToolCalls": 12,
+    "totalTokenEstimate": 4100
+  },
+  "tasks": [
+    {
+      "taskId": "auth-redirect-001",
+      "status": "success",
+      "expectedFileCount": 2,
+      "expectedTestCount": 1,
+      "recommendedFileCount": 3,
+      "relevantRecommendedFileCount": 3,
+      "irrelevantRecommendedFileCount": 0,
+      "recommendationPrecision": 1.0,
+      "recommendationRecall": 1.0,
+      "filesReadCount": 4,
+      "relevantFilesReadCount": 2,
+      "irrelevantFileReadCount": 2,
+      "filesEditedCount": 2,
+      "expectedFilesEditedCount": 2,
+      "contextPrecision": 0.5,
+      "editedFileRecall": 1.0,
+      "validationCovered": true,
+      "toolCallCount": 12,
+      "tokenEstimate": 4100,
+      "elapsedMillis": 4500,
+      "timeToFirstRelevantFileMillis": 550
+    }
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

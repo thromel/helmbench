@@ -24,11 +24,14 @@ This repository currently implements the first MVP slice:
 - privacy checks that reject raw-source/raw-transcript traces
 - `ctxhelm-trace` adapter that calls `ctxhelm prepare-task` and emits
   source-free recommendation traces
+- `claude-trace` importer that converts sanitized Claude Code event JSONL into
+  source-free read/edit/test traces
 - recommendation precision and recall metrics for context-plan evaluation
 
 It does **not** yet launch Claude Code, Codex, Cursor, or other agents directly.
-The current runner ingests source-free traces and can generate ctxhelm plan
-traces. Direct coding-agent adapters come next.
+The current runner ingests source-free traces, can generate ctxhelm plan traces,
+and can convert source-free Claude Code events. Direct process-launch adapters
+come next.
 
 ## Quickstart
 
@@ -65,6 +68,21 @@ cargo run -- compare \
   --base reports/example-native.json \
   --head reports/example-ctxhelm.json \
   --format markdown
+```
+
+Convert sanitized Claude Code events into traces:
+
+```bash
+cargo run -- claude-trace \
+  --suite suites/example-auth-bugs.json \
+  --events examples/events/claude-code/auth-redirect-001.jsonl \
+  --variant ctxhelm-mcp \
+  --out-dir examples/traces/claude-code
+
+cargo run -- run \
+  --suite suites/example-auth-bugs.json \
+  --trace-dir examples/traces/claude-code \
+  --out reports/example-claude-code.json
 ```
 
 Generate a ctxhelm recommendation trace over the HelmBench repo:
@@ -112,6 +130,27 @@ pollute ctxhelm recommendation quality.
 | Time to first relevant file | How quickly the agent reached a target file. |
 | Tool/token cost | Source-free cost proxies from trace metadata. |
 
+## Source-Free Claude Event JSONL
+
+`claude-trace` accepts newline-delimited JSON events such as:
+
+```json
+{"schemaVersion":1,"taskId":"auth-redirect-001","eventKind":"file_read","path":"src/auth/session.ts","observedAtMillis":550}
+```
+
+Supported `eventKind` values:
+
+- `recommended_file`
+- `file_read`
+- `file_edit`
+- `command`
+- `usage`
+- `status`
+
+These events are intended to be produced by Claude Code hooks or wrappers
+without storing raw transcripts, raw tool payloads, raw terminal logs, or source
+snippets.
+
 ## Privacy Contract
 
 HelmBench reports are source-free by default. Trace files may contain:
@@ -151,11 +190,13 @@ helmbench-cli
   validate-suite
   run
   ctxhelm-trace
+  claude-trace
   compare
   doctor
 
 adapters
   ctxhelm prepare-task trace generation
+  Claude Code source-free event import
 
 future direct-agent adapters
   claude-code

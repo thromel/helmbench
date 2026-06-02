@@ -84,6 +84,12 @@ impl PrivacyStatus {
     }
 }
 
+impl Default for PrivacyStatus {
+    fn default() -> Self {
+        Self::source_free()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct AgentTrace {
@@ -125,6 +131,37 @@ pub struct CommandObservation {
     pub touched_tests: Vec<String>,
     pub exit_status: Option<i32>,
     pub elapsed_millis: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AgentEventKind {
+    RecommendedFile,
+    FileRead,
+    FileEdit,
+    Command,
+    Status,
+    Usage,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentEvent {
+    pub schema_version: u32,
+    pub task_id: String,
+    pub event_kind: AgentEventKind,
+    pub path: Option<String>,
+    pub command_class: Option<CommandClass>,
+    pub command_hash: Option<String>,
+    #[serde(default)]
+    pub touched_tests: Vec<String>,
+    pub exit_status: Option<i32>,
+    pub status: Option<TaskStatus>,
+    pub token_estimate: Option<u64>,
+    pub elapsed_millis: Option<u64>,
+    pub observed_at_millis: Option<u64>,
+    #[serde(default)]
+    pub privacy: PrivacyStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -260,6 +297,110 @@ pub fn load_traces(trace_dir: &Path) -> Result<Vec<AgentTrace>> {
         traces.push(trace);
     }
     traces.sort_by(|left, right| left.task_id.cmp(&right.task_id));
+    Ok(traces)
+}
+
+pub fn load_agent_events(path: &Path) -> Result<Vec<AgentEvent>> {
+    let raw = fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    let mut events = Vec::new();
+    for (index, line) in raw.lines().enumerate() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let event = serde_json::from_str::<AgentEvent>(line)
+            .with_context(|| format!("parse event {} in {}", index + 1, path.display()))?;
+        validate_agent_event(&event)
+            .with_context(|| format!("event {} in {}", index + 1, path.display()))?;
+        events.push(event);
+    }
+    Ok(events)
+}
+
+pub fn validate_agent_event(event: &AgentEvent) -> Result<()> {
+    if event.schema_version != TRACE_SCHEMA_VERSION {
+        bail!(
+            "unsupported event schema version {}; expected {}",
+            event.schema_version,
+            TRACE_SCHEMA_VERSION
+        );
+    }
+    if event.task_id.trim().is_empty() {
+        bail!("event task id is required");
+    }
+    if !event.privacy.source_free
+        || event.privacy.raw_source_logged
+        || event.privacy.raw_prompt_logged
+        || event.privacy.raw_transcript_logged
+        || event.privacy.raw_terminal_logged
+    {
+        bail!("event is not source-free");
+    }
+    if let Some(path) = &event.path {
+        validate_safe_relative_path(path)?;
+    }
+    for test in &event.touched_tests {
+        validate_safe_relative_path(test)?;
+    }
+    match event.event_kind {
+        AgentEventKind::RecommendedFile | AgentEventKind::FileRead | AgentEventKind::FileEdit => {
+            if event.path.is_none() {
+                bail!("{:?} event requires path", event.event_kind);
+            }
+        }
+        AgentEventKind::Command => {
+            if event.command_class.is_none() {
+                bail!("command event requires commandClass");
+            }
+        }
+        AgentEventKind::Status => {
+            if event.status.is_none() {
+                bail!("status event requires status");
+            }
+        }
+        AgentEventKind::Usage => {}
+    }
+    Ok(())
+}
+
+pub fn traces_from_agent_events(
+    suite: &TaskSuite,
+    events: &[AgentEvent],
+    agent: &str,
+    variant: AgentVariant,
+) -> Result<Vec<AgentTrace>> {
+    validate_suite(suite)?;
+    for event in events {
+        validate_agent_event(event)?;
+    }
+    let task_ids = suite
+        .tasks
+        .iter()
+        .map(|task| task.id.as_str())
+        .collect::<BTreeSet<_>>();
+    let mut by_task = BTreeMap::<String, Vec<&AgentEvent>>::new();
+    for event in events {
+        if !task_ids.contains(event.task_id.as_str()) {
+            bail!("event references unknown task `{}`", event.task_id);
+        }
+        by_task
+            .entry(event.task_id.clone())
+            .or_default()
+            .push(event);
+    }
+
+    let mut traces = Vec::new();
+    for task in &suite.tasks {
+        let task_events = by_task.remove(&task.id).unwrap_or_default();
+        if task_events.is_empty() {
+            continue;
+        }
+        traces.push(trace_from_task_events(
+            task,
+            &task_events,
+            agent,
+            variant.clone(),
+        )?);
+    }
     Ok(traces)
 }
 
@@ -555,6 +696,110 @@ fn collect_path_observations(
         });
     }
     Ok(())
+}
+
+fn trace_from_task_events(
+    task: &BenchTask,
+    events: &[&AgentEvent],
+    agent: &str,
+    variant: AgentVariant,
+) -> Result<AgentTrace> {
+    let mut recommended_files = Vec::new();
+    let mut files_read = Vec::new();
+    let mut files_edited = Vec::new();
+    let mut commands = Vec::new();
+    let mut status = TaskStatus::Skipped;
+    let mut token_estimate = 0u64;
+    let mut has_token_estimate = false;
+    let mut elapsed_millis = None;
+
+    for event in events {
+        match event.event_kind {
+            AgentEventKind::RecommendedFile => {
+                recommended_files.push(event_path_observation(event)?);
+            }
+            AgentEventKind::FileRead => {
+                files_read.push(event_path_observation(event)?);
+            }
+            AgentEventKind::FileEdit => {
+                files_edited.push(event_path_observation(event)?);
+            }
+            AgentEventKind::Command => {
+                commands.push(CommandObservation {
+                    command_class: event.command_class.clone().expect("validated commandClass"),
+                    command_hash: event.command_hash.clone(),
+                    touched_tests: event.touched_tests.clone(),
+                    exit_status: event.exit_status,
+                    elapsed_millis: event.elapsed_millis,
+                });
+            }
+            AgentEventKind::Status => {
+                status = event.status.clone().expect("validated status");
+            }
+            AgentEventKind::Usage => {
+                if let Some(tokens) = event.token_estimate {
+                    token_estimate = token_estimate.saturating_add(tokens);
+                    has_token_estimate = true;
+                }
+            }
+        }
+        if let Some(observed) = event.observed_at_millis {
+            elapsed_millis =
+                Some(elapsed_millis.map_or(observed, |current: u64| current.max(observed)));
+        }
+    }
+    dedupe_observations(&mut recommended_files);
+    dedupe_observations(&mut files_read);
+    dedupe_observations(&mut files_edited);
+    let expected_files = task.expected_files.iter().cloned().collect::<BTreeSet<_>>();
+    let trace = AgentTrace {
+        schema_version: TRACE_SCHEMA_VERSION,
+        task_id: task.id.clone(),
+        agent: agent.to_string(),
+        variant,
+        status,
+        recommended_files,
+        files_read,
+        files_edited,
+        commands,
+        tool_call_count: events.len() as u32,
+        token_estimate: has_token_estimate.then_some(token_estimate),
+        elapsed_millis,
+        time_to_first_relevant_file_millis: infer_time_to_first_relevant_file_from_events(
+            events,
+            &expected_files,
+        ),
+        privacy: PrivacyStatus::source_free(),
+    };
+    validate_trace(&trace)?;
+    Ok(trace)
+}
+
+fn event_path_observation(event: &AgentEvent) -> Result<PathObservation> {
+    let path = event.path.as_ref().context("event path")?;
+    validate_safe_relative_path(path)?;
+    Ok(PathObservation {
+        path: path.clone(),
+        path_hash: Some(format!("path:{}", stable_hash(path))),
+        observed_at_millis: event.observed_at_millis,
+    })
+}
+
+fn infer_time_to_first_relevant_file_from_events(
+    events: &[&AgentEvent],
+    expected_files: &BTreeSet<String>,
+) -> Option<u64> {
+    events
+        .iter()
+        .filter(|event| event.event_kind == AgentEventKind::FileRead)
+        .filter(|event| {
+            event
+                .path
+                .as_ref()
+                .is_some_and(|path| expected_files.contains(path))
+        })
+        .filter_map(|event| event.observed_at_millis)
+        .min()
 }
 
 fn dedupe_observations(observations: &mut Vec<PathObservation>) {
@@ -893,6 +1138,123 @@ mod tests {
     }
 
     #[test]
+    fn source_free_agent_events_become_claude_trace() {
+        let suite = example_suite();
+        let events = vec![
+            event(
+                "auth-redirect-001",
+                AgentEventKind::RecommendedFile,
+                Some("src/auth/session.ts"),
+                None,
+                None,
+                Some(50),
+            ),
+            event(
+                "auth-redirect-001",
+                AgentEventKind::FileRead,
+                Some("README.md"),
+                None,
+                None,
+                Some(100),
+            ),
+            event(
+                "auth-redirect-001",
+                AgentEventKind::FileRead,
+                Some("src/auth/session.ts"),
+                None,
+                None,
+                Some(200),
+            ),
+            event(
+                "auth-redirect-001",
+                AgentEventKind::FileEdit,
+                Some("src/auth/session.ts"),
+                None,
+                None,
+                Some(300),
+            ),
+            AgentEvent {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                event_kind: AgentEventKind::Command,
+                path: None,
+                command_class: Some(CommandClass::Test),
+                command_hash: Some("cmd:targeted".to_string()),
+                touched_tests: vec!["tests/auth/session.test.ts".to_string()],
+                exit_status: Some(0),
+                status: None,
+                token_estimate: None,
+                elapsed_millis: Some(1200),
+                observed_at_millis: Some(400),
+                privacy: PrivacyStatus::source_free(),
+            },
+            AgentEvent {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                event_kind: AgentEventKind::Usage,
+                path: None,
+                command_class: None,
+                command_hash: None,
+                touched_tests: Vec::new(),
+                exit_status: None,
+                status: None,
+                token_estimate: Some(2400),
+                elapsed_millis: None,
+                observed_at_millis: Some(450),
+                privacy: PrivacyStatus::source_free(),
+            },
+            AgentEvent {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                event_kind: AgentEventKind::Status,
+                path: None,
+                command_class: None,
+                command_hash: None,
+                touched_tests: Vec::new(),
+                exit_status: None,
+                status: Some(TaskStatus::Success),
+                token_estimate: None,
+                elapsed_millis: None,
+                observed_at_millis: Some(500),
+                privacy: PrivacyStatus::source_free(),
+            },
+        ];
+
+        let traces =
+            traces_from_agent_events(&suite, &events, "claude-code", AgentVariant::CtxhelmMcp)
+                .expect("traces");
+        assert_eq!(traces.len(), 1);
+        let trace = &traces[0];
+        assert_eq!(trace.status, TaskStatus::Success);
+        assert_eq!(trace.files_read.len(), 2);
+        assert_eq!(trace.files_edited.len(), 1);
+        assert_eq!(trace.commands.len(), 1);
+        assert_eq!(trace.token_estimate, Some(2400));
+        assert_eq!(trace.time_to_first_relevant_file_millis, Some(200));
+
+        let report = build_report(&suite, &traces).expect("report");
+        assert_eq!(report.summary.success_rate, 1.0);
+        assert_eq!(report.summary.validation_coverage_rate, 1.0);
+        assert_eq!(report.tasks[0].irrelevant_file_read_count, 1);
+    }
+
+    #[test]
+    fn agent_event_validation_rejects_raw_transcript_flag() {
+        let mut unsafe_event = event(
+            "auth-redirect-001",
+            AgentEventKind::FileRead,
+            Some("src/auth/session.ts"),
+            None,
+            None,
+            Some(1),
+        );
+        unsafe_event.privacy.raw_transcript_logged = true;
+
+        let error = validate_agent_event(&unsafe_event).expect_err("unsafe event should fail");
+        assert!(error.to_string().contains("not source-free"));
+    }
+
+    #[test]
     fn compare_reports_reports_directional_deltas() {
         let suite = example_suite();
         let base = build_report(
@@ -951,6 +1313,31 @@ mod tests {
             token_estimate: Some(100),
             elapsed_millis: None,
             time_to_first_relevant_file_millis: None,
+            privacy: PrivacyStatus::source_free(),
+        }
+    }
+
+    fn event(
+        task_id: &str,
+        event_kind: AgentEventKind,
+        path: Option<&str>,
+        command_class: Option<CommandClass>,
+        status: Option<TaskStatus>,
+        observed_at_millis: Option<u64>,
+    ) -> AgentEvent {
+        AgentEvent {
+            schema_version: TRACE_SCHEMA_VERSION,
+            task_id: task_id.to_string(),
+            event_kind,
+            path: path.map(str::to_string),
+            command_class,
+            command_hash: None,
+            touched_tests: Vec::new(),
+            exit_status: None,
+            status,
+            token_estimate: None,
+            elapsed_millis: None,
+            observed_at_millis,
             privacy: PrivacyStatus::source_free(),
         }
     }

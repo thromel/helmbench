@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use helmbench::{
-    build_report, compare_reports, example_suite, load_suite, load_traces, project_root_for_cli,
-    read_report, render_markdown_compare, render_markdown_report, trace_from_ctxhelm_prepare_json,
-    validate_suite, write_json, AgentVariant,
+    build_report, compare_reports, example_suite, load_agent_events, load_suite, load_traces,
+    project_root_for_cli, read_report, render_markdown_compare, render_markdown_report,
+    trace_from_ctxhelm_prepare_json, traces_from_agent_events, validate_suite, write_json,
+    AgentVariant,
 };
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
@@ -57,6 +58,17 @@ enum Command {
         #[arg(long, default_value = "traces/ctxhelm-plan")]
         out_dir: PathBuf,
     },
+    /// Convert sanitized Claude Code event JSONL into source-free HelmBench traces.
+    ClaudeTrace {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        events: PathBuf,
+        #[arg(long, value_enum, default_value_t = TraceVariant::Native)]
+        variant: TraceVariant,
+        #[arg(long, default_value = "traces/claude-code")]
+        out_dir: PathBuf,
+    },
     /// Compare two source-free run reports.
     Compare {
         #[arg(long)]
@@ -79,6 +91,23 @@ enum Command {
 enum OutputFormat {
     Json,
     Markdown,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum TraceVariant {
+    Native,
+    CtxhelmMcp,
+    CtxhelmPack,
+}
+
+impl From<TraceVariant> for AgentVariant {
+    fn from(value: TraceVariant) -> Self {
+        match value {
+            TraceVariant::Native => AgentVariant::Native,
+            TraceVariant::CtxhelmMcp => AgentVariant::CtxhelmMcp,
+            TraceVariant::CtxhelmPack => AgentVariant::CtxhelmPack,
+        }
+    }
 }
 
 fn main() -> Result<()> {
@@ -160,6 +189,23 @@ fn main() -> Result<()> {
                     Some(started.elapsed().as_millis() as u64),
                 )?;
                 let out = out_dir.join(format!("{}.json", task.id));
+                write_json(&trace, &out)?;
+                println!("wrote {}", out.display());
+            }
+        }
+        Command::ClaudeTrace {
+            suite,
+            events,
+            variant,
+            out_dir,
+        } => {
+            let suite = load_suite(&suite)?;
+            let events = load_agent_events(&events)?;
+            let traces = traces_from_agent_events(&suite, &events, "claude-code", variant.into())?;
+            std::fs::create_dir_all(&out_dir)
+                .with_context(|| format!("create {}", out_dir.display()))?;
+            for trace in traces {
+                let out = out_dir.join(format!("{}.json", trace.task_id));
                 write_json(&trace, &out)?;
                 println!("wrote {}", out.display());
             }

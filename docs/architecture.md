@@ -55,6 +55,8 @@ Initial variants:
 The first MVP ingests manually produced or synthetic traces. Later adapters will
 run agents and produce traces automatically. The current ctxhelm adapter already
 generates source-free recommendation traces from `ctxhelm prepare-task`.
+The current Claude Code path imports source-free JSONL events produced by hooks
+or wrappers; it does not require raw transcripts.
 
 ## Metrics
 
@@ -93,6 +95,14 @@ ctxhelm can already emit source-free `prepare-task` plans. Converting those
 plans into HelmBench traces gives immediate measurement of recommendation
 precision and recall, while direct agent adapters can be added without changing
 the report contract.
+
+### Why import Claude Code events before launching Claude Code directly?
+
+Claude Code process automation and hook integration can vary by local
+installation and permissions. A source-free event importer gives us the durable
+contract first: hooks or wrappers can emit `file_read`, `file_edit`, `command`,
+`usage`, and `status` events, and HelmBench can score them without storing raw
+model output.
 
 ### Why not pass/fail only?
 

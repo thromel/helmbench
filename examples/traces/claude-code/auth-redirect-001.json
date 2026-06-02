@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "taskId": "auth-redirect-001",
+  "agent": "claude-code",
+  "variant": "ctxhelm_mcp",
+  "status": "success",
+  "recommendedFiles": [
+    {
+      "path": "src/auth/session.ts",
+      "pathHash": "path:a57f6316dd4c3a9a",
+      "observedAtMillis": 100
+    },
+    {
+      "path": "src/auth/middleware.ts",
+      "pathHash": "path:f562b84294c48d44",
+      "observedAtMillis": 100
+    },
+    {
+      "path": "tests/auth/session.test.ts",
+      "pathHash": "path:080cbcf8c09499d7",
+      "observedAtMillis": 100
+    }
+  ],
+  "filesRead": [
+    {
+      "path": "README.md",
+      "pathHash": "path:3f15cf6f633a5d62",
+      "observedAtMillis": 300
+    },
+    {
+      "path": "src/auth/session.ts",
+      "pathHash": "path:a57f6316dd4c3a9a",
+      "observedAtMillis": 550
+    },
+    {
+      "path": "src/auth/middleware.ts",
+      "pathHash": "path:f562b84294c48d44",
+      "observedAtMillis": 800
+    },
+    {
+      "path": "tests/auth/session.test.ts",
+      "pathHash": "path:080cbcf8c09499d7",
+      "observedAtMillis": 1100
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "src/auth/session.ts",
+      "pathHash": "path:a57f6316dd4c3a9a",
+      "observedAtMillis": 2500
+    },
+    {
+      "path": "src/auth/middleware.ts",
+      "pathHash": "path:f562b84294c48d44",
+      "observedAtMillis": 2800
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:targeted-auth-test",
+      "touchedTests": [
+        "tests/auth/session.test.ts"
+      ],
+      "exitStatus": 0,
+      "elapsedMillis": 1800
+    }
+  ],
+  "toolCallCount": 12,
+  "tokenEstimate": 4100,
+  "elapsedMillis": 4500,
+  "timeToFirstRelevantFileMillis": 550,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}
