@@ -105,6 +105,23 @@ The dashboard intentionally embeds no raw source, no JavaScript, and no remote
 assets. It is safe to publish as an example artifact when the input reports are
 source-free.
 
+## Autopsy
+
+`autopsy` diagnoses agent behavior from a suite plus trace directory. It is
+designed for post-run review of agent-created patches without reading source or
+transcripts.
+
+Autopsy flags:
+
+- failed tasks;
+- validation gaps;
+- edits outside expected files;
+- edited files with no recorded read event;
+- expected files that were neither read nor edited.
+
+This makes trace files useful for reviewer-facing questions such as "what did
+the agent change without inspecting?" and "which validation did it skip?"
+
 ## Design Trade-Offs
 
 ### Why source-free first?

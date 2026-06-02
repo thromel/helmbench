@@ -86,6 +86,15 @@ cargo run -- dashboard \
   --out docs/example-dashboard.html
 ```
 
+Generate a source-free agent autopsy:
+
+```bash
+cargo run -- autopsy \
+  --suite suites/example-auth-bugs.json \
+  --trace-dir examples/traces/native \
+  --out docs/example-autopsy.md
+```
+
 Run direct agent presets:
 
 ```bash
@@ -257,6 +266,7 @@ helmbench-cli
   codex-run
   record-event
   compare
+  autopsy
   dashboard
   doctor
 
@@ -266,6 +276,7 @@ adapters
   explicit local adapter command runner
   Claude Code direct launch preset
   Codex direct launch preset
+  Agent Diff Autopsy from source-free traces
 
 future direct-agent adapters
   cursor
@@ -278,4 +289,3 @@ future direct-agent adapters
 2. Extend the ctxhelm adapter from `prepare-task` plans to MCP resource reads
    and pack usage without raw MCP payloads.
 3. Add public benchmark suites over small reproducible repositories.
-4. Add Agent Diff Autopsy for agent-created PRs.

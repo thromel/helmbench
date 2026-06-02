@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 pub const SUITE_SCHEMA_VERSION: u32 = 1;
 pub const TRACE_SCHEMA_VERSION: u32 = 1;
 pub const REPORT_SCHEMA_VERSION: u32 = 1;
+pub const AUTOPSY_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -239,6 +240,53 @@ pub struct CompareReport {
     pub validation_coverage_rate_delta: f32,
     pub total_tool_calls_delta: i64,
     pub total_token_estimate_delta: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopsyReport {
+    pub schema_version: u32,
+    pub suite_name: String,
+    pub agent: String,
+    pub variant: AgentVariant,
+    pub summary: AutopsySummary,
+    pub tasks: Vec<AutopsyTask>,
+    pub privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopsySummary {
+    pub task_count: usize,
+    pub failed_task_count: usize,
+    pub validation_gap_count: usize,
+    pub overbroad_edit_count: usize,
+    pub missing_expected_inspection_count: usize,
+    pub changed_without_read_count: usize,
+    pub high_risk_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AutopsyRisk {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct AutopsyTask {
+    pub task_id: String,
+    pub status: TaskStatus,
+    pub risk: AutopsyRisk,
+    pub changed_files: Vec<String>,
+    pub expected_files: Vec<String>,
+    pub missing_expected_inspections: Vec<String>,
+    pub changed_without_read: Vec<String>,
+    pub overbroad_edits: Vec<String>,
+    pub validation_gap: bool,
+    pub notes: Vec<String>,
 }
 
 pub fn load_suite(path: &Path) -> Result<TaskSuite> {
@@ -502,6 +550,44 @@ pub fn compare_reports(base: &RunReport, head: &RunReport) -> CompareReport {
     }
 }
 
+pub fn build_autopsy(suite: &TaskSuite, traces: &[AgentTrace]) -> Result<AutopsyReport> {
+    validate_suite(suite)?;
+    if traces.is_empty() {
+        bail!("at least one trace is required");
+    }
+    for trace in traces {
+        validate_trace(trace)?;
+    }
+
+    let first = &traces[0];
+    let mut tasks_by_id = BTreeMap::new();
+    for task in &suite.tasks {
+        tasks_by_id.insert(task.id.as_str(), task);
+    }
+
+    let mut tasks = Vec::new();
+    for trace in traces {
+        if trace.agent != first.agent || trace.variant != first.variant {
+            bail!("all traces in an autopsy must use one agent and variant");
+        }
+        let Some(task) = tasks_by_id.get(trace.task_id.as_str()) else {
+            bail!("trace references unknown task `{}`", trace.task_id);
+        };
+        tasks.push(autopsy_task(task, trace));
+    }
+
+    let summary = summarize_autopsy(&tasks);
+    Ok(AutopsyReport {
+        schema_version: AUTOPSY_SCHEMA_VERSION,
+        suite_name: suite.name.clone(),
+        agent: first.agent.clone(),
+        variant: first.variant.clone(),
+        summary,
+        tasks,
+        privacy: PrivacyStatus::source_free(),
+    })
+}
+
 pub fn render_markdown_report(report: &RunReport) -> String {
     let mut out = String::new();
     out.push_str(&format!(
@@ -590,6 +676,88 @@ pub fn render_markdown_compare(compare: &CompareReport) -> String {
         compare.total_token_estimate_delta
     ));
     out
+}
+
+pub fn render_markdown_autopsy(report: &AutopsyReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "# HelmBench Autopsy: {} / {:?}\n\n",
+        report.agent, report.variant
+    ));
+    out.push_str("## Summary\n\n");
+    out.push_str(&format!(
+        "- Suite: `{}`\n- Tasks: `{}`\n- Failed tasks: `{}`\n- Validation gaps: `{}`\n- Overbroad edits: `{}`\n- Missing expected inspections: `{}`\n- Changed without read: `{}`\n- High risk tasks: `{}`\n- Source-free: `{}`\n\n",
+        report.suite_name,
+        report.summary.task_count,
+        report.summary.failed_task_count,
+        report.summary.validation_gap_count,
+        report.summary.overbroad_edit_count,
+        report.summary.missing_expected_inspection_count,
+        report.summary.changed_without_read_count,
+        report.summary.high_risk_count,
+        report.privacy.source_free
+    ));
+    out.push_str("## Tasks\n\n");
+    out.push_str(
+        "| Task | Status | Risk | Changed | Overbroad | Missing inspections | Validation gap |\n",
+    );
+    out.push_str("| --- | --- | --- | ---: | ---: | ---: | --- |\n");
+    for task in &report.tasks {
+        out.push_str(&format!(
+            "| `{}` | {:?} | {:?} | {} | {} | {} | {} |\n",
+            task.task_id,
+            task.status,
+            task.risk,
+            task.changed_files.len(),
+            task.overbroad_edits.len(),
+            task.missing_expected_inspections.len(),
+            if task.validation_gap { "yes" } else { "no" }
+        ));
+    }
+
+    for task in &report.tasks {
+        out.push_str(&format!("\n### `{}`\n\n", task.task_id));
+        out.push_str(&format!("- Status: `{:?}`\n", task.status));
+        out.push_str(&format!("- Risk: `{:?}`\n", task.risk));
+        out.push_str(&markdown_path_list("Changed files", &task.changed_files));
+        out.push_str(&markdown_path_list(
+            "Overbroad edits",
+            &task.overbroad_edits,
+        ));
+        out.push_str(&markdown_path_list(
+            "Missing expected inspections",
+            &task.missing_expected_inspections,
+        ));
+        out.push_str(&markdown_path_list(
+            "Changed without recorded read",
+            &task.changed_without_read,
+        ));
+        if !task.notes.is_empty() {
+            out.push_str("- Notes:\n");
+            for note in &task.notes {
+                out.push_str(&format!("  - {}\n", note));
+            }
+        }
+    }
+
+    out.push_str("\n## Privacy\n\n");
+    out.push_str("- Raw source logged: `false`\n- Raw prompts logged: `false`\n- Raw transcripts logged: `false`\n- Raw terminal logs logged: `false`\n");
+    out
+}
+
+fn markdown_path_list(label: &str, paths: &[String]) -> String {
+    if paths.is_empty() {
+        format!("- {label}: none\n")
+    } else {
+        format!(
+            "- {label}: {}\n",
+            paths
+                .iter()
+                .map(|path| format!("`{}`", path.replace('`', "\\`")))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    }
 }
 
 pub fn render_html_dashboard(reports: &[RunReport]) -> Result<String> {
@@ -1055,6 +1223,101 @@ pub fn project_root_for_cli(path: Option<PathBuf>) -> Result<PathBuf> {
 
 pub fn validate_safe_relative_path_for_cli(path: &str) -> Result<()> {
     validate_safe_relative_path(path)
+}
+
+fn autopsy_task(task: &BenchTask, trace: &AgentTrace) -> AutopsyTask {
+    let expected_files = task.expected_files.iter().cloned().collect::<BTreeSet<_>>();
+    let expected_tests = task.expected_tests.iter().cloned().collect::<BTreeSet<_>>();
+    let read = trace
+        .files_read
+        .iter()
+        .map(|obs| obs.path.clone())
+        .collect::<BTreeSet<_>>();
+    let changed = trace
+        .files_edited
+        .iter()
+        .map(|obs| obs.path.clone())
+        .collect::<BTreeSet<_>>();
+    let changed_files = changed.iter().cloned().collect::<Vec<_>>();
+    let expected_files_vec = expected_files.iter().cloned().collect::<Vec<_>>();
+    let missing_expected_inspections = expected_files
+        .difference(&read)
+        .filter(|path| !changed.contains(*path))
+        .cloned()
+        .collect::<Vec<_>>();
+    let changed_without_read = changed.difference(&read).cloned().collect::<Vec<_>>();
+    let overbroad_edits = changed
+        .difference(&expected_files)
+        .cloned()
+        .collect::<Vec<_>>();
+    let validation_gap = !validation_covered(trace, &expected_tests);
+    let mut notes = Vec::new();
+    if trace.status != TaskStatus::Success {
+        notes.push("Task did not end in success.".to_string());
+    }
+    if validation_gap {
+        notes.push("No successful expected validation was recorded.".to_string());
+    }
+    if !overbroad_edits.is_empty() {
+        notes.push("Agent edited files outside the expected target set.".to_string());
+    }
+    if !changed_without_read.is_empty() {
+        notes.push("Some edited files had no recorded read event.".to_string());
+    }
+    if !missing_expected_inspections.is_empty() {
+        notes.push("Expected files were neither read nor edited.".to_string());
+    }
+    if notes.is_empty() {
+        notes.push("No source-free autopsy issues detected.".to_string());
+    }
+    let risk = if trace.status != TaskStatus::Success
+        || validation_gap
+        || !overbroad_edits.is_empty()
+        || !changed_without_read.is_empty()
+    {
+        AutopsyRisk::High
+    } else if !missing_expected_inspections.is_empty() {
+        AutopsyRisk::Medium
+    } else {
+        AutopsyRisk::Low
+    };
+
+    AutopsyTask {
+        task_id: task.id.clone(),
+        status: trace.status.clone(),
+        risk,
+        changed_files,
+        expected_files: expected_files_vec,
+        missing_expected_inspections,
+        changed_without_read,
+        overbroad_edits,
+        validation_gap,
+        notes,
+    }
+}
+
+fn summarize_autopsy(tasks: &[AutopsyTask]) -> AutopsySummary {
+    AutopsySummary {
+        task_count: tasks.len(),
+        failed_task_count: tasks
+            .iter()
+            .filter(|task| task.status != TaskStatus::Success)
+            .count(),
+        validation_gap_count: tasks.iter().filter(|task| task.validation_gap).count(),
+        overbroad_edit_count: tasks.iter().map(|task| task.overbroad_edits.len()).sum(),
+        missing_expected_inspection_count: tasks
+            .iter()
+            .map(|task| task.missing_expected_inspections.len())
+            .sum(),
+        changed_without_read_count: tasks
+            .iter()
+            .map(|task| task.changed_without_read.len())
+            .sum(),
+        high_risk_count: tasks
+            .iter()
+            .filter(|task| task.risk == AutopsyRisk::High)
+            .count(),
+    }
 }
 
 fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
@@ -1550,6 +1813,45 @@ mod tests {
         assert!(compare.success_rate_delta > 0.0);
         assert!(compare.irrelevant_read_rate_delta < 0.0);
         assert!(render_markdown_compare(&compare).contains("Task success rate"));
+    }
+
+    #[test]
+    fn autopsy_reports_overbroad_edits_and_validation_gaps() {
+        let suite = example_suite();
+        let trace = AgentTrace {
+            schema_version: TRACE_SCHEMA_VERSION,
+            task_id: "auth-redirect-001".to_string(),
+            agent: "codex".to_string(),
+            variant: AgentVariant::Native,
+            status: TaskStatus::Failure,
+            recommended_files: Vec::new(),
+            files_read: vec![path("src/auth/session.ts")],
+            files_edited: vec![
+                path("src/auth/session.ts"),
+                path("README.md"),
+                path("src/auth/middleware.ts"),
+            ],
+            commands: Vec::new(),
+            tool_call_count: 4,
+            token_estimate: None,
+            elapsed_millis: Some(1000),
+            time_to_first_relevant_file_millis: None,
+            privacy: PrivacyStatus::source_free(),
+        };
+
+        let autopsy = build_autopsy(&suite, &[trace]).expect("autopsy");
+        assert_eq!(autopsy.summary.task_count, 1);
+        assert_eq!(autopsy.summary.failed_task_count, 1);
+        assert_eq!(autopsy.summary.validation_gap_count, 1);
+        assert_eq!(autopsy.summary.overbroad_edit_count, 1);
+        assert_eq!(autopsy.summary.changed_without_read_count, 2);
+        assert_eq!(autopsy.summary.high_risk_count, 1);
+        assert_eq!(autopsy.tasks[0].risk, AutopsyRisk::High);
+        assert_eq!(autopsy.tasks[0].overbroad_edits, vec!["README.md"]);
+        assert!(autopsy.tasks[0]
+            .changed_without_read
+            .contains(&"src/auth/middleware.ts".to_string()));
+        assert!(render_markdown_autopsy(&autopsy).contains("Overbroad edits"));
     }
 
     #[test]

@@ -1,11 +1,11 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use helmbench::{
-    build_report, compare_reports, example_suite, load_agent_events, load_suite, load_traces,
-    project_root_for_cli, read_report, render_html_dashboard, render_markdown_compare,
-    render_markdown_report, trace_from_ctxhelm_prepare_json, traces_from_agent_events,
-    validate_agent_event, validate_suite, write_json, AgentEvent, AgentEventKind, AgentVariant,
-    CommandClass, PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
+    build_autopsy, build_report, compare_reports, example_suite, load_agent_events, load_suite,
+    load_traces, project_root_for_cli, read_report, render_html_dashboard, render_markdown_autopsy,
+    render_markdown_compare, render_markdown_report, trace_from_ctxhelm_prepare_json,
+    traces_from_agent_events, validate_agent_event, validate_suite, write_json, AgentEvent,
+    AgentEventKind, AgentVariant, CommandClass, PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
 };
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
@@ -170,6 +170,17 @@ enum Command {
         format: OutputFormat,
         #[arg(long)]
         out: Option<PathBuf>,
+    },
+    /// Diagnose source-free agent behavior from task traces.
+    Autopsy {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        trace_dir: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
+        format: OutputFormat,
     },
     /// Render a static source-free HTML dashboard from run reports.
     Dashboard {
@@ -507,6 +518,21 @@ fn main() -> Result<()> {
             } else {
                 print!("{rendered}");
             }
+        }
+        Command::Autopsy {
+            suite,
+            trace_dir,
+            out,
+            format,
+        } => {
+            let suite = load_suite(&suite)?;
+            let traces = load_traces(&trace_dir)?;
+            let autopsy = build_autopsy(&suite, &traces)?;
+            match format {
+                OutputFormat::Json => write_json(&autopsy, &out)?,
+                OutputFormat::Markdown => write_text(&render_markdown_autopsy(&autopsy), &out)?,
+            }
+            println!("wrote {}", out.display());
         }
         Command::Dashboard { report, out } => {
             let reports = report
