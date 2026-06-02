@@ -126,6 +126,10 @@ HELMBENCH_BIN=$(pwd)/target/debug/helmbench \
     --force
 ```
 
+Every successful matrix run writes `matrix-manifest.json`, a source-free
+top-level index of run labels, report paths, dashboard/evidence artifacts,
+quality-gate status, and evidence verification status.
+
 Add `ctxhelm=true` to a `--head` spec when the row should call
 `ctxhelm prepare-task` before the adapter. Add `pack=true` to also call
 `ctxhelm get-pack --format json`; HelmBench stores only source-free

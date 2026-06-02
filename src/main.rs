@@ -1620,6 +1620,45 @@ struct RunMatrixResult {
     trace_dir: PathBuf,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunMatrixManifest {
+    schema_version: u32,
+    suite_path: String,
+    repo_path: String,
+    out_dir: String,
+    baseline: RunMatrixManifestRun,
+    heads: Vec<RunMatrixManifestRun>,
+    artifacts: RunMatrixManifestArtifacts,
+    quality_gate_passed: bool,
+    evidence_bundle_verified: bool,
+    privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunMatrixManifestRun {
+    name: String,
+    agent: String,
+    variant: AgentVariant,
+    report_path: String,
+    trace_dir: String,
+    ctxhelm_enabled: bool,
+    pack_enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunMatrixManifestArtifacts {
+    benchmark_summary_json: String,
+    benchmark_summary_markdown: String,
+    quality_gate_json: String,
+    quality_gate_markdown: String,
+    dashboard_html: String,
+    baseline_autopsy_markdown: String,
+    evidence_manifest: String,
+}
+
 #[derive(Debug, Clone)]
 struct RunMatrixRequest {
     suite_path: PathBuf,
@@ -1907,46 +1946,125 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
     )?;
 
     let gate = evaluate_quality_gate(&summary, &QualityGateConfig::default())?;
-    write_json(&gate, &reports_dir.join("quality-gate.json"))?;
+    let quality_gate_json_path = reports_dir.join("quality-gate.json");
+    write_json(&gate, &quality_gate_json_path)?;
+    let quality_gate_markdown_path = docs_dir.join("quality-gate.md");
     write_text(
         &render_markdown_quality_gate(&gate),
-        &docs_dir.join("quality-gate.md"),
+        &quality_gate_markdown_path,
     )?;
 
     let baseline_traces = load_traces(&baseline_result.trace_dir)?;
     let autopsy = build_autopsy(&suite, &baseline_traces)?;
-    write_text(
-        &render_markdown_autopsy(&autopsy),
-        &docs_dir.join(format!("{}-autopsy.md", baseline_result.spec.safe_name)),
-    )?;
+    let baseline_autopsy_path =
+        docs_dir.join(format!("{}-autopsy.md", baseline_result.spec.safe_name));
+    write_text(&render_markdown_autopsy(&autopsy), &baseline_autopsy_path)?;
 
     let all_reports = std::iter::once(baseline_result.report.clone())
         .chain(head_results.iter().map(|result| result.report.clone()))
         .collect::<Vec<_>>();
-    write_text(
-        &render_html_dashboard(&all_reports)?,
-        &docs_dir.join("dashboard.html"),
-    )?;
+    let dashboard_path = docs_dir.join("dashboard.html");
+    write_text(&render_html_dashboard(&all_reports)?, &dashboard_path)?;
 
     let head_report_paths = head_results
         .iter()
         .map(|result| result.report_path.clone())
         .collect::<Vec<_>>();
+    let evidence_dir = out_dir.join("evidence");
     write_evidence_bundle(
         &request.suite_path,
         None,
         &baseline_result.report_path,
         &head_report_paths,
-        &out_dir.join("evidence"),
+        &evidence_dir,
         false,
     )?;
-    verify_evidence_bundle(&out_dir.join("evidence"))?;
+    verify_evidence_bundle(&evidence_dir)?;
+
+    let manifest = build_run_matrix_manifest(
+        request,
+        &baseline_result,
+        &head_results,
+        &summary_json_path,
+        &docs_dir.join("benchmark-summary.md"),
+        &quality_gate_json_path,
+        &quality_gate_markdown_path,
+        &dashboard_path,
+        &baseline_autopsy_path,
+        &evidence_dir.join("manifest.json"),
+        gate.passed,
+        true,
+    );
+    write_json(&manifest, &out_dir.join("matrix-manifest.json"))?;
 
     if request.fail_on_regression && !gate.passed {
         anyhow::bail!("run-matrix quality gate failed");
     }
 
     Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_run_matrix_manifest(
+    request: &RunMatrixRequest,
+    baseline: &RunMatrixResult,
+    heads: &[RunMatrixResult],
+    benchmark_summary_json: &Path,
+    benchmark_summary_markdown: &Path,
+    quality_gate_json: &Path,
+    quality_gate_markdown: &Path,
+    dashboard_html: &Path,
+    baseline_autopsy_markdown: &Path,
+    evidence_manifest: &Path,
+    quality_gate_passed: bool,
+    evidence_bundle_verified: bool,
+) -> RunMatrixManifest {
+    RunMatrixManifest {
+        schema_version: 1,
+        suite_path: request.suite_path.display().to_string(),
+        repo_path: request.repo.display().to_string(),
+        out_dir: request.out_dir.display().to_string(),
+        baseline: run_matrix_manifest_run(&request.out_dir, baseline),
+        heads: heads
+            .iter()
+            .map(|head| run_matrix_manifest_run(&request.out_dir, head))
+            .collect(),
+        artifacts: RunMatrixManifestArtifacts {
+            benchmark_summary_json: manifest_path(&request.out_dir, benchmark_summary_json),
+            benchmark_summary_markdown: manifest_path(&request.out_dir, benchmark_summary_markdown),
+            quality_gate_json: manifest_path(&request.out_dir, quality_gate_json),
+            quality_gate_markdown: manifest_path(&request.out_dir, quality_gate_markdown),
+            dashboard_html: manifest_path(&request.out_dir, dashboard_html),
+            baseline_autopsy_markdown: manifest_path(&request.out_dir, baseline_autopsy_markdown),
+            evidence_manifest: manifest_path(&request.out_dir, evidence_manifest),
+        },
+        quality_gate_passed,
+        evidence_bundle_verified,
+        privacy: PrivacyStatus::source_free(),
+    }
+}
+
+fn run_matrix_manifest_run(out_dir: &Path, result: &RunMatrixResult) -> RunMatrixManifestRun {
+    RunMatrixManifestRun {
+        name: result.spec.name.clone(),
+        agent: result.spec.agent.clone(),
+        variant: result.spec.variant.clone(),
+        report_path: manifest_path(out_dir, &result.report_path),
+        trace_dir: manifest_path(out_dir, &result.trace_dir),
+        ctxhelm_enabled: result.spec.ctxhelm.is_some(),
+        pack_enabled: result
+            .spec
+            .ctxhelm
+            .as_ref()
+            .is_some_and(|ctxhelm| ctxhelm.include_pack),
+    }
+}
+
+fn manifest_path(out_dir: &Path, path: &Path) -> String {
+    path.strip_prefix(out_dir)
+        .unwrap_or(path)
+        .display()
+        .to_string()
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3217,6 +3335,7 @@ mod tests {
         assert!(out.join("docs/native-autopsy.md").exists());
         assert!(out.join("docs/dashboard.html").exists());
         assert!(out.join("evidence/manifest.json").exists());
+        assert!(out.join("matrix-manifest.json").exists());
         verify_evidence_bundle(&out.join("evidence")).expect("verify evidence");
 
         let summary =
@@ -3239,6 +3358,25 @@ mod tests {
             .all(|trace| trace.commands.iter().any(|command| {
                 command.command_hash == Some(command_hash("ctxhelm get-pack brief"))
             })));
+
+        let manifest = std::fs::read_to_string(out.join("matrix-manifest.json")).expect("manifest");
+        let manifest = serde_json::from_str::<serde_json::Value>(&manifest).expect("json");
+        assert_eq!(manifest["schemaVersion"], 1);
+        assert_eq!(manifest["baseline"]["name"], "native");
+        assert_eq!(manifest["heads"][0]["name"], "guided");
+        assert_eq!(manifest["heads"][0]["ctxhelmEnabled"], true);
+        assert_eq!(manifest["heads"][0]["packEnabled"], true);
+        assert_eq!(manifest["qualityGatePassed"], true);
+        assert_eq!(manifest["evidenceBundleVerified"], true);
+        assert_eq!(manifest["privacy"]["sourceFree"], true);
+        assert_eq!(
+            manifest["artifacts"]["benchmarkSummaryJson"],
+            "reports/benchmark-summary.json"
+        );
+        assert_eq!(
+            manifest["artifacts"]["evidenceManifest"],
+            "evidence/manifest.json"
+        );
     }
 
     #[test]

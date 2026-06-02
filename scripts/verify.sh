@@ -151,9 +151,11 @@ test -f "$TMP_DIR/matrix/reports/benchmark-summary.json"
 test -f "$TMP_DIR/matrix/reports/quality-gate.json"
 test -f "$TMP_DIR/matrix/docs/dashboard.html"
 test -f "$TMP_DIR/matrix/evidence/manifest.json"
+test -f "$TMP_DIR/matrix/matrix-manifest.json"
 test -f "$TMP_DIR/matrix-config/reports/benchmark-summary.json"
 test -f "$TMP_DIR/matrix-config/reports/quality-gate.json"
 test -f "$TMP_DIR/matrix-config/evidence/manifest.json"
+test -f "$TMP_DIR/matrix-config/matrix-manifest.json"
 
 git diff --check
 

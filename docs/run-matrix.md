@@ -89,6 +89,7 @@ source-free baseline trace.
 
 ```text
 /tmp/helmbench-matrix
+├── matrix-manifest.json
 ├── traces/
 │   ├── native/
 │   └── guided/
@@ -107,6 +108,11 @@ source-free baseline trace.
 └── evidence/
     └── manifest.json
 ```
+
+`matrix-manifest.json` is the top-level source-free run identity. It records the
+suite path, repo path, baseline/head run labels, relative report and trace
+paths, key artifact paths, quality-gate status, evidence-bundle verification
+status, and source-free privacy flags.
 
 Verify the bundle before publishing:
 
