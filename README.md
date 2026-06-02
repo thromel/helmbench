@@ -34,6 +34,8 @@ This repository currently implements the first MVP slice:
 - `stream-trace` importer that converts structured Claude/Codex-style JSONL
   tool streams into source-free traces without storing command text or tool
   payloads
+- `init-public-suite` generator for verified public-repo benchmark suites,
+  starting with RefactoringMiner
 - recommendation precision and recall metrics for context-plan evaluation
 
 It does **not** yet parse raw Claude Code, Codex, Cursor, or other agent
@@ -56,6 +58,18 @@ Create a reproducible demo benchmark repo plus matching suite:
 cargo run -- init-demo-repo \
   --repo-out /tmp/helmbench-demo-repo \
   --suite-out /tmp/helmbench-demo-suite.json \
+  --force
+```
+
+Generate a source-free RefactoringMiner public benchmark suite after checking
+fixture health:
+
+```bash
+cargo run -- init-public-suite \
+  --preset refactoring-miner \
+  --repo ../ctxhelm-proof-fixtures/RefactoringMiner \
+  --suite-out /tmp/refactoringminer-suite.json \
+  --health-out /tmp/refactoringminer-health.json \
   --force
 ```
 
@@ -319,6 +333,7 @@ helmbench-core
 helmbench-cli
   init-suite
   init-demo-repo
+  init-public-suite
   validate-suite
   run
   ctxhelm-trace
@@ -350,4 +365,4 @@ future direct-agent adapters
 
 ## Next Milestones
 
-1. Add larger public benchmark suites over real open-source repositories.
+1. Add more public benchmark presets beyond RefactoringMiner.

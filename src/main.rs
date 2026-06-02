@@ -8,6 +8,7 @@ use helmbench::{
     validate_agent_event, validate_suite, write_json, AgentEvent, AgentEventKind, AgentVariant,
     CommandClass, PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
 };
+use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::time::{Duration, Instant};
@@ -36,6 +37,21 @@ enum Command {
         repo_out: PathBuf,
         #[arg(long, default_value = "suites/demo-tiny-repo.json")]
         suite_out: PathBuf,
+        #[arg(long)]
+        force: bool,
+    },
+    /// Generate a source-free suite from a known public repository fixture.
+    InitPublicSuite {
+        #[arg(long, value_enum)]
+        preset: PublicSuitePreset,
+        #[arg(long)]
+        repo: PathBuf,
+        #[arg(long, default_value = "suites/refactoringminer-public.json")]
+        suite_out: PathBuf,
+        #[arg(long, default_value = ".helmbench/public-suite-health.json")]
+        health_out: PathBuf,
+        #[arg(long, default_value_t = 1000)]
+        min_commits: u64,
         #[arg(long)]
         force: bool,
     },
@@ -276,6 +292,11 @@ enum TraceVariant {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
+enum PublicSuitePreset {
+    RefactoringMiner,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
 enum CliEventKind {
     RecommendedFile,
     FileRead,
@@ -363,6 +384,18 @@ fn main() -> Result<()> {
             init_demo_repo(&repo_out, &suite_out, force)?;
             println!("wrote {}", repo_out.display());
             println!("wrote {}", suite_out.display());
+        }
+        Command::InitPublicSuite {
+            preset,
+            repo,
+            suite_out,
+            health_out,
+            min_commits,
+            force,
+        } => {
+            init_public_suite(preset, &repo, &suite_out, &health_out, min_commits, force)?;
+            println!("wrote {}", suite_out.display());
+            println!("wrote {}", health_out.display());
         }
         Command::ValidateSuite { suite } => {
             let suite = load_suite(&suite)?;
@@ -742,6 +775,226 @@ fn write_text(content: &str, path: &PathBuf) -> Result<()> {
         std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     }
     std::fs::write(path, content).with_context(|| format!("write {}", path.display()))
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PublicSuiteHealth {
+    schema_version: u32,
+    preset: String,
+    repo_name: String,
+    head: Option<String>,
+    commit_count: Option<u64>,
+    min_commits: u64,
+    dirty: bool,
+    fsck_ok: bool,
+    checked_files: Vec<String>,
+    missing_files: Vec<String>,
+    ok: bool,
+}
+
+fn init_public_suite(
+    preset: PublicSuitePreset,
+    repo: &Path,
+    suite_out: &Path,
+    health_out: &Path,
+    min_commits: u64,
+    force: bool,
+) -> Result<()> {
+    ensure_output_path_available(suite_out, force)?;
+    ensure_output_path_available(health_out, force)?;
+
+    let suite = match preset {
+        PublicSuitePreset::RefactoringMiner => refactoring_miner_suite(),
+    };
+    validate_suite(&suite)?;
+
+    let health = public_suite_health(preset, repo, min_commits, &suite)?;
+    write_json(&health, health_out)?;
+    if !health.ok {
+        anyhow::bail!(
+            "public suite fixture is not healthy; wrote source-free health report to {}",
+            health_out.display()
+        );
+    }
+
+    write_json(&suite, suite_out)?;
+    Ok(())
+}
+
+fn ensure_output_path_available(path: &Path, force: bool) -> Result<()> {
+    if path.exists() && !force {
+        anyhow::bail!(
+            "{} already exists; pass --force to replace it",
+            path.display()
+        );
+    }
+    Ok(())
+}
+
+fn public_suite_health(
+    preset: PublicSuitePreset,
+    repo: &Path,
+    min_commits: u64,
+    suite: &helmbench::TaskSuite,
+) -> Result<PublicSuiteHealth> {
+    let repo_name = repo
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("repo")
+        .to_string();
+    let checked_files = checked_files_for_suite(suite);
+    let missing_files = checked_files
+        .iter()
+        .filter(|path| !repo.join(path).exists())
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let head = git_output(repo, &["rev-parse", "HEAD"]).ok();
+    let commit_count = git_output(repo, &["rev-list", "--count", "HEAD"])
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok());
+    let dirty = git_output(repo, &["status", "--short"])
+        .map(|status| !status.trim().is_empty())
+        .unwrap_or(true);
+    let fsck_ok = git_status_ok(repo, &["fsck", "--no-progress"]);
+    let ok = repo.join(".git").exists()
+        && head.is_some()
+        && commit_count.is_some_and(|count| count >= min_commits)
+        && !dirty
+        && fsck_ok
+        && missing_files.is_empty();
+
+    Ok(PublicSuiteHealth {
+        schema_version: 1,
+        preset: match preset {
+            PublicSuitePreset::RefactoringMiner => "refactoring-miner".to_string(),
+        },
+        repo_name,
+        head,
+        commit_count,
+        min_commits,
+        dirty,
+        fsck_ok,
+        checked_files,
+        missing_files,
+        ok,
+    })
+}
+
+fn checked_files_for_suite(suite: &helmbench::TaskSuite) -> Vec<String> {
+    let mut paths = vec![
+        "README.md".to_string(),
+        "build.gradle".to_string(),
+        "gradlew".to_string(),
+    ];
+    for task in &suite.tasks {
+        paths.extend(task.expected_files.iter().cloned());
+        paths.extend(task.expected_tests.iter().cloned());
+    }
+    paths.sort();
+    paths.dedup();
+    paths
+}
+
+fn git_output(repo: &Path, args: &[&str]) -> Result<String> {
+    let output = ProcessCommand::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(args)
+        .output()
+        .with_context(|| format!("git {} {}", repo.display(), args.join(" ")))?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "git {} failed with status {:?}",
+            args.join(" "),
+            output.status.code()
+        );
+    }
+    String::from_utf8(output.stdout)
+        .context("git stdout utf8")
+        .map(|value| value.trim().to_string())
+}
+
+fn git_status_ok(repo: &Path, args: &[&str]) -> bool {
+    ProcessCommand::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(args)
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+fn refactoring_miner_suite() -> helmbench::TaskSuite {
+    helmbench::TaskSuite {
+        schema_version: helmbench::SUITE_SCHEMA_VERSION,
+        name: "refactoringminer-public".to_string(),
+        description: "Source-free public-repo suite for RefactoringMiner agent navigation, validation, and ctxhelm comparison.".to_string(),
+        tasks: vec![
+            helmbench::BenchTask {
+                id: "rm-mcp-intent-validation-001".to_string(),
+                prompt: "Tighten MCP refactoring-intent validation without changing unrelated server behavior.".to_string(),
+                expected_files: vec![
+                    "src/main/java/org/refactoringminer/mcp/McpIntentValidator.java".to_string(),
+                    "src/main/java/org/refactoringminer/mcp/McpValidationResult.java".to_string(),
+                ],
+                expected_tests: vec![
+                    "src/test/java/org/refactoringminer/mcp/McpIntentValidatorTest.java".to_string(),
+                    "src/test/java/org/refactoringminer/mcp/McpValidationContractTest.java".to_string(),
+                ],
+                success_command: Some("./gradlew test --tests org.refactoringminer.mcp.McpIntentValidatorTest --tests org.refactoringminer.mcp.McpValidationContractTest".to_string()),
+                tags: vec!["public_repo".to_string(), "mcp".to_string(), "bug_fix".to_string()],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "rm-mcp-tools-contract-001".to_string(),
+                prompt: "Update the MCP tools layer while preserving service contracts and source-free validation behavior.".to_string(),
+                expected_files: vec![
+                    "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java".to_string(),
+                    "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java".to_string(),
+                    "src/main/java/org/refactoringminer/mcp/WorktreeChangeCollector.java".to_string(),
+                ],
+                expected_tests: vec![
+                    "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpToolsTest.java".to_string(),
+                    "src/test/java/org/refactoringminer/mcp/WorktreeChangeCollectorTest.java".to_string(),
+                ],
+                success_command: Some("./gradlew test --tests org.refactoringminer.mcp.RefactoringMinerMcpToolsTest --tests org.refactoringminer.mcp.WorktreeChangeCollectorTest".to_string()),
+                tags: vec!["public_repo".to_string(), "mcp".to_string(), "feature".to_string()],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "rm-webdiff-viewed-files-001".to_string(),
+                prompt: "Fix viewed-file tracking in the web diff UI without altering unrelated diff rendering.".to_string(),
+                expected_files: vec![
+                    "src/main/java/gui/MarkAsViewed.java".to_string(),
+                    "src/main/java/gui/webdiff/viewers/spv/SinglePageView.java".to_string(),
+                ],
+                expected_tests: vec![
+                    "src/test/java/gui/MarkAsViewedTest.java".to_string(),
+                    "src/test/java/gui/webdiff/viewers/spv/SinglePageViewViewedFilesTest.java".to_string(),
+                ],
+                success_command: Some("./gradlew test --tests gui.MarkAsViewedTest --tests gui.webdiff.viewers.spv.SinglePageViewViewedFilesTest".to_string()),
+                tags: vec!["public_repo".to_string(), "webdiff".to_string(), "bug_fix".to_string()],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "rm-git-history-merge-001".to_string(),
+                prompt: "Improve merge-commit handling in git-history refactoring detection and keep existing merge tests targeted.".to_string(),
+                expected_files: vec![
+                    "src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java".to_string(),
+                    "src/main/java/org/refactoringminer/util/GitServiceImpl.java".to_string(),
+                ],
+                expected_tests: vec![
+                    "src/test/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImplMergeCommitTest.java".to_string(),
+                    "src/test/java/org/refactoringminer/util/GitServiceImplTest.java".to_string(),
+                ],
+                success_command: Some("./gradlew test --tests org.refactoringminer.rm1.GitHistoryRefactoringMinerImplMergeCommitTest --tests org.refactoringminer.util.GitServiceImplTest".to_string()),
+                tags: vec!["public_repo".to_string(), "git_history".to_string(), "bug_fix".to_string()],
+                timeout_seconds: Some(1200),
+            },
+        ],
+    }
 }
 
 fn init_demo_repo(repo_out: &Path, suite_out: &Path, force: bool) -> Result<()> {
@@ -1611,6 +1864,64 @@ mod tests {
     }
 
     #[test]
+    fn refactoring_miner_public_suite_is_source_free_and_valid() {
+        let suite = refactoring_miner_suite();
+        validate_suite(&suite).expect("suite");
+
+        assert_eq!(suite.name, "refactoringminer-public");
+        assert_eq!(suite.tasks.len(), 4);
+        assert!(suite
+            .tasks
+            .iter()
+            .all(|task| task.tags.contains(&"public_repo".to_string())));
+        assert!(suite.tasks.iter().any(|task| task.expected_files.contains(
+            &"src/main/java/org/refactoringminer/mcp/McpIntentValidator.java".to_string()
+        )));
+        assert!(suite.tasks.iter().any(|task| task
+            .expected_tests
+            .contains(&"src/test/java/gui/MarkAsViewedTest.java".to_string())));
+    }
+
+    #[test]
+    fn public_suite_health_accepts_clean_fixture() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        create_public_suite_fixture_repo(&repo).expect("fixture repo");
+        let suite = refactoring_miner_suite();
+
+        let health = public_suite_health(PublicSuitePreset::RefactoringMiner, &repo, 1, &suite)
+            .expect("health");
+
+        assert!(health.ok);
+        assert_eq!(health.repo_name, "repo");
+        assert_eq!(health.commit_count, Some(1));
+        assert!(!health.dirty);
+        assert!(health.fsck_ok);
+        assert!(health.missing_files.is_empty());
+        assert!(health.head.is_some());
+    }
+
+    #[test]
+    fn public_suite_health_rejects_dirty_fixture_without_source_logs() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        create_public_suite_fixture_repo(&repo).expect("fixture repo");
+        std::fs::write(repo.join("UNTRACKED.md"), "dirty").expect("dirty file");
+        let suite = refactoring_miner_suite();
+
+        let health = public_suite_health(PublicSuitePreset::RefactoringMiner, &repo, 1, &suite)
+            .expect("health");
+
+        assert!(!health.ok);
+        assert!(health.dirty);
+        assert!(health.missing_files.is_empty());
+        assert!(health
+            .checked_files
+            .iter()
+            .all(|path| !path.starts_with('/')));
+    }
+
+    #[test]
     fn collect_ctxhelm_paths_rejects_unsafe_paths() {
         let value = serde_json::json!({
             "targetFiles": [
@@ -1641,5 +1952,14 @@ mod tests {
         assert!(config.semantic);
         assert_eq!(config.pack_budget, "brief");
         assert_eq!(config.semantic_dimensions, Some(64));
+    }
+
+    fn create_public_suite_fixture_repo(repo: &Path) -> Result<()> {
+        let suite = refactoring_miner_suite();
+        std::fs::create_dir_all(repo).with_context(|| format!("create {}", repo.display()))?;
+        for path in checked_files_for_suite(&suite) {
+            write_demo_file(repo, &path, "fixture\n")?;
+        }
+        init_git_repo(repo)
     }
 }
