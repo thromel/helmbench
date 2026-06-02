@@ -16,6 +16,48 @@ helmbench run-matrix \
   --force
 ```
 
+For repeatable runs, use a JSON config:
+
+```bash
+HELMBENCH_BIN=$(pwd)/target/debug/helmbench \
+  helmbench run-matrix \
+    --config suites/demo-matrix.json \
+    --force
+```
+
+Config format:
+
+```json
+{
+  "suite": "suites/demo-tiny-repo.json",
+  "repo": ".helmbench/demo-repo",
+  "outDir": ".helmbench/matrix-demo",
+  "setupCommands": [],
+  "failOnRegression": true,
+  "baseline": {
+    "name": "native",
+    "agent": "demo-baseline",
+    "variant": "native"
+  },
+  "heads": [
+    {
+      "name": "guided",
+      "agent": "demo-guided",
+      "variant": "ctxhelm_mcp",
+      "ctxhelm": true,
+      "pack": true,
+      "packBudget": "brief",
+      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
+    }
+  ]
+}
+```
+
+CLI values override `suite`, `repo`, `outDir`, `baseline`, and `heads` when
+provided. `setupCommands` from the config run before additional
+`--setup-command` values. Config paths are resolved from the current working
+directory.
+
 Run specs use comma-separated `key=value` fields:
 
 - `name`: stable run identifier used in output paths;

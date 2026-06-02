@@ -1,0 +1,19 @@
+{
+  "suite": "suites/demo-tiny-repo.json",
+  "repo": ".helmbench/demo-repo",
+  "outDir": ".helmbench/matrix-demo",
+  "failOnRegression": true,
+  "baseline": {
+    "name": "native",
+    "agent": "demo-baseline",
+    "variant": "native"
+  },
+  "heads": [
+    {
+      "name": "guided",
+      "agent": "demo-guided",
+      "variant": "ctxhelm_mcp",
+      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
+    }
+  ]
+}

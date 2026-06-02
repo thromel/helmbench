@@ -113,6 +113,15 @@ cargo run -- verify-bundle \
   --bundle /tmp/helmbench-matrix/evidence
 ```
 
+For repeatable runs, put the matrix definition in JSON:
+
+```bash
+HELMBENCH_BIN=$(pwd)/target/debug/helmbench \
+  cargo run -- run-matrix \
+    --config suites/demo-matrix.json \
+    --force
+```
+
 Add `ctxhelm=true` to a `--head` spec when the row should call
 `ctxhelm prepare-task` before the adapter. Add `pack=true` to also call
 `ctxhelm get-pack --format json`; HelmBench stores only source-free

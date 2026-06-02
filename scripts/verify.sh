@@ -52,6 +52,32 @@ cargo run -- run-matrix \
   --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,command=HELMBENCH_BIN=$ROOT/target/debug/helmbench sh scripts/demo-agent.sh" \
   --force
 
+cat > "$TMP_DIR/matrix-config.json" <<EOF
+{
+  "suite": "$TMP_DIR/demo-suite.json",
+  "repo": "$TMP_DIR/demo-repo",
+  "outDir": "$TMP_DIR/matrix-config",
+  "failOnRegression": true,
+  "baseline": {
+    "name": "native",
+    "agent": "demo-baseline",
+    "variant": "native"
+  },
+  "heads": [
+    {
+      "name": "guided",
+      "agent": "demo-guided",
+      "variant": "ctxhelm_mcp",
+      "command": "HELMBENCH_BIN=\${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
+    }
+  ]
+}
+EOF
+
+HELMBENCH_BIN="$ROOT/target/debug/helmbench" cargo run -- run-matrix \
+  --config "$TMP_DIR/matrix-config.json" \
+  --force
+
 cargo run -- run \
   --suite "$TMP_DIR/demo-suite.json" \
   --trace-dir "$TMP_DIR/traces" \
@@ -105,6 +131,9 @@ cargo run -- verify-bundle \
 cargo run -- verify-bundle \
   --bundle "$TMP_DIR/matrix/evidence"
 
+cargo run -- verify-bundle \
+  --bundle "$TMP_DIR/matrix-config/evidence"
+
 test -f "$TMP_DIR/report.json"
 test -f "$TMP_DIR/autopsy.md"
 test -f "$TMP_DIR/dashboard.html"
@@ -118,6 +147,9 @@ test -f "$TMP_DIR/matrix/reports/benchmark-summary.json"
 test -f "$TMP_DIR/matrix/reports/quality-gate.json"
 test -f "$TMP_DIR/matrix/docs/dashboard.html"
 test -f "$TMP_DIR/matrix/evidence/manifest.json"
+test -f "$TMP_DIR/matrix-config/reports/benchmark-summary.json"
+test -f "$TMP_DIR/matrix-config/reports/quality-gate.json"
+test -f "$TMP_DIR/matrix-config/evidence/manifest.json"
 
 git diff --check
 

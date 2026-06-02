@@ -53,16 +53,18 @@ enum Command {
     /// Run a baseline and one or more local adapter variants, then write comparison artifacts.
     RunMatrix {
         #[arg(long)]
-        suite: PathBuf,
+        config: Option<PathBuf>,
         #[arg(long)]
-        repo: PathBuf,
-        #[arg(long, default_value = ".helmbench/matrix")]
-        out_dir: PathBuf,
+        suite: Option<PathBuf>,
+        #[arg(long)]
+        repo: Option<PathBuf>,
+        #[arg(long)]
+        out_dir: Option<PathBuf>,
         /// Run spec: name=<id>,agent=<agent>,variant=<native|ctxhelm_plan|ctxhelm_mcp|ctxhelm_pack|other>[,command=<adapter command>]
         #[arg(long)]
-        baseline: String,
+        baseline: Option<String>,
         /// Repeated run spec with the same format as --baseline.
-        #[arg(long, required = true)]
+        #[arg(long)]
         head: Vec<String>,
         #[arg(long)]
         setup_command: Vec<String>,
@@ -479,6 +481,7 @@ fn main() -> Result<()> {
             println!("wrote {}", out_dir.display());
         }
         Command::RunMatrix {
+            config,
             suite,
             repo,
             out_dir,
@@ -489,18 +492,20 @@ fn main() -> Result<()> {
             keep_workdirs,
             fail_on_regression,
         } => {
-            run_matrix(
-                &suite,
-                &repo,
-                &out_dir,
-                &baseline,
-                &head,
-                &setup_command,
+            let request = build_run_matrix_request(
+                config.as_deref(),
+                suite,
+                repo,
+                out_dir,
+                baseline,
+                head,
+                setup_command,
                 force,
                 keep_workdirs,
                 fail_on_regression,
             )?;
-            println!("wrote {}", out_dir.display());
+            run_matrix(&request)?;
+            println!("wrote {}", request.out_dir.display());
         }
         Command::InitPublicSuite {
             preset,
@@ -1587,20 +1592,208 @@ struct RunMatrixResult {
     trace_dir: PathBuf,
 }
 
-#[allow(clippy::too_many_arguments)]
-fn run_matrix(
-    suite_path: &Path,
-    repo: &Path,
-    out_dir: &Path,
-    baseline_spec: &str,
-    head_specs: &[String],
-    setup_commands: &[String],
+#[derive(Debug, Clone)]
+struct RunMatrixRequest {
+    suite_path: PathBuf,
+    repo: PathBuf,
+    out_dir: PathBuf,
+    baseline: RunMatrixSpec,
+    heads: Vec<RunMatrixSpec>,
+    setup_commands: Vec<String>,
     force: bool,
     keep_workdirs: bool,
     fail_on_regression: bool,
-) -> Result<()> {
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunMatrixConfig {
+    suite: Option<PathBuf>,
+    repo: Option<PathBuf>,
+    out_dir: Option<PathBuf>,
+    #[serde(default)]
+    setup_commands: Vec<String>,
+    baseline: RunMatrixConfigSpec,
+    #[serde(default)]
+    heads: Vec<RunMatrixConfigSpec>,
+    #[serde(default)]
+    keep_workdirs: Option<bool>,
+    #[serde(default)]
+    fail_on_regression: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunMatrixConfigSpec {
+    name: String,
+    agent: String,
+    variant: AgentVariant,
+    #[serde(default)]
+    ctxhelm: bool,
+    #[serde(default)]
+    ctxhelm_bin: Option<PathBuf>,
+    #[serde(default)]
+    mode: Option<String>,
+    #[serde(default)]
+    target_agent: Option<String>,
+    #[serde(default)]
+    semantic: bool,
+    #[serde(default)]
+    semantic_provider: Option<String>,
+    #[serde(default)]
+    semantic_model: Option<String>,
+    #[serde(default)]
+    semantic_dimensions: Option<u16>,
+    #[serde(default)]
+    pack: bool,
+    #[serde(default)]
+    pack_budget: Option<String>,
+    #[serde(default, alias = "adapterCommand")]
+    command: Option<String>,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_run_matrix_request(
+    config_path: Option<&Path>,
+    suite: Option<PathBuf>,
+    repo: Option<PathBuf>,
+    out_dir: Option<PathBuf>,
+    baseline: Option<String>,
+    heads: Vec<String>,
+    setup_commands: Vec<String>,
+    force: bool,
+    keep_workdirs: bool,
+    fail_on_regression: bool,
+) -> Result<RunMatrixRequest> {
+    let config = config_path
+        .map(load_run_matrix_config)
+        .transpose()
+        .context("load run-matrix config")?;
+
+    let suite_path = suite
+        .or_else(|| config.as_ref().and_then(|config| config.suite.clone()))
+        .context("run-matrix requires --suite or config.suite")?;
+    let repo = repo
+        .or_else(|| config.as_ref().and_then(|config| config.repo.clone()))
+        .context("run-matrix requires --repo or config.repo")?;
+    let out_dir = out_dir
+        .or_else(|| config.as_ref().and_then(|config| config.out_dir.clone()))
+        .unwrap_or_else(|| PathBuf::from(".helmbench/matrix"));
+
+    let baseline = match (baseline, config.as_ref()) {
+        (Some(raw), _) => parse_run_matrix_spec(&raw).context("parse --baseline")?,
+        (None, Some(config)) => {
+            run_matrix_spec_from_config(&config.baseline).context("parse config baseline")?
+        }
+        (None, None) => anyhow::bail!("run-matrix requires --baseline or config.baseline"),
+    };
+    let heads = if heads.is_empty() {
+        let Some(config) = config.as_ref() else {
+            anyhow::bail!("run-matrix requires --head or config.heads");
+        };
+        config
+            .heads
+            .iter()
+            .map(run_matrix_spec_from_config)
+            .collect::<Result<Vec<_>>>()
+            .context("parse config heads")?
+    } else {
+        heads
+            .iter()
+            .map(|spec| {
+                parse_run_matrix_spec(spec).with_context(|| format!("parse --head `{spec}`"))
+            })
+            .collect::<Result<Vec<_>>>()?
+    };
+
+    let mut merged_setup_commands = config
+        .as_ref()
+        .map(|config| config.setup_commands.clone())
+        .unwrap_or_default();
+    merged_setup_commands.extend(setup_commands);
+
+    let keep_workdirs = keep_workdirs
+        || config
+            .as_ref()
+            .and_then(|config| config.keep_workdirs)
+            .unwrap_or(false);
+    let fail_on_regression = fail_on_regression
+        || config
+            .as_ref()
+            .and_then(|config| config.fail_on_regression)
+            .unwrap_or(false);
+
+    validate_run_matrix_specs(&baseline, &heads)?;
+    Ok(RunMatrixRequest {
+        suite_path,
+        repo,
+        out_dir,
+        baseline,
+        heads,
+        setup_commands: merged_setup_commands,
+        force,
+        keep_workdirs,
+        fail_on_regression,
+    })
+}
+
+fn load_run_matrix_config(path: &Path) -> Result<RunMatrixConfig> {
+    let raw = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    serde_json::from_str::<RunMatrixConfig>(&raw)
+        .with_context(|| format!("parse {}", path.display()))
+}
+
+fn run_matrix_spec_from_config(config: &RunMatrixConfigSpec) -> Result<RunMatrixSpec> {
+    if config.name.trim().is_empty() {
+        anyhow::bail!("run spec name must not be empty");
+    }
+    if config.agent.trim().is_empty() {
+        anyhow::bail!("run spec agent must not be empty");
+    }
+    let safe_name = safe_task_dir_name(&config.name);
+    Ok(RunMatrixSpec {
+        name: config.name.clone(),
+        safe_name,
+        agent: config.agent.clone(),
+        variant: config.variant.clone(),
+        ctxhelm: (config.ctxhelm
+            || config.ctxhelm_bin.is_some()
+            || config.mode.is_some()
+            || config.target_agent.is_some()
+            || config.semantic
+            || config.semantic_provider.is_some()
+            || config.semantic_model.is_some()
+            || config.semantic_dimensions.is_some()
+            || config.pack
+            || config.pack_budget.is_some())
+        .then_some(CtxhelmRunConfig {
+            ctxhelm_bin: config
+                .ctxhelm_bin
+                .clone()
+                .unwrap_or_else(|| PathBuf::from("ctxhelm")),
+            mode: config.mode.clone().unwrap_or_else(|| "explain".to_string()),
+            target_agent: config
+                .target_agent
+                .clone()
+                .unwrap_or_else(|| "generic".to_string()),
+            semantic: config.semantic,
+            semantic_provider: config.semantic_provider.clone(),
+            semantic_model: config.semantic_model.clone(),
+            semantic_dimensions: config.semantic_dimensions,
+            include_pack: config.pack,
+            pack_budget: config
+                .pack_budget
+                .clone()
+                .unwrap_or_else(|| "brief".to_string()),
+        }),
+        adapter_command: config.command.clone(),
+    })
+}
+
+fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
+    let out_dir = &request.out_dir;
     if out_dir.exists() {
-        if !force {
+        if !request.force {
             anyhow::bail!(
                 "{} already exists; pass --force to replace it",
                 out_dir.display()
@@ -1611,13 +1804,7 @@ fn run_matrix(
     }
     std::fs::create_dir_all(out_dir).with_context(|| format!("create {}", out_dir.display()))?;
 
-    let suite = load_suite(suite_path)?;
-    let baseline = parse_run_matrix_spec(baseline_spec).context("parse --baseline")?;
-    let heads = head_specs
-        .iter()
-        .map(|spec| parse_run_matrix_spec(spec).with_context(|| format!("parse --head `{spec}`")))
-        .collect::<Result<Vec<_>>>()?;
-    validate_run_matrix_specs(&baseline, &heads)?;
+    let suite = load_suite(&request.suite_path)?;
 
     let traces_dir = out_dir.join("traces");
     let reports_dir = out_dir.join("reports");
@@ -1629,26 +1816,27 @@ fn run_matrix(
 
     let baseline_result = run_matrix_spec(
         &suite,
-        repo,
+        &request.repo,
         &work_dir,
         &traces_dir,
         &reports_dir,
-        &baseline,
-        setup_commands,
-        keep_workdirs,
+        &request.baseline,
+        &request.setup_commands,
+        request.keep_workdirs,
     )?;
-    let head_results = heads
+    let head_results = request
+        .heads
         .iter()
         .map(|spec| {
             run_matrix_spec(
                 &suite,
-                repo,
+                &request.repo,
                 &work_dir,
                 &traces_dir,
                 &reports_dir,
                 spec,
-                setup_commands,
-                keep_workdirs,
+                &request.setup_commands,
+                request.keep_workdirs,
             )
         })
         .collect::<Result<Vec<_>>>()?;
@@ -1705,7 +1893,7 @@ fn run_matrix(
         .map(|result| result.report_path.clone())
         .collect::<Vec<_>>();
     write_evidence_bundle(
-        suite_path,
+        &request.suite_path,
         None,
         &baseline_result.report_path,
         &head_report_paths,
@@ -1714,7 +1902,7 @@ fn run_matrix(
     )?;
     verify_evidence_bundle(&out_dir.join("evidence"))?;
 
-    if fail_on_regression && !gate.passed {
+    if request.fail_on_regression && !gate.passed {
         anyhow::bail!("run-matrix quality gate failed");
     }
 
@@ -2958,18 +3146,20 @@ mod tests {
             ctxhelm.to_string_lossy(),
             shell_escape(&adapter.to_string_lossy()),
         );
-        run_matrix(
-            &suite_path,
-            &repo,
-            &out,
-            "name=native,agent=demo-baseline,variant=native",
-            &[head],
-            &[],
+        let request = build_run_matrix_request(
+            None,
+            Some(suite_path.clone()),
+            Some(repo.clone()),
+            Some(out.clone()),
+            Some("name=native,agent=demo-baseline,variant=native".to_string()),
+            vec![head],
+            Vec::new(),
             false,
             false,
             true,
         )
-        .expect("run matrix");
+        .expect("matrix request");
+        run_matrix(&request).expect("run matrix");
 
         assert!(out
             .join("traces/native/demo-auth-redirect-001.json")
@@ -3009,6 +3199,108 @@ mod tests {
             .all(|trace| trace.commands.iter().any(|command| {
                 command.command_hash == Some(command_hash("ctxhelm get-pack brief"))
             })));
+    }
+
+    #[test]
+    fn run_matrix_config_file_builds_request() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let config_path = temp.path().join("matrix.json");
+        std::fs::write(
+            &config_path,
+            serde_json::json!({
+                "suite": "suite.json",
+                "repo": "repo",
+                "outDir": "matrix-out",
+                "setupCommands": ["printf setup >/dev/null"],
+                "failOnRegression": true,
+                "baseline": {
+                    "name": "native",
+                    "agent": "demo-baseline",
+                    "variant": "native"
+                },
+                "heads": [
+                    {
+                        "name": "ctxhelm",
+                        "agent": "demo-guided",
+                        "variant": "ctxhelm_mcp",
+                        "ctxhelm": true,
+                        "ctxhelmBin": "fake-ctxhelm",
+                        "pack": true,
+                        "packBudget": "brief",
+                        "command": "sh fake-agent.sh"
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("config");
+
+        let request = build_run_matrix_request(
+            Some(&config_path),
+            None,
+            None,
+            None,
+            None,
+            Vec::new(),
+            Vec::new(),
+            true,
+            false,
+            false,
+        )
+        .expect("request");
+
+        assert_eq!(request.suite_path, PathBuf::from("suite.json"));
+        assert_eq!(request.repo, PathBuf::from("repo"));
+        assert_eq!(request.out_dir, PathBuf::from("matrix-out"));
+        assert!(request.force);
+        assert!(request.fail_on_regression);
+        assert_eq!(request.setup_commands, vec!["printf setup >/dev/null"]);
+        assert_eq!(request.baseline.safe_name, "native");
+        assert_eq!(request.heads[0].safe_name, "ctxhelm");
+        assert_eq!(request.heads[0].variant, AgentVariant::CtxhelmMcp);
+        assert_eq!(
+            request.heads[0]
+                .ctxhelm
+                .as_ref()
+                .expect("ctxhelm")
+                .ctxhelm_bin,
+            PathBuf::from("fake-ctxhelm")
+        );
+        assert!(
+            request.heads[0]
+                .ctxhelm
+                .as_ref()
+                .expect("ctxhelm")
+                .include_pack
+        );
+
+        let override_request = build_run_matrix_request(
+            Some(&config_path),
+            Some(PathBuf::from("suite-override.json")),
+            Some(PathBuf::from("repo-override")),
+            Some(PathBuf::from("out-override")),
+            Some("name=base2,agent=agent2,variant=other".to_string()),
+            vec!["name=head2,agent=agent2,variant=other".to_string()],
+            vec!["printf cli >/dev/null".to_string()],
+            false,
+            true,
+            true,
+        )
+        .expect("override request");
+        assert_eq!(
+            override_request.suite_path,
+            PathBuf::from("suite-override.json")
+        );
+        assert_eq!(override_request.repo, PathBuf::from("repo-override"));
+        assert_eq!(override_request.out_dir, PathBuf::from("out-override"));
+        assert_eq!(override_request.baseline.safe_name, "base2");
+        assert_eq!(override_request.heads[0].safe_name, "head2");
+        assert_eq!(
+            override_request.setup_commands,
+            vec!["printf setup >/dev/null", "printf cli >/dev/null"]
+        );
+        assert!(override_request.keep_workdirs);
+        assert!(override_request.fail_on_regression);
     }
 
     #[test]
