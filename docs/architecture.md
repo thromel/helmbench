@@ -117,6 +117,10 @@ The core report computes:
 evaluation question: given a baseline, how did one or more variants perform on
 the same suite?
 
+Both commands require comparable reports: the suite name must match and the
+task ID set must be identical. Partial reports are still valid standalone
+artifacts, but HelmBench will not publish deltas for mismatched task coverage.
+
 The summary artifact includes:
 
 - one baseline run summary;

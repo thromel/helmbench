@@ -6,9 +6,9 @@ use helmbench::{
     project_root_for_cli, read_benchmark_summary, read_report, render_html_dashboard,
     render_markdown_autopsy, render_markdown_benchmark_summary, render_markdown_compare,
     render_markdown_quality_gate, render_markdown_report, trace_from_ctxhelm_prepare_json,
-    traces_from_agent_events, validate_agent_event, validate_suite, write_json, AgentEvent,
-    AgentEventKind, AgentVariant, CommandClass, PrivacyStatus, QualityGateConfig, TaskStatus,
-    TRACE_SCHEMA_VERSION,
+    traces_from_agent_events, validate_agent_event, validate_comparable_reports, validate_suite,
+    write_json, AgentEvent, AgentEventKind, AgentVariant, CommandClass, PrivacyStatus,
+    QualityGateConfig, TaskStatus, TRACE_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
@@ -785,6 +785,7 @@ fn main() -> Result<()> {
         } => {
             let base_report = read_report(&base)?;
             let head_report = read_report(&head)?;
+            validate_comparable_reports(&base_report, &head_report)?;
             let compare = compare_reports(&base_report, &head_report);
             let rendered = match format {
                 OutputFormat::Json => serde_json::to_string_pretty(&compare)?,

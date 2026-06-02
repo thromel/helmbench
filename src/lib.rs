@@ -684,6 +684,41 @@ pub fn compare_reports(base: &RunReport, head: &RunReport) -> CompareReport {
     }
 }
 
+pub fn validate_comparable_reports(base: &RunReport, head: &RunReport) -> Result<()> {
+    validate_source_free_report(base)?;
+    validate_source_free_report(head)?;
+    if base.suite_name != head.suite_name {
+        bail!(
+            "cannot compare different suites: `{}` vs `{}`",
+            base.suite_name,
+            head.suite_name
+        );
+    }
+
+    let base_ids = report_task_ids(base);
+    let head_ids = report_task_ids(head);
+    if base_ids != head_ids {
+        let missing_in_head = base_ids
+            .difference(&head_ids)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ");
+        let extra_in_head = head_ids
+            .difference(&base_ids)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ");
+        bail!(
+            "reports for suite `{}` are not comparable: missing in head [{}], extra in head [{}]",
+            base.suite_name,
+            missing_in_head,
+            extra_in_head
+        );
+    }
+
+    Ok(())
+}
+
 pub fn build_benchmark_summary(
     baseline: &RunReport,
     heads: &[RunReport],
@@ -693,14 +728,7 @@ pub fn build_benchmark_summary(
         bail!("at least one head report is required");
     }
     for head in heads {
-        validate_source_free_report(head)?;
-        if head.suite_name != baseline.suite_name {
-            bail!(
-                "cannot summarize different suites: `{}` vs `{}`",
-                baseline.suite_name,
-                head.suite_name
-            );
-        }
+        validate_comparable_reports(baseline, head)?;
     }
 
     let mut runs = Vec::with_capacity(heads.len() + 1);
@@ -732,6 +760,14 @@ fn validate_source_free_report(report: &RunReport) -> Result<()> {
         bail!("benchmark summaries require source-free reports");
     }
     Ok(())
+}
+
+fn report_task_ids(report: &RunReport) -> BTreeSet<String> {
+    report
+        .tasks
+        .iter()
+        .map(|task| task.task_id.clone())
+        .collect()
 }
 
 fn benchmark_run_summary(report: &RunReport) -> BenchmarkRunSummary {
@@ -2551,6 +2587,25 @@ mod tests {
 
         let error = build_benchmark_summary(&base, &[head]).expect_err("privacy");
         assert!(error.to_string().contains("source-free reports"));
+    }
+
+    #[test]
+    fn benchmark_summary_rejects_mismatched_task_sets() {
+        let suite = example_suite();
+        let trace = trace_with_reads(
+            AgentVariant::Native,
+            TaskStatus::Success,
+            vec!["src/auth/session.ts"],
+        );
+        let base = build_report(&suite, std::slice::from_ref(&trace)).expect("base");
+        let mut head = build_report(&suite, &[trace]).expect("head");
+        head.variant = AgentVariant::CtxhelmMcp;
+        head.tasks[0].task_id = "different-task".to_string();
+
+        let error = build_benchmark_summary(&base, &[head]).expect_err("task mismatch");
+        assert!(error.to_string().contains("not comparable"));
+        assert!(error.to_string().contains("auth-redirect-001"));
+        assert!(error.to_string().contains("different-task"));
     }
 
     #[test]
