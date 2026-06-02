@@ -151,6 +151,8 @@ These events are intended to be produced by Claude Code hooks or wrappers
 without storing raw transcripts, raw tool payloads, raw terminal logs, or source
 snippets.
 
+For hook-friendly commands, see [Claude Code Event Capture](docs/claude-code-events.md).
+
 ## Privacy Contract
 
 HelmBench reports are source-free by default. Trace files may contain:
@@ -191,6 +193,7 @@ helmbench-cli
   run
   ctxhelm-trace
   claude-trace
+  record-event
   compare
   doctor
 

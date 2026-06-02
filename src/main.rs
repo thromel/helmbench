@@ -3,8 +3,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 use helmbench::{
     build_report, compare_reports, example_suite, load_agent_events, load_suite, load_traces,
     project_root_for_cli, read_report, render_markdown_compare, render_markdown_report,
-    trace_from_ctxhelm_prepare_json, traces_from_agent_events, validate_suite, write_json,
-    AgentVariant,
+    trace_from_ctxhelm_prepare_json, traces_from_agent_events, validate_agent_event,
+    validate_suite, write_json, AgentEvent, AgentEventKind, AgentVariant, CommandClass,
+    PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
 };
 use std::path::PathBuf;
 use std::process::Command as ProcessCommand;
@@ -69,6 +70,33 @@ enum Command {
         #[arg(long, default_value = "traces/claude-code")]
         out_dir: PathBuf,
     },
+    /// Append one validated source-free event to a JSONL file.
+    RecordEvent {
+        #[arg(long)]
+        events: PathBuf,
+        #[arg(long)]
+        task_id: String,
+        #[arg(long, value_enum)]
+        event_kind: CliEventKind,
+        #[arg(long)]
+        path: Option<String>,
+        #[arg(long, value_enum)]
+        command_class: Option<CliCommandClass>,
+        #[arg(long)]
+        command_hash: Option<String>,
+        #[arg(long)]
+        touched_test: Vec<String>,
+        #[arg(long)]
+        exit_status: Option<i32>,
+        #[arg(long, value_enum)]
+        status: Option<CliTaskStatus>,
+        #[arg(long)]
+        token_estimate: Option<u64>,
+        #[arg(long)]
+        elapsed_millis: Option<u64>,
+        #[arg(long)]
+        observed_at_millis: Option<u64>,
+    },
     /// Compare two source-free run reports.
     Compare {
         #[arg(long)]
@@ -98,6 +126,67 @@ enum TraceVariant {
     Native,
     CtxhelmMcp,
     CtxhelmPack,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CliEventKind {
+    RecommendedFile,
+    FileRead,
+    FileEdit,
+    Command,
+    Status,
+    Usage,
+}
+
+impl From<CliEventKind> for AgentEventKind {
+    fn from(value: CliEventKind) -> Self {
+        match value {
+            CliEventKind::RecommendedFile => AgentEventKind::RecommendedFile,
+            CliEventKind::FileRead => AgentEventKind::FileRead,
+            CliEventKind::FileEdit => AgentEventKind::FileEdit,
+            CliEventKind::Command => AgentEventKind::Command,
+            CliEventKind::Status => AgentEventKind::Status,
+            CliEventKind::Usage => AgentEventKind::Usage,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CliCommandClass {
+    Test,
+    Build,
+    Lint,
+    Typecheck,
+    Other,
+}
+
+impl From<CliCommandClass> for CommandClass {
+    fn from(value: CliCommandClass) -> Self {
+        match value {
+            CliCommandClass::Test => CommandClass::Test,
+            CliCommandClass::Build => CommandClass::Build,
+            CliCommandClass::Lint => CommandClass::Lint,
+            CliCommandClass::Typecheck => CommandClass::Typecheck,
+            CliCommandClass::Other => CommandClass::Other,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum CliTaskStatus {
+    Success,
+    Failure,
+    Skipped,
+}
+
+impl From<CliTaskStatus> for TaskStatus {
+    fn from(value: CliTaskStatus) -> Self {
+        match value {
+            CliTaskStatus::Success => TaskStatus::Success,
+            CliTaskStatus::Failure => TaskStatus::Failure,
+            CliTaskStatus::Skipped => TaskStatus::Skipped,
+        }
+    }
 }
 
 impl From<TraceVariant> for AgentVariant {
@@ -210,6 +299,39 @@ fn main() -> Result<()> {
                 println!("wrote {}", out.display());
             }
         }
+        Command::RecordEvent {
+            events,
+            task_id,
+            event_kind,
+            path,
+            command_class,
+            command_hash,
+            touched_test,
+            exit_status,
+            status,
+            token_estimate,
+            elapsed_millis,
+            observed_at_millis,
+        } => {
+            let event = AgentEvent {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id,
+                event_kind: event_kind.into(),
+                path,
+                command_class: command_class.map(Into::into),
+                command_hash,
+                touched_tests: touched_test,
+                exit_status,
+                status: status.map(Into::into),
+                token_estimate,
+                elapsed_millis,
+                observed_at_millis,
+                privacy: PrivacyStatus::source_free(),
+            };
+            validate_agent_event(&event)?;
+            append_event(&events, &event)?;
+            println!("appended {}", events.display());
+        }
         Command::Compare {
             base,
             head,
@@ -254,4 +376,20 @@ fn write_text(content: &str, path: &PathBuf) -> Result<()> {
         std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     }
     std::fs::write(path, content).with_context(|| format!("write {}", path.display()))
+}
+
+fn append_event(path: &PathBuf, event: &AgentEvent) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
+    }
+    let mut line = serde_json::to_string(event)?;
+    line.push('\n');
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .with_context(|| format!("open {}", path.display()))?;
+    use std::io::Write;
+    file.write_all(line.as_bytes())
+        .with_context(|| format!("append {}", path.display()))
 }
