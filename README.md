@@ -47,6 +47,15 @@ Create an example suite:
 cargo run -- init-suite --out suites/example-auth-bugs.json
 ```
 
+Create a reproducible demo benchmark repo plus matching suite:
+
+```bash
+cargo run -- init-demo-repo \
+  --repo-out /tmp/helmbench-demo-repo \
+  --suite-out /tmp/helmbench-demo-suite.json \
+  --force
+```
+
 Validate a suite:
 
 ```bash
@@ -180,6 +189,23 @@ cargo run -- run \
 `local-run` clones the repo into `.helmbench/workdirs/<task-id>` by default and
 removes the workdir after writing the trace unless `--keep-workdirs` is set.
 
+Run the generated demo benchmark:
+
+```bash
+cargo build
+
+cargo run -- local-run \
+  --suite /tmp/helmbench-demo-suite.json \
+  --repo /tmp/helmbench-demo-repo \
+  --adapter-command "HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-agent.sh" \
+  --out-dir /tmp/helmbench-demo-traces
+
+cargo run -- run \
+  --suite /tmp/helmbench-demo-suite.json \
+  --trace-dir /tmp/helmbench-demo-traces \
+  --out /tmp/helmbench-demo-report.json
+```
+
 The repo includes `.ctxhelmignore` so generated reports and traces do not
 pollute ctxhelm recommendation quality.
 
@@ -257,6 +283,7 @@ helmbench-core
 
 helmbench-cli
   init-suite
+  init-demo-repo
   validate-suite
   run
   ctxhelm-trace
@@ -288,4 +315,4 @@ future direct-agent adapters
    where available, without storing transcripts.
 2. Extend the ctxhelm adapter from `prepare-task` plans to MCP resource reads
    and pack usage without raw MCP payloads.
-3. Add public benchmark suites over small reproducible repositories.
+3. Add larger public benchmark suites over real open-source repositories.

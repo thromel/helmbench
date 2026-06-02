@@ -21,6 +21,11 @@ Task Suite
   -> Dashboard / Markdown / JSON
 ```
 
+`init-demo-repo` provides a reproducible fixture lane for this flow. It creates
+a tiny git repository, writes a matching task suite, and includes a source-free
+demo agent script so the full runner/report/autopsy/dashboard pipeline can be
+tested without external agents or network access.
+
 ## Source-Free Trace Model
 
 A trace records only evaluation-safe metadata:
