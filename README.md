@@ -38,6 +38,8 @@ This repository currently implements the first MVP slice:
   starting with RefactoringMiner
 - `benchmark-summary` reports that compare one baseline against multiple
   source-free variant reports
+- `evidence-bundle` packaging for source-free suites, health reports, run
+  reports, benchmark summaries, and artifact hashes
 - recommendation precision and recall metrics for context-plan evaluation
 
 It does **not** yet parse raw Claude Code, Codex, Cursor, or other agent
@@ -113,6 +115,18 @@ cargo run -- benchmark-summary \
   --head reports/example-claude-code.json \
   --out reports/example-benchmark-summary.md \
   --format markdown
+```
+
+Package a source-free evidence bundle:
+
+```bash
+cargo run -- evidence-bundle \
+  --suite suites/example-auth-bugs.json \
+  --base-report reports/example-native.json \
+  --head-report reports/example-ctxhelm.json \
+  --head-report reports/example-claude-code.json \
+  --out-dir /tmp/helmbench-evidence \
+  --force
 ```
 
 Render a static source-free dashboard:
@@ -359,6 +373,7 @@ helmbench-cli
   record-event
   compare
   benchmark-summary
+  evidence-bundle
   autopsy
   dashboard
   doctor

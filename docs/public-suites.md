@@ -63,6 +63,22 @@ helmbench run \
   --out /tmp/refactoringminer-ctxhelm-plan-report.json
 ```
 
+When you have a baseline report and one or more variant reports, package the
+evidence:
+
+```bash
+helmbench evidence-bundle \
+  --suite /tmp/refactoringminer-suite.json \
+  --health /tmp/refactoringminer-health.json \
+  --base-report /tmp/refactoringminer-native-report.json \
+  --head-report /tmp/refactoringminer-ctxhelm-plan-report.json \
+  --out-dir /tmp/refactoringminer-evidence \
+  --force
+```
+
+The bundle contains copied suite/report/health artifacts, generated benchmark
+summary JSON and Markdown, and a manifest with content hashes.
+
 For full agent runs, use `claude-run`, `codex-run`, `local-run`, or
 `ctxhelm-run` with the same suite. HelmBench clones the repository per task, so
 the source repository must be a healthy Git checkout.

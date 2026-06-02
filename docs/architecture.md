@@ -130,6 +130,27 @@ The summary artifact includes:
 This is the artifact to publish when showing whether ctxhelm made an agent
 better, cheaper, or less wasteful across a benchmark suite.
 
+## Evidence Bundle
+
+`evidence-bundle` packages the source-free proof for a benchmark run. It
+validates the suite and reports, optionally validates a public-suite health
+report, generates JSON and Markdown benchmark summaries, copies the artifacts
+into a bundle directory, and writes `manifest.json`.
+
+The manifest records only:
+
+- suite name;
+- baseline agent and variant;
+- relative artifact paths;
+- source filenames, not absolute source paths;
+- byte counts;
+- content hashes;
+- source-free check status.
+
+This gives ctxhelm and HelmBench a repeatable proof artifact: reviewers can
+inspect exactly which suite, reports, summary, and health metadata supported a
+claim without reading source files or model transcripts.
+
 ## Dashboard
 
 `dashboard` renders one or more source-free run reports into a static HTML file.

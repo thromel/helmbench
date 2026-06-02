@@ -9,7 +9,7 @@ use helmbench::{
     validate_suite, write_json, AgentEvent, AgentEventKind, AgentVariant, CommandClass,
     PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use std::time::{Duration, Instant};
@@ -264,6 +264,21 @@ enum Command {
         out: PathBuf,
         #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
         format: OutputFormat,
+    },
+    /// Build a source-free evidence bundle from suite, health, and run reports.
+    EvidenceBundle {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        health: Option<PathBuf>,
+        #[arg(long)]
+        base_report: PathBuf,
+        #[arg(long, required = true)]
+        head_report: Vec<PathBuf>,
+        #[arg(long)]
+        out_dir: PathBuf,
+        #[arg(long)]
+        force: bool,
     },
     /// Diagnose source-free agent behavior from task traces.
     Autopsy {
@@ -759,6 +774,24 @@ fn main() -> Result<()> {
             }
             println!("wrote {}", out.display());
         }
+        Command::EvidenceBundle {
+            suite,
+            health,
+            base_report,
+            head_report,
+            out_dir,
+            force,
+        } => {
+            write_evidence_bundle(
+                &suite,
+                health.as_deref(),
+                &base_report,
+                &head_report,
+                &out_dir,
+                force,
+            )?;
+            println!("wrote {}", out_dir.display());
+        }
         Command::Autopsy {
             suite,
             trace_dir,
@@ -809,7 +842,7 @@ fn write_text(content: &str, path: &PathBuf) -> Result<()> {
     std::fs::write(path, content).with_context(|| format!("write {}", path.display()))
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PublicSuiteHealth {
     schema_version: u32,
@@ -823,6 +856,211 @@ struct PublicSuiteHealth {
     checked_files: Vec<String>,
     missing_files: Vec<String>,
     ok: bool,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EvidenceBundleManifest {
+    schema_version: u32,
+    suite_name: String,
+    baseline_agent: String,
+    baseline_variant: AgentVariant,
+    artifacts: Vec<EvidenceBundleArtifact>,
+    privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct EvidenceBundleArtifact {
+    kind: String,
+    path: String,
+    source_name: String,
+    byte_count: u64,
+    content_hash: String,
+    source_free_checked: bool,
+}
+
+fn write_evidence_bundle(
+    suite_path: &Path,
+    health_path: Option<&Path>,
+    base_report_path: &Path,
+    head_report_paths: &[PathBuf],
+    out_dir: &Path,
+    force: bool,
+) -> Result<()> {
+    if out_dir.exists() {
+        if !force {
+            anyhow::bail!(
+                "{} already exists; pass --force to replace it",
+                out_dir.display()
+            );
+        }
+        std::fs::remove_dir_all(out_dir)
+            .with_context(|| format!("remove {}", out_dir.display()))?;
+    }
+    std::fs::create_dir_all(out_dir).with_context(|| format!("create {}", out_dir.display()))?;
+    std::fs::create_dir_all(out_dir.join("reports"))
+        .with_context(|| format!("create {}", out_dir.join("reports").display()))?;
+
+    let suite = load_suite(suite_path)?;
+    let base_report = read_report(base_report_path)?;
+    if base_report.suite_name != suite.name {
+        anyhow::bail!(
+            "base report suite `{}` does not match suite `{}`",
+            base_report.suite_name,
+            suite.name
+        );
+    }
+    let head_reports = head_report_paths
+        .iter()
+        .map(|path| read_report(path))
+        .collect::<Result<Vec<_>>>()?;
+    for report in &head_reports {
+        if report.suite_name != suite.name {
+            anyhow::bail!(
+                "head report suite `{}` does not match suite `{}`",
+                report.suite_name,
+                suite.name
+            );
+        }
+    }
+
+    let mut artifacts = Vec::new();
+    artifacts.push(copy_bundle_artifact(
+        "suite",
+        suite_path,
+        out_dir,
+        "suite.json",
+        true,
+    )?);
+    if let Some(health_path) = health_path {
+        validate_public_suite_health(health_path)?;
+        artifacts.push(copy_bundle_artifact(
+            "health",
+            health_path,
+            out_dir,
+            "health.json",
+            true,
+        )?);
+    }
+    artifacts.push(copy_bundle_artifact(
+        "base_report",
+        base_report_path,
+        out_dir,
+        "reports/base.json",
+        true,
+    )?);
+    for (index, path) in head_report_paths.iter().enumerate() {
+        artifacts.push(copy_bundle_artifact(
+            "head_report",
+            path,
+            out_dir,
+            &format!("reports/head-{}.json", index + 1),
+            true,
+        )?);
+    }
+
+    let summary = build_benchmark_summary(&base_report, &head_reports)?;
+    let summary_json = serde_json::to_string_pretty(&summary)?;
+    artifacts.push(write_bundle_artifact(
+        "benchmark_summary_json",
+        "generated",
+        out_dir,
+        "benchmark-summary.json",
+        summary_json.as_bytes(),
+        true,
+    )?);
+    let summary_markdown = render_markdown_benchmark_summary(&summary);
+    artifacts.push(write_bundle_artifact(
+        "benchmark_summary_markdown",
+        "generated",
+        out_dir,
+        "benchmark-summary.md",
+        summary_markdown.as_bytes(),
+        true,
+    )?);
+
+    let manifest = EvidenceBundleManifest {
+        schema_version: 1,
+        suite_name: suite.name,
+        baseline_agent: base_report.agent,
+        baseline_variant: base_report.variant,
+        artifacts,
+        privacy: PrivacyStatus::source_free(),
+    };
+    write_json(&manifest, &out_dir.join("manifest.json"))?;
+    Ok(())
+}
+
+fn validate_public_suite_health(path: &Path) -> Result<()> {
+    let raw = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    let health = serde_json::from_str::<PublicSuiteHealth>(&raw)
+        .with_context(|| format!("parse health {}", path.display()))?;
+    if health.repo_name.contains('/') || health.repo_name.contains('\\') {
+        anyhow::bail!("health repoName must not contain path separators");
+    }
+    for checked in health
+        .checked_files
+        .iter()
+        .chain(health.missing_files.iter())
+    {
+        helmbench::validate_safe_relative_path_for_cli(checked)?;
+    }
+    Ok(())
+}
+
+fn copy_bundle_artifact(
+    kind: &str,
+    source: &Path,
+    out_dir: &Path,
+    relative_out: &str,
+    source_free_checked: bool,
+) -> Result<EvidenceBundleArtifact> {
+    let bytes = std::fs::read(source).with_context(|| format!("read {}", source.display()))?;
+    write_bundle_artifact(
+        kind,
+        source
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("artifact"),
+        out_dir,
+        relative_out,
+        &bytes,
+        source_free_checked,
+    )
+}
+
+fn write_bundle_artifact(
+    kind: &str,
+    source_name: &str,
+    out_dir: &Path,
+    relative_out: &str,
+    bytes: &[u8],
+    source_free_checked: bool,
+) -> Result<EvidenceBundleArtifact> {
+    helmbench::validate_safe_relative_path_for_cli(relative_out)?;
+    let path = out_dir.join(relative_out);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
+    }
+    std::fs::write(&path, bytes).with_context(|| format!("write {}", path.display()))?;
+    Ok(EvidenceBundleArtifact {
+        kind: kind.to_string(),
+        path: relative_out.to_string(),
+        source_name: source_name.to_string(),
+        byte_count: bytes.len() as u64,
+        content_hash: content_hash(bytes),
+        source_free_checked,
+    })
+}
+
+fn content_hash(bytes: &[u8]) -> String {
+    let mut hash = 0xcbf29ce484222325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100000001b3);
+    }
+    format!("fnv64:{hash:016x}")
 }
 
 fn init_public_suite(
@@ -1954,6 +2192,109 @@ mod tests {
     }
 
     #[test]
+    fn evidence_bundle_writes_source_free_manifest_and_summaries() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let suite = example_suite();
+        let suite_path = temp.path().join("suite.json");
+        write_json(&suite, &suite_path).expect("suite");
+        let health_path = temp.path().join("health.json");
+        write_json(
+            &PublicSuiteHealth {
+                schema_version: 1,
+                preset: "test".to_string(),
+                repo_name: "repo".to_string(),
+                head: Some("abc123".to_string()),
+                commit_count: Some(1),
+                min_commits: 1,
+                dirty: false,
+                fsck_ok: true,
+                checked_files: vec!["README.md".to_string()],
+                missing_files: Vec::new(),
+                ok: true,
+            },
+            &health_path,
+        )
+        .expect("health");
+
+        let base_report = build_report(
+            &suite,
+            &[helmbench::AgentTrace {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                agent: "claude-code".to_string(),
+                variant: AgentVariant::Native,
+                status: TaskStatus::Failure,
+                recommended_files: Vec::new(),
+                files_read: vec![bundle_path("README.md")],
+                files_edited: Vec::new(),
+                commands: Vec::new(),
+                tool_call_count: 5,
+                token_estimate: Some(1000),
+                elapsed_millis: Some(1000),
+                time_to_first_relevant_file_millis: None,
+                privacy: PrivacyStatus::source_free(),
+            }],
+        )
+        .expect("base report");
+        let head_report = build_report(
+            &suite,
+            &[helmbench::AgentTrace {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                agent: "claude-code".to_string(),
+                variant: AgentVariant::CtxhelmMcp,
+                status: TaskStatus::Success,
+                recommended_files: vec![bundle_path("src/auth/session.ts")],
+                files_read: vec![bundle_path("src/auth/session.ts")],
+                files_edited: vec![bundle_path("src/auth/session.ts")],
+                commands: Vec::new(),
+                tool_call_count: 3,
+                token_estimate: Some(700),
+                elapsed_millis: Some(800),
+                time_to_first_relevant_file_millis: None,
+                privacy: PrivacyStatus::source_free(),
+            }],
+        )
+        .expect("head report");
+        let base_path = temp.path().join("base.json");
+        let head_path = temp.path().join("head.json");
+        write_json(&base_report, &base_path).expect("base");
+        write_json(&head_report, &head_path).expect("head");
+        let out_dir = temp.path().join("bundle");
+
+        write_evidence_bundle(
+            &suite_path,
+            Some(&health_path),
+            &base_path,
+            std::slice::from_ref(&head_path),
+            &out_dir,
+            false,
+        )
+        .expect("bundle");
+
+        assert!(out_dir.join("suite.json").exists());
+        assert!(out_dir.join("health.json").exists());
+        assert!(out_dir.join("reports/base.json").exists());
+        assert!(out_dir.join("reports/head-1.json").exists());
+        assert!(out_dir.join("benchmark-summary.json").exists());
+        assert!(out_dir.join("benchmark-summary.md").exists());
+        let manifest = std::fs::read_to_string(out_dir.join("manifest.json")).expect("manifest");
+        let manifest = serde_json::from_str::<serde_json::Value>(&manifest).expect("json");
+        assert_eq!(manifest["suiteName"], "example-auth-bugs");
+        assert_eq!(manifest["privacy"]["sourceFree"], true);
+        let artifacts = manifest["artifacts"].as_array().expect("artifacts");
+        assert_eq!(artifacts.len(), 6);
+        assert!(artifacts.iter().all(|artifact| {
+            artifact["path"]
+                .as_str()
+                .is_some_and(|path| !path.starts_with('/'))
+        }));
+        assert!(artifacts.iter().all(|artifact| artifact["contentHash"]
+            .as_str()
+            .is_some_and(|hash| hash.starts_with("fnv64:"))));
+    }
+
+    #[test]
     fn collect_ctxhelm_paths_rejects_unsafe_paths() {
         let value = serde_json::json!({
             "targetFiles": [
@@ -1993,5 +2334,13 @@ mod tests {
             write_demo_file(repo, &path, "fixture\n")?;
         }
         init_git_repo(repo)
+    }
+
+    fn bundle_path(path: &str) -> helmbench::PathObservation {
+        helmbench::PathObservation {
+            path: path.to_string(),
+            path_hash: None,
+            observed_at_millis: None,
+        }
     }
 }
