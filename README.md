@@ -38,6 +38,9 @@ This repository currently implements the core HelmBench workflow:
   starting with RefactoringMiner
 - `demo-run` one-command deterministic demo pipeline with reports, dashboard,
   quality gate, and evidence bundle
+- `run-matrix` benchmark coordinator that runs one baseline plus one or more
+  local adapter variants and emits reports, comparisons, dashboard, quality
+  gate, autopsy, and evidence bundle artifacts
 - `benchmark-summary` reports that compare one baseline against multiple
   source-free variant reports
 - `evidence-bundle` packaging for source-free suites, health reports, run
@@ -93,6 +96,21 @@ Run the full deterministic demo pipeline:
 cargo run -- demo-run \
   --out-dir /tmp/helmbench-demo-run \
   --force
+```
+
+Run a baseline-vs-variant matrix and write publishable artifacts:
+
+```bash
+cargo run -- run-matrix \
+  --suite /tmp/helmbench-demo-suite.json \
+  --repo /tmp/helmbench-demo-repo \
+  --out-dir /tmp/helmbench-matrix \
+  --baseline "name=native,agent=demo-baseline,variant=native" \
+  --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,command=HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-agent.sh" \
+  --force
+
+cargo run -- verify-bundle \
+  --bundle /tmp/helmbench-matrix/evidence
 ```
 
 Generate a source-free RefactoringMiner public benchmark suite after checking
@@ -407,6 +425,7 @@ helmbench-cli
   init-suite
   init-demo-repo
   demo-run
+  run-matrix
   init-public-suite
   validate-suite
   run

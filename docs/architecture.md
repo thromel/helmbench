@@ -26,6 +26,11 @@ a tiny git repository, writes a matching task suite, and includes a source-free
 demo agent script so the full runner/report/autopsy/dashboard pipeline can be
 tested without external agents or network access.
 
+`run-matrix` is the main orchestration command for real eval runs. It executes
+one baseline plus one or more local adapter variants over the same suite, then
+writes per-run reports, pairwise comparisons, a benchmark summary, quality
+gate, baseline autopsy, dashboard, and verifiable evidence bundle.
+
 ## Source-Free Trace Model
 
 A trace records only evaluation-safe metadata:
@@ -83,6 +88,10 @@ variables such as `HELMBENCH_TASK_ID`, `HELMBENCH_REPO`, and
 
 `local-run` itself is not agent-specific. It is the isolation and observation
 foundation the Claude/Codex launch presets use.
+
+`run-matrix` uses the same local-run foundation for every row in the matrix, so
+baseline and variant results share identical clone, validation, trace, and
+privacy behavior.
 
 `claude-run` and `codex-run` are thin launch presets over `local-run`. They
 start the installed agent CLI non-interactively, suppress raw stdout/stderr, and

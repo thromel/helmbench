@@ -50,6 +50,29 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Run a baseline and one or more local adapter variants, then write comparison artifacts.
+    RunMatrix {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        repo: PathBuf,
+        #[arg(long, default_value = ".helmbench/matrix")]
+        out_dir: PathBuf,
+        /// Run spec: name=<id>,agent=<agent>,variant=<native|ctxhelm_plan|ctxhelm_mcp|ctxhelm_pack|other>[,command=<adapter command>]
+        #[arg(long)]
+        baseline: String,
+        /// Repeated run spec with the same format as --baseline.
+        #[arg(long, required = true)]
+        head: Vec<String>,
+        #[arg(long)]
+        setup_command: Vec<String>,
+        #[arg(long)]
+        force: bool,
+        #[arg(long)]
+        keep_workdirs: bool,
+        #[arg(long)]
+        fail_on_regression: bool,
+    },
     /// Generate a source-free suite from a known public repository fixture.
     InitPublicSuite {
         #[arg(long, value_enum)]
@@ -453,6 +476,30 @@ fn main() -> Result<()> {
         }
         Command::DemoRun { out_dir, force } => {
             run_demo_pipeline(&out_dir, force)?;
+            println!("wrote {}", out_dir.display());
+        }
+        Command::RunMatrix {
+            suite,
+            repo,
+            out_dir,
+            baseline,
+            head,
+            setup_command,
+            force,
+            keep_workdirs,
+            fail_on_regression,
+        } => {
+            run_matrix(
+                &suite,
+                &repo,
+                &out_dir,
+                &baseline,
+                &head,
+                &setup_command,
+                force,
+                keep_workdirs,
+                fail_on_regression,
+            )?;
             println!("wrote {}", out_dir.display());
         }
         Command::InitPublicSuite {
@@ -1523,6 +1570,267 @@ fn run_demo_pipeline(out_dir: &Path, force: bool) -> Result<()> {
     run_demo_pipeline_with_adapter(out_dir, force, None)
 }
 
+#[derive(Debug, Clone)]
+struct RunMatrixSpec {
+    name: String,
+    safe_name: String,
+    agent: String,
+    variant: AgentVariant,
+    adapter_command: Option<String>,
+}
+
+struct RunMatrixResult {
+    spec: RunMatrixSpec,
+    report: helmbench::RunReport,
+    report_path: PathBuf,
+    trace_dir: PathBuf,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_matrix(
+    suite_path: &Path,
+    repo: &Path,
+    out_dir: &Path,
+    baseline_spec: &str,
+    head_specs: &[String],
+    setup_commands: &[String],
+    force: bool,
+    keep_workdirs: bool,
+    fail_on_regression: bool,
+) -> Result<()> {
+    if out_dir.exists() {
+        if !force {
+            anyhow::bail!(
+                "{} already exists; pass --force to replace it",
+                out_dir.display()
+            );
+        }
+        std::fs::remove_dir_all(out_dir)
+            .with_context(|| format!("remove {}", out_dir.display()))?;
+    }
+    std::fs::create_dir_all(out_dir).with_context(|| format!("create {}", out_dir.display()))?;
+
+    let suite = load_suite(suite_path)?;
+    let baseline = parse_run_matrix_spec(baseline_spec).context("parse --baseline")?;
+    let heads = head_specs
+        .iter()
+        .map(|spec| parse_run_matrix_spec(spec).with_context(|| format!("parse --head `{spec}`")))
+        .collect::<Result<Vec<_>>>()?;
+    validate_run_matrix_specs(&baseline, &heads)?;
+
+    let traces_dir = out_dir.join("traces");
+    let reports_dir = out_dir.join("reports");
+    let docs_dir = out_dir.join("docs");
+    let work_dir = out_dir.join("workdirs");
+    std::fs::create_dir_all(&reports_dir)
+        .with_context(|| format!("create {}", reports_dir.display()))?;
+    std::fs::create_dir_all(&docs_dir).with_context(|| format!("create {}", docs_dir.display()))?;
+
+    let baseline_result = run_matrix_spec(
+        &suite,
+        repo,
+        &work_dir,
+        &traces_dir,
+        &reports_dir,
+        &baseline,
+        setup_commands,
+        keep_workdirs,
+    )?;
+    let head_results = heads
+        .iter()
+        .map(|spec| {
+            run_matrix_spec(
+                &suite,
+                repo,
+                &work_dir,
+                &traces_dir,
+                &reports_dir,
+                spec,
+                setup_commands,
+                keep_workdirs,
+            )
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    for head in &head_results {
+        validate_comparable_reports(&baseline_result.report, &head.report)?;
+        let compare = compare_reports(&baseline_result.report, &head.report);
+        write_json(
+            &compare,
+            &reports_dir.join(format!("compare-{}.json", head.spec.safe_name)),
+        )?;
+        write_text(
+            &render_markdown_compare(&compare),
+            &docs_dir.join(format!("compare-{}.md", head.spec.safe_name)),
+        )?;
+    }
+
+    let head_reports = head_results
+        .iter()
+        .map(|result| result.report.clone())
+        .collect::<Vec<_>>();
+    let summary = build_benchmark_summary(&baseline_result.report, &head_reports)?;
+    let summary_json_path = reports_dir.join("benchmark-summary.json");
+    write_json(&summary, &summary_json_path)?;
+    write_text(
+        &render_markdown_benchmark_summary(&summary),
+        &docs_dir.join("benchmark-summary.md"),
+    )?;
+
+    let gate = evaluate_quality_gate(&summary, &QualityGateConfig::default())?;
+    write_json(&gate, &reports_dir.join("quality-gate.json"))?;
+    write_text(
+        &render_markdown_quality_gate(&gate),
+        &docs_dir.join("quality-gate.md"),
+    )?;
+
+    let baseline_traces = load_traces(&baseline_result.trace_dir)?;
+    let autopsy = build_autopsy(&suite, &baseline_traces)?;
+    write_text(
+        &render_markdown_autopsy(&autopsy),
+        &docs_dir.join(format!("{}-autopsy.md", baseline_result.spec.safe_name)),
+    )?;
+
+    let all_reports = std::iter::once(baseline_result.report.clone())
+        .chain(head_results.iter().map(|result| result.report.clone()))
+        .collect::<Vec<_>>();
+    write_text(
+        &render_html_dashboard(&all_reports)?,
+        &docs_dir.join("dashboard.html"),
+    )?;
+
+    let head_report_paths = head_results
+        .iter()
+        .map(|result| result.report_path.clone())
+        .collect::<Vec<_>>();
+    write_evidence_bundle(
+        suite_path,
+        None,
+        &baseline_result.report_path,
+        &head_report_paths,
+        &out_dir.join("evidence"),
+        false,
+    )?;
+    verify_evidence_bundle(&out_dir.join("evidence"))?;
+
+    if fail_on_regression && !gate.passed {
+        anyhow::bail!("run-matrix quality gate failed");
+    }
+
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_matrix_spec(
+    suite: &helmbench::TaskSuite,
+    repo: &Path,
+    work_dir: &Path,
+    traces_dir: &Path,
+    reports_dir: &Path,
+    spec: &RunMatrixSpec,
+    setup_commands: &[String],
+    keep_workdirs: bool,
+) -> Result<RunMatrixResult> {
+    let trace_dir = traces_dir.join(&spec.safe_name);
+    run_local_suite(
+        suite,
+        repo,
+        &work_dir.join(&spec.safe_name),
+        &trace_dir,
+        &spec.agent,
+        spec.variant.clone(),
+        setup_commands,
+        None,
+        spec.adapter_command.as_deref(),
+        keep_workdirs,
+    )
+    .with_context(|| format!("run matrix spec `{}`", spec.name))?;
+    let report = build_report(suite, &load_traces(&trace_dir)?)?;
+    let report_path = reports_dir.join(format!("{}.json", spec.safe_name));
+    write_json(&report, &report_path)?;
+    write_text(
+        &render_markdown_report(&report),
+        &reports_dir.join(format!("{}.md", spec.safe_name)),
+    )?;
+    Ok(RunMatrixResult {
+        spec: spec.clone(),
+        report,
+        report_path,
+        trace_dir,
+    })
+}
+
+fn parse_run_matrix_spec(raw: &str) -> Result<RunMatrixSpec> {
+    let mut name = None;
+    let mut agent = None;
+    let mut variant = None;
+    let mut command = None;
+
+    for part in raw.split(',') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let Some((key, value)) = part.split_once('=') else {
+            anyhow::bail!("run spec part `{part}` must use key=value");
+        };
+        let key = key.trim();
+        let value = value.trim();
+        match key {
+            "name" => name = Some(value.to_string()),
+            "agent" => agent = Some(value.to_string()),
+            "variant" => variant = Some(parse_agent_variant(value)?),
+            "command" => {
+                if !value.is_empty() {
+                    command = Some(value.to_string());
+                }
+            }
+            other => anyhow::bail!("unsupported run spec field `{other}`"),
+        }
+    }
+
+    let name = name.context("run spec requires name=<id>")?;
+    if name.trim().is_empty() {
+        anyhow::bail!("run spec name must not be empty");
+    }
+    let agent = agent.context("run spec requires agent=<agent>")?;
+    if agent.trim().is_empty() {
+        anyhow::bail!("run spec agent must not be empty");
+    }
+    let safe_name = safe_task_dir_name(&name);
+    Ok(RunMatrixSpec {
+        name,
+        safe_name,
+        agent,
+        variant: variant.context("run spec requires variant=<variant>")?,
+        adapter_command: command,
+    })
+}
+
+fn validate_run_matrix_specs(baseline: &RunMatrixSpec, heads: &[RunMatrixSpec]) -> Result<()> {
+    if heads.is_empty() {
+        anyhow::bail!("run-matrix requires at least one --head");
+    }
+    let mut names = BTreeSet::new();
+    for spec in std::iter::once(baseline).chain(heads.iter()) {
+        if !names.insert(spec.safe_name.clone()) {
+            anyhow::bail!("duplicate run-matrix name `{}`", spec.safe_name);
+        }
+    }
+    Ok(())
+}
+
+fn parse_agent_variant(value: &str) -> Result<AgentVariant> {
+    match value {
+        "native" => Ok(AgentVariant::Native),
+        "ctxhelm_plan" => Ok(AgentVariant::CtxhelmPlan),
+        "ctxhelm_mcp" => Ok(AgentVariant::CtxhelmMcp),
+        "ctxhelm_pack" => Ok(AgentVariant::CtxhelmPack),
+        "other" => Ok(AgentVariant::Other),
+        _ => anyhow::bail!("unsupported variant `{value}`"),
+    }
+}
+
 fn run_demo_pipeline_with_adapter(
     out_dir: &Path,
     force: bool,
@@ -2552,6 +2860,62 @@ mod tests {
             std::fs::read_to_string(out.join("reports/guided.json")).expect("guided report");
         let guided = serde_json::from_str::<serde_json::Value>(&guided).expect("json");
         assert_eq!(guided["summary"]["successRate"], 1.0);
+    }
+
+    #[test]
+    fn run_matrix_writes_publishable_artifacts() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        let suite_path = temp.path().join("suite.json");
+        init_demo_repo(&repo, &suite_path, false).expect("demo repo");
+
+        let adapter = temp.path().join("fake-demo-agent.sh");
+        std::fs::write(&adapter, FAKE_DEMO_AGENT).expect("adapter");
+        set_executable(&adapter).expect("chmod adapter");
+
+        let out = temp.path().join("matrix");
+        let head = format!(
+            "name=guided,agent=demo-guided,variant=ctxhelm_mcp,command=sh {}",
+            shell_escape(&adapter.to_string_lossy())
+        );
+        run_matrix(
+            &suite_path,
+            &repo,
+            &out,
+            "name=native,agent=demo-baseline,variant=native",
+            &[head],
+            &[],
+            false,
+            false,
+            true,
+        )
+        .expect("run matrix");
+
+        assert!(out
+            .join("traces/native/demo-auth-redirect-001.json")
+            .exists());
+        assert!(out
+            .join("traces/guided/demo-auth-redirect-001.json")
+            .exists());
+        assert!(out.join("reports/native.json").exists());
+        assert!(out.join("reports/guided.json").exists());
+        assert!(out.join("reports/compare-guided.json").exists());
+        assert!(out.join("reports/benchmark-summary.json").exists());
+        assert!(out.join("reports/quality-gate.json").exists());
+        assert!(out.join("docs/compare-guided.md").exists());
+        assert!(out.join("docs/benchmark-summary.md").exists());
+        assert!(out.join("docs/native-autopsy.md").exists());
+        assert!(out.join("docs/dashboard.html").exists());
+        assert!(out.join("evidence/manifest.json").exists());
+        verify_evidence_bundle(&out.join("evidence")).expect("verify evidence");
+
+        let summary =
+            std::fs::read_to_string(out.join("reports/benchmark-summary.json")).expect("summary");
+        let summary = serde_json::from_str::<serde_json::Value>(&summary).expect("json");
+        assert_eq!(summary["comparisons"][0]["successRateDelta"], 1.0);
+        let gate = std::fs::read_to_string(out.join("reports/quality-gate.json")).expect("gate");
+        let gate = serde_json::from_str::<serde_json::Value>(&gate).expect("json");
+        assert_eq!(gate["passed"], true);
     }
 
     #[test]

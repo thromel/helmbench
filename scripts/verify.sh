@@ -18,6 +18,7 @@ cargo clippy --all-targets -- -D warnings
 
 cargo run -- --help >/dev/null
 cargo run -- demo-run --help >/dev/null
+cargo run -- run-matrix --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
 cargo run -- benchmark-summary --help >/dev/null
 cargo run -- evidence-bundle --help >/dev/null
@@ -42,6 +43,14 @@ cargo run -- local-run \
   --work-dir "$TMP_DIR/workdirs" \
   --out-dir "$TMP_DIR/traces" \
   --adapter-command "HELMBENCH_BIN=$ROOT/target/debug/helmbench sh scripts/demo-agent.sh"
+
+cargo run -- run-matrix \
+  --suite "$TMP_DIR/demo-suite.json" \
+  --repo "$TMP_DIR/demo-repo" \
+  --out-dir "$TMP_DIR/matrix" \
+  --baseline "name=native,agent=demo-baseline,variant=native" \
+  --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,command=HELMBENCH_BIN=$ROOT/target/debug/helmbench sh scripts/demo-agent.sh" \
+  --force
 
 cargo run -- run \
   --suite "$TMP_DIR/demo-suite.json" \
@@ -93,6 +102,9 @@ cargo run -- verify-bundle \
 cargo run -- verify-bundle \
   --bundle "$TMP_DIR/full-demo/evidence"
 
+cargo run -- verify-bundle \
+  --bundle "$TMP_DIR/matrix/evidence"
+
 test -f "$TMP_DIR/report.json"
 test -f "$TMP_DIR/autopsy.md"
 test -f "$TMP_DIR/dashboard.html"
@@ -102,6 +114,10 @@ test -f "$TMP_DIR/quality-gate.md"
 test -f "$TMP_DIR/evidence/manifest.json"
 test -f "$TMP_DIR/full-demo/evidence/manifest.json"
 test -f "$TMP_DIR/full-demo/docs/dashboard.html"
+test -f "$TMP_DIR/matrix/reports/benchmark-summary.json"
+test -f "$TMP_DIR/matrix/reports/quality-gate.json"
+test -f "$TMP_DIR/matrix/docs/dashboard.html"
+test -f "$TMP_DIR/matrix/evidence/manifest.json"
 
 git diff --check
 
