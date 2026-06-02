@@ -2,10 +2,10 @@ use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use helmbench::{
     build_report, compare_reports, example_suite, load_agent_events, load_suite, load_traces,
-    project_root_for_cli, read_report, render_markdown_compare, render_markdown_report,
-    trace_from_ctxhelm_prepare_json, traces_from_agent_events, validate_agent_event,
-    validate_suite, write_json, AgentEvent, AgentEventKind, AgentVariant, CommandClass,
-    PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
+    project_root_for_cli, read_report, render_html_dashboard, render_markdown_compare,
+    render_markdown_report, trace_from_ctxhelm_prepare_json, traces_from_agent_events,
+    validate_agent_event, validate_suite, write_json, AgentEvent, AgentEventKind, AgentVariant,
+    CommandClass, PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
 };
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
@@ -128,6 +128,13 @@ enum Command {
         format: OutputFormat,
         #[arg(long)]
         out: Option<PathBuf>,
+    },
+    /// Render a static source-free HTML dashboard from run reports.
+    Dashboard {
+        #[arg(long, required = true)]
+        report: Vec<PathBuf>,
+        #[arg(long)]
+        out: PathBuf,
     },
     /// Validate local CLI and show supported variants.
     Doctor {
@@ -396,6 +403,15 @@ fn main() -> Result<()> {
             } else {
                 print!("{rendered}");
             }
+        }
+        Command::Dashboard { report, out } => {
+            let reports = report
+                .iter()
+                .map(|path| read_report(path))
+                .collect::<Result<Vec<_>>>()?;
+            let rendered = render_html_dashboard(&reports)?;
+            write_text(&rendered, &out)?;
+            println!("wrote {}", out.display());
         }
         Command::Doctor { repo } => {
             let root = project_root_for_cli(repo)?;

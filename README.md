@@ -73,6 +73,16 @@ cargo run -- compare \
   --format markdown
 ```
 
+Render a static source-free dashboard:
+
+```bash
+cargo run -- dashboard \
+  --report reports/example-native.json \
+  --report reports/example-ctxhelm.json \
+  --report reports/example-claude-code.json \
+  --out docs/example-dashboard.html
+```
+
 Convert sanitized Claude Code events into traces:
 
 ```bash
@@ -222,6 +232,7 @@ helmbench-cli
   local-run
   record-event
   compare
+  dashboard
   doctor
 
 adapters
@@ -241,6 +252,5 @@ future direct-agent adapters
    and source-free hooks.
 2. Extend the ctxhelm adapter from `prepare-task` plans to MCP resource reads
    and pack usage without raw MCP payloads.
-3. Add a static HTML dashboard from generated report JSON.
-4. Add public benchmark suites over small reproducible repositories.
-5. Add Agent Diff Autopsy for agent-created PRs.
+3. Add public benchmark suites over small reproducible repositories.
+4. Add Agent Diff Autopsy for agent-created PRs.

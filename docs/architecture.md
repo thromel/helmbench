@@ -89,6 +89,17 @@ The core report computes:
 - tool call count
 - token estimate
 
+## Dashboard
+
+`dashboard` renders one or more source-free run reports into a static HTML file.
+It uses the same privacy gate as JSON and Markdown report readers: if a report
+claims raw source, raw prompts, raw transcripts, or raw terminal logs were
+captured, dashboard rendering fails.
+
+The dashboard intentionally embeds no raw source, no JavaScript, and no remote
+assets. It is safe to publish as an example artifact when the input reports are
+source-free.
+
 ## Design Trade-Offs
 
 ### Why source-free first?

@@ -592,12 +592,251 @@ pub fn render_markdown_compare(compare: &CompareReport) -> String {
     out
 }
 
+pub fn render_html_dashboard(reports: &[RunReport]) -> Result<String> {
+    if reports.is_empty() {
+        bail!("at least one report is required");
+    }
+    for report in reports {
+        if !report.privacy.source_free
+            || report.privacy.raw_source_logged
+            || report.privacy.raw_prompt_logged
+            || report.privacy.raw_transcript_logged
+            || report.privacy.raw_terminal_logged
+        {
+            bail!("dashboard report is not source-free");
+        }
+    }
+
+    let mut out = String::new();
+    out.push_str("<!doctype html>\n<html lang=\"en\">\n<head>\n");
+    out.push_str("<meta charset=\"utf-8\">\n");
+    out.push_str("<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n");
+    out.push_str("<title>HelmBench Dashboard</title>\n");
+    out.push_str("<style>\n");
+    out.push_str(DASHBOARD_CSS);
+    out.push_str("\n</style>\n</head>\n<body>\n");
+    out.push_str("<main class=\"shell\">\n");
+    out.push_str("<header class=\"hero\">\n");
+    out.push_str("<div><p class=\"eyebrow\">Source-free agent evaluation</p>\n");
+    out.push_str("<h1>HelmBench Dashboard</h1>\n");
+    out.push_str("<p class=\"lede\">Measure how coding agents navigate repositories, validate changes, and spend context.</p></div>\n");
+    out.push_str("<div class=\"privacy-badge\">Source-free reports</div>\n");
+    out.push_str("</header>\n");
+
+    out.push_str("<section class=\"summary-grid\" aria-label=\"Run summaries\">\n");
+    for report in reports {
+        out.push_str("<article class=\"run-card\">\n");
+        out.push_str(&format!(
+            "<div class=\"run-title\"><span>{}</span><code>{:?}</code></div>\n",
+            html_escape(&report.agent),
+            report.variant
+        ));
+        out.push_str(&format!(
+            "<p class=\"suite\">Suite: <strong>{}</strong></p>\n",
+            html_escape(&report.suite_name)
+        ));
+        out.push_str("<div class=\"metric-row\">\n");
+        out.push_str(&metric_tile(
+            "Success",
+            pct(report.summary.success_rate),
+            "%",
+        ));
+        out.push_str(&metric_tile(
+            "Validation",
+            pct(report.summary.validation_coverage_rate),
+            "%",
+        ));
+        out.push_str(&metric_tile(
+            "Context precision",
+            pct(report.summary.average_context_precision),
+            "%",
+        ));
+        out.push_str(&metric_tile(
+            "Irrelevant reads",
+            pct(report.summary.irrelevant_read_rate),
+            "%",
+        ));
+        out.push_str("</div>\n");
+        out.push_str("<dl class=\"facts\">\n");
+        out.push_str(&fact("Tasks", report.summary.task_count.to_string()));
+        out.push_str(&fact(
+            "Files read",
+            report.summary.total_files_read.to_string(),
+        ));
+        out.push_str(&fact(
+            "Tool calls",
+            report.summary.total_tool_calls.to_string(),
+        ));
+        out.push_str(&fact(
+            "Token estimate",
+            report.summary.total_token_estimate.to_string(),
+        ));
+        out.push_str("</dl>\n");
+        out.push_str("</article>\n");
+    }
+    out.push_str("</section>\n");
+
+    out.push_str("<section class=\"panel\">\n");
+    out.push_str("<h2>Run Comparison</h2>\n");
+    out.push_str("<div class=\"table-wrap\"><table>\n");
+    out.push_str("<thead><tr><th>Run</th><th>Suite</th><th>Tasks</th><th>Success</th><th>Validation</th><th>Context precision</th><th>Edited recall</th><th>Irrelevant reads</th><th>Tools</th><th>Tokens</th></tr></thead>\n<tbody>\n");
+    for report in reports {
+        out.push_str(&format!(
+            "<tr><td><strong>{}</strong><br><code>{:?}</code></td><td>{}</td><td>{}</td><td>{:.1}%</td><td>{:.1}%</td><td>{:.1}%</td><td>{:.1}%</td><td>{:.1}%</td><td>{}</td><td>{}</td></tr>\n",
+            html_escape(&report.agent),
+            report.variant,
+            html_escape(&report.suite_name),
+            report.summary.task_count,
+            pct(report.summary.success_rate),
+            pct(report.summary.validation_coverage_rate),
+            pct(report.summary.average_context_precision),
+            pct(report.summary.average_edited_file_recall),
+            pct(report.summary.irrelevant_read_rate),
+            report.summary.total_tool_calls,
+            report.summary.total_token_estimate,
+        ));
+    }
+    out.push_str("</tbody></table></div>\n</section>\n");
+
+    out.push_str("<section class=\"panel\">\n");
+    out.push_str("<h2>Task Detail</h2>\n");
+    out.push_str("<div class=\"table-wrap\"><table>\n");
+    out.push_str("<thead><tr><th>Run</th><th>Task</th><th>Status</th><th>Recommendations</th><th>Reads</th><th>Irrelevant</th><th>Validation</th><th>First relevant file</th></tr></thead>\n<tbody>\n");
+    for report in reports {
+        for task in &report.tasks {
+            out.push_str(&format!(
+                "<tr><td>{}<br><code>{:?}</code></td><td><code>{}</code></td><td><span class=\"status status-{}\">{:?}</span></td><td>{} / {} relevant</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>\n",
+                html_escape(&report.agent),
+                report.variant,
+                html_escape(&task.task_id),
+                status_class(&task.status),
+                task.status,
+                task.relevant_recommended_file_count,
+                task.recommended_file_count,
+                task.files_read_count,
+                task.irrelevant_file_read_count,
+                if task.validation_covered { "yes" } else { "no" },
+                task.time_to_first_relevant_file_millis
+                    .map(|millis| format!("{millis} ms"))
+                    .unwrap_or_else(|| "n/a".to_string())
+            ));
+        }
+    }
+    out.push_str("</tbody></table></div>\n</section>\n");
+
+    out.push_str("<section class=\"privacy\">\n");
+    out.push_str("<h2>Privacy Contract</h2>\n");
+    out.push_str("<p>This dashboard is generated from source-free HelmBench reports. It contains paths/count-derived metrics only; raw source, raw prompts, raw transcripts, raw terminal logs, and raw MCP payloads are not included.</p>\n");
+    out.push_str("</section>\n");
+    out.push_str("</main>\n</body>\n</html>\n");
+    Ok(out)
+}
+
 pub fn write_json<T: Serialize>(value: &T, path: &Path) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     }
     let json = serde_json::to_string_pretty(value)?;
     fs::write(path, json).with_context(|| format!("write {}", path.display()))
+}
+
+const DASHBOARD_CSS: &str = r#"
+:root {
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --ink: #172033;
+  --muted: #5c667a;
+  --line: #d8deea;
+  --card: #ffffff;
+  --accent: #0f766e;
+  --accent-weak: #e0f2f1;
+  --danger: #b42318;
+  --warning: #b54708;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0; }
+.hero { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 28px; }
+.eyebrow { margin: 0 0 8px; color: var(--accent); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; }
+h1 { margin: 0; font-size: 44px; line-height: 1.05; letter-spacing: 0; }
+h2 { margin: 0 0 16px; font-size: 22px; letter-spacing: 0; }
+.lede { margin: 12px 0 0; color: var(--muted); max-width: 680px; font-size: 17px; line-height: 1.5; }
+.privacy-badge { border: 1px solid var(--line); background: var(--card); color: var(--accent); padding: 10px 12px; border-radius: 8px; font-weight: 700; white-space: nowrap; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.run-card, .panel, .privacy { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px; box-shadow: 0 8px 28px rgba(23, 32, 51, .06); }
+.run-title { display: flex; justify-content: space-between; gap: 12px; align-items: center; font-size: 18px; font-weight: 800; }
+code { background: #eef2f7; border-radius: 5px; padding: 2px 5px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88em; }
+.suite { margin: 10px 0 16px; color: var(--muted); }
+.metric-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.metric { background: #f8fafc; border: 1px solid #e6ebf3; border-radius: 8px; padding: 12px; }
+.metric span { display: block; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; }
+.metric strong { display: block; margin-top: 8px; font-size: 24px; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 16px 0 0; }
+.facts div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #edf1f7; padding-top: 8px; }
+dt { color: var(--muted); }
+dd { margin: 0; font-weight: 700; }
+.panel { margin-top: 20px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 860px; }
+th, td { border-bottom: 1px solid #edf1f7; padding: 11px 10px; text-align: left; vertical-align: top; }
+th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0; }
+.status { display: inline-block; border-radius: 5px; padding: 3px 7px; font-weight: 800; font-size: 12px; }
+.status-success { background: var(--accent-weak); color: var(--accent); }
+.status-failure { background: #fee4e2; color: var(--danger); }
+.status-skipped { background: #fff4e5; color: var(--warning); }
+.privacy { margin-top: 20px; color: var(--muted); line-height: 1.55; }
+.privacy p { margin: 0; }
+@media (max-width: 720px) {
+  .shell { width: min(100% - 20px, 1180px); padding: 24px 0; }
+  .hero { display: block; }
+  .privacy-badge { display: inline-block; margin-top: 16px; }
+  h1 { font-size: 34px; }
+}
+"#;
+
+fn metric_tile(label: &str, value: f32, suffix: &str) -> String {
+    format!(
+        "<div class=\"metric\"><span>{}</span><strong>{:.1}{}</strong></div>\n",
+        html_escape(label),
+        value,
+        html_escape(suffix)
+    )
+}
+
+fn fact(label: &str, value: String) -> String {
+    format!(
+        "<div><dt>{}</dt><dd>{}</dd></div>\n",
+        html_escape(label),
+        html_escape(&value)
+    )
+}
+
+fn status_class(status: &TaskStatus) -> &'static str {
+    match status {
+        TaskStatus::Success => "success",
+        TaskStatus::Failure => "failure",
+        TaskStatus::Skipped => "skipped",
+    }
+}
+
+fn html_escape(value: &str) -> String {
+    let mut escaped = String::new();
+    for ch in value.chars() {
+        match ch {
+            '&' => escaped.push_str("&amp;"),
+            '<' => escaped.push_str("&lt;"),
+            '>' => escaped.push_str("&gt;"),
+            '"' => escaped.push_str("&quot;"),
+            '\'' => escaped.push_str("&#39;"),
+            _ => escaped.push(ch),
+        }
+    }
+    escaped
 }
 
 pub fn read_report(path: &Path) -> Result<RunReport> {
@@ -1311,6 +1550,29 @@ mod tests {
         assert!(compare.success_rate_delta > 0.0);
         assert!(compare.irrelevant_read_rate_delta < 0.0);
         assert!(render_markdown_compare(&compare).contains("Task success rate"));
+    }
+
+    #[test]
+    fn html_dashboard_escapes_report_content() {
+        let suite = example_suite();
+        let mut report = build_report(
+            &suite,
+            &[trace_with_reads(
+                AgentVariant::Native,
+                TaskStatus::Failure,
+                vec!["README.md", "docs/auth.md"],
+            )],
+        )
+        .expect("report");
+        report.agent = "claude<script>".to_string();
+        report.suite_name = "suite & private".to_string();
+
+        let html = render_html_dashboard(&[report]).expect("dashboard");
+        assert!(html.contains("HelmBench Dashboard"));
+        assert!(html.contains("claude&lt;script&gt;"));
+        assert!(html.contains("suite &amp; private"));
+        assert!(!html.contains("claude<script>"));
+        assert!(html.contains("raw source"));
     }
 
     fn path(path: &str) -> PathObservation {
