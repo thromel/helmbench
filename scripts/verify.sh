@@ -18,6 +18,7 @@ cargo clippy --all-targets -- -D warnings
 
 cargo run -- --help >/dev/null
 cargo run -- demo-run --help >/dev/null
+cargo run -- validate-matrix --help >/dev/null
 cargo run -- run-matrix --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
 cargo run -- benchmark-summary --help >/dev/null
@@ -73,6 +74,9 @@ cat > "$TMP_DIR/matrix-config.json" <<EOF
   ]
 }
 EOF
+
+cargo run -- validate-matrix \
+  --config "$TMP_DIR/matrix-config.json"
 
 HELMBENCH_BIN="$ROOT/target/debug/helmbench" cargo run -- run-matrix \
   --config "$TMP_DIR/matrix-config.json" \

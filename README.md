@@ -117,6 +117,10 @@ For repeatable runs, put the matrix definition in JSON:
 
 ```bash
 HELMBENCH_BIN=$(pwd)/target/debug/helmbench \
+  cargo run -- validate-matrix \
+    --config suites/demo-matrix.json
+
+HELMBENCH_BIN=$(pwd)/target/debug/helmbench \
   cargo run -- run-matrix \
     --config suites/demo-matrix.json \
     --force

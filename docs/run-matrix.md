@@ -20,6 +20,10 @@ For repeatable runs, use a JSON config:
 
 ```bash
 HELMBENCH_BIN=$(pwd)/target/debug/helmbench \
+  helmbench validate-matrix \
+    --config suites/demo-matrix.json
+
+HELMBENCH_BIN=$(pwd)/target/debug/helmbench \
   helmbench run-matrix \
     --config suites/demo-matrix.json \
     --force

@@ -50,6 +50,11 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Validate a run-matrix JSON config without executing agents.
+    ValidateMatrix {
+        #[arg(long)]
+        config: PathBuf,
+    },
     /// Run a baseline and one or more local adapter variants, then write comparison artifacts.
     RunMatrix {
         #[arg(long)]
@@ -479,6 +484,29 @@ fn main() -> Result<()> {
         Command::DemoRun { out_dir, force } => {
             run_demo_pipeline(&out_dir, force)?;
             println!("wrote {}", out_dir.display());
+        }
+        Command::ValidateMatrix { config } => {
+            let request = build_run_matrix_request(
+                Some(&config),
+                None,
+                None,
+                None,
+                None,
+                Vec::new(),
+                Vec::new(),
+                false,
+                false,
+                false,
+            )?;
+            let suite = validate_run_matrix_request(&request)?;
+            println!(
+                "matrix config `{}` is valid: suite `{}` has {} task(s), {} run(s), repo `{}` is a git checkout",
+                config.display(),
+                suite.name,
+                suite.tasks.len(),
+                request.heads.len() + 1,
+                request.repo.display()
+            );
         }
         Command::RunMatrix {
             config,
@@ -1790,6 +1818,18 @@ fn run_matrix_spec_from_config(config: &RunMatrixConfigSpec) -> Result<RunMatrix
     })
 }
 
+fn validate_run_matrix_request(request: &RunMatrixRequest) -> Result<helmbench::TaskSuite> {
+    let suite = load_suite(&request.suite_path)
+        .with_context(|| format!("validate suite {}", request.suite_path.display()))?;
+    let repo = std::fs::canonicalize(&request.repo)
+        .with_context(|| format!("resolve repo {}", request.repo.display()))?;
+    if !repo.join(".git").exists() {
+        anyhow::bail!("run-matrix requires a git repository: {}", repo.display());
+    }
+    validate_run_matrix_specs(&request.baseline, &request.heads)?;
+    Ok(suite)
+}
+
 fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
     let out_dir = &request.out_dir;
     if out_dir.exists() {
@@ -1804,7 +1844,7 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
     }
     std::fs::create_dir_all(out_dir).with_context(|| format!("create {}", out_dir.display()))?;
 
-    let suite = load_suite(&request.suite_path)?;
+    let suite = validate_run_matrix_request(request)?;
 
     let traces_dir = out_dir.join("traces");
     let reports_dir = out_dir.join("reports");
@@ -3301,6 +3341,53 @@ mod tests {
         );
         assert!(override_request.keep_workdirs);
         assert!(override_request.fail_on_regression);
+    }
+
+    #[test]
+    fn validate_matrix_request_accepts_demo_repo() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        let suite_path = temp.path().join("suite.json");
+        init_demo_repo(&repo, &suite_path, false).expect("demo repo");
+        let config_path = temp.path().join("matrix.json");
+        std::fs::write(
+            &config_path,
+            serde_json::json!({
+                "suite": suite_path,
+                "repo": repo,
+                "baseline": {
+                    "name": "native",
+                    "agent": "demo-baseline",
+                    "variant": "native"
+                },
+                "heads": [
+                    {
+                        "name": "guided",
+                        "agent": "demo-guided",
+                        "variant": "ctxhelm_mcp"
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .expect("config");
+
+        let request = build_run_matrix_request(
+            Some(&config_path),
+            None,
+            None,
+            None,
+            None,
+            Vec::new(),
+            Vec::new(),
+            false,
+            false,
+            false,
+        )
+        .expect("request");
+        let suite = validate_run_matrix_request(&request).expect("valid matrix");
+        assert_eq!(suite.name, "demo-tiny-repo");
+        assert_eq!(request.heads.len(), 1);
     }
 
     #[test]
