@@ -8,6 +8,7 @@ pub const SUITE_SCHEMA_VERSION: u32 = 1;
 pub const TRACE_SCHEMA_VERSION: u32 = 1;
 pub const REPORT_SCHEMA_VERSION: u32 = 1;
 pub const AUTOPSY_SCHEMA_VERSION: u32 = 1;
+pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -240,6 +241,59 @@ pub struct CompareReport {
     pub validation_coverage_rate_delta: f32,
     pub total_tool_calls_delta: i64,
     pub total_token_estimate_delta: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BenchmarkSummaryReport {
+    pub schema_version: u32,
+    pub suite_name: String,
+    pub baseline: BenchmarkRunSummary,
+    pub runs: Vec<BenchmarkRunSummary>,
+    pub comparisons: Vec<BenchmarkComparison>,
+    pub privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BenchmarkRunSummary {
+    pub agent: String,
+    pub variant: AgentVariant,
+    pub task_count: usize,
+    pub success_rate: f32,
+    pub validation_coverage_rate: f32,
+    pub irrelevant_read_rate: f32,
+    pub recommendation_precision: f32,
+    pub recommendation_recall: f32,
+    pub context_precision: f32,
+    pub edited_file_recall: f32,
+    pub total_tool_calls: u32,
+    pub total_token_estimate: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct BenchmarkComparison {
+    pub head_agent: String,
+    pub head_variant: AgentVariant,
+    pub success_rate_delta: f32,
+    pub validation_coverage_rate_delta: f32,
+    pub irrelevant_read_rate_delta: f32,
+    pub recommendation_recall_delta: f32,
+    pub context_precision_delta: f32,
+    pub edited_file_recall_delta: f32,
+    pub total_tool_calls_delta: i64,
+    pub total_token_estimate_delta: i64,
+    pub verdict: BenchmarkVerdict,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum BenchmarkVerdict {
+    Improved,
+    Regressed,
+    Mixed,
+    NoChange,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -580,6 +634,152 @@ pub fn compare_reports(base: &RunReport, head: &RunReport) -> CompareReport {
     }
 }
 
+pub fn build_benchmark_summary(
+    baseline: &RunReport,
+    heads: &[RunReport],
+) -> Result<BenchmarkSummaryReport> {
+    validate_source_free_report(baseline)?;
+    if heads.is_empty() {
+        bail!("at least one head report is required");
+    }
+    for head in heads {
+        validate_source_free_report(head)?;
+        if head.suite_name != baseline.suite_name {
+            bail!(
+                "cannot summarize different suites: `{}` vs `{}`",
+                baseline.suite_name,
+                head.suite_name
+            );
+        }
+    }
+
+    let mut runs = Vec::with_capacity(heads.len() + 1);
+    runs.push(benchmark_run_summary(baseline));
+    runs.extend(heads.iter().map(benchmark_run_summary));
+
+    let comparisons = heads
+        .iter()
+        .map(|head| benchmark_comparison(baseline, head))
+        .collect::<Vec<_>>();
+
+    Ok(BenchmarkSummaryReport {
+        schema_version: BENCHMARK_SUMMARY_SCHEMA_VERSION,
+        suite_name: baseline.suite_name.clone(),
+        baseline: benchmark_run_summary(baseline),
+        runs,
+        comparisons,
+        privacy: PrivacyStatus::source_free(),
+    })
+}
+
+fn validate_source_free_report(report: &RunReport) -> Result<()> {
+    if !report.privacy.source_free
+        || report.privacy.raw_source_logged
+        || report.privacy.raw_prompt_logged
+        || report.privacy.raw_transcript_logged
+        || report.privacy.raw_terminal_logged
+    {
+        bail!("benchmark summaries require source-free reports");
+    }
+    Ok(())
+}
+
+fn benchmark_run_summary(report: &RunReport) -> BenchmarkRunSummary {
+    BenchmarkRunSummary {
+        agent: report.agent.clone(),
+        variant: report.variant.clone(),
+        task_count: report.summary.task_count,
+        success_rate: report.summary.success_rate,
+        validation_coverage_rate: report.summary.validation_coverage_rate,
+        irrelevant_read_rate: report.summary.irrelevant_read_rate,
+        recommendation_precision: report.summary.average_recommendation_precision,
+        recommendation_recall: report.summary.average_recommendation_recall,
+        context_precision: report.summary.average_context_precision,
+        edited_file_recall: report.summary.average_edited_file_recall,
+        total_tool_calls: report.summary.total_tool_calls,
+        total_token_estimate: report.summary.total_token_estimate,
+    }
+}
+
+fn benchmark_comparison(baseline: &RunReport, head: &RunReport) -> BenchmarkComparison {
+    let success_rate_delta = head.summary.success_rate - baseline.summary.success_rate;
+    let validation_coverage_rate_delta =
+        head.summary.validation_coverage_rate - baseline.summary.validation_coverage_rate;
+    let irrelevant_read_rate_delta =
+        head.summary.irrelevant_read_rate - baseline.summary.irrelevant_read_rate;
+    let recommendation_recall_delta =
+        head.summary.average_recommendation_recall - baseline.summary.average_recommendation_recall;
+    let context_precision_delta =
+        head.summary.average_context_precision - baseline.summary.average_context_precision;
+    let edited_file_recall_delta =
+        head.summary.average_edited_file_recall - baseline.summary.average_edited_file_recall;
+    let total_tool_calls_delta =
+        head.summary.total_tool_calls as i64 - baseline.summary.total_tool_calls as i64;
+    let total_token_estimate_delta =
+        head.summary.total_token_estimate as i64 - baseline.summary.total_token_estimate as i64;
+
+    BenchmarkComparison {
+        head_agent: head.agent.clone(),
+        head_variant: head.variant.clone(),
+        success_rate_delta,
+        validation_coverage_rate_delta,
+        irrelevant_read_rate_delta,
+        recommendation_recall_delta,
+        context_precision_delta,
+        edited_file_recall_delta,
+        total_tool_calls_delta,
+        total_token_estimate_delta,
+        verdict: benchmark_verdict(
+            success_rate_delta,
+            validation_coverage_rate_delta,
+            irrelevant_read_rate_delta,
+            context_precision_delta,
+            total_tool_calls_delta,
+            total_token_estimate_delta,
+        ),
+    }
+}
+
+fn benchmark_verdict(
+    success_rate_delta: f32,
+    validation_coverage_rate_delta: f32,
+    irrelevant_read_rate_delta: f32,
+    context_precision_delta: f32,
+    total_tool_calls_delta: i64,
+    total_token_estimate_delta: i64,
+) -> BenchmarkVerdict {
+    let epsilon = 0.0001;
+    let positives = [
+        success_rate_delta > epsilon,
+        validation_coverage_rate_delta > epsilon,
+        context_precision_delta > epsilon,
+        irrelevant_read_rate_delta < -epsilon,
+        total_tool_calls_delta < 0,
+        total_token_estimate_delta < 0,
+    ]
+    .into_iter()
+    .filter(|positive| *positive)
+    .count();
+    let negatives = [
+        success_rate_delta < -epsilon,
+        validation_coverage_rate_delta < -epsilon,
+        context_precision_delta < -epsilon,
+        irrelevant_read_rate_delta > epsilon,
+        total_tool_calls_delta > 0,
+        total_token_estimate_delta > 0,
+    ]
+    .into_iter()
+    .filter(|negative| *negative)
+    .count();
+
+    match (positives, negatives) {
+        (0, 0) => BenchmarkVerdict::NoChange,
+        (_, 0) => BenchmarkVerdict::Improved,
+        (0, _) => BenchmarkVerdict::Regressed,
+        _ => BenchmarkVerdict::Mixed,
+    }
+}
+
 pub fn build_autopsy(suite: &TaskSuite, traces: &[AgentTrace]) -> Result<AutopsyReport> {
     validate_suite(suite)?;
     if traces.is_empty() {
@@ -705,6 +905,66 @@ pub fn render_markdown_compare(compare: &CompareReport) -> String {
         "| Token estimate | {:+} |\n",
         compare.total_token_estimate_delta
     ));
+    out
+}
+
+pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "# HelmBench Benchmark Summary: `{}`\n\n",
+        report.suite_name
+    ));
+    out.push_str(&format!(
+        "Baseline: **{} / {:?}**\n\n",
+        report.baseline.agent, report.baseline.variant
+    ));
+
+    out.push_str("## Runs\n\n");
+    out.push_str("| Run | Tasks | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | Tools | Tokens |\n");
+    out.push_str("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    for run in &report.runs {
+        out.push_str(&format!(
+            "| {} / {:?} | {} | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {} | {} |\n",
+            run.agent,
+            run.variant,
+            run.task_count,
+            pct(run.success_rate),
+            pct(run.validation_coverage_rate),
+            pct(run.recommendation_recall),
+            pct(run.context_precision),
+            pct(run.edited_file_recall),
+            pct(run.irrelevant_read_rate),
+            run.total_tool_calls,
+            run.total_token_estimate
+        ));
+    }
+
+    out.push_str("\n## Deltas From Baseline\n\n");
+    out.push_str("| Variant | Verdict | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | Tools | Tokens |\n");
+    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    for comparison in &report.comparisons {
+        out.push_str(&format!(
+            "| {} / {:?} | {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+} | {:+} |\n",
+            comparison.head_agent,
+            comparison.head_variant,
+            comparison.verdict,
+            pct(comparison.success_rate_delta),
+            pct(comparison.validation_coverage_rate_delta),
+            pct(comparison.recommendation_recall_delta),
+            pct(comparison.context_precision_delta),
+            pct(comparison.edited_file_recall_delta),
+            pct(comparison.irrelevant_read_rate_delta),
+            comparison.total_tool_calls_delta,
+            comparison.total_token_estimate_delta
+        ));
+    }
+
+    out.push_str("\n## Privacy\n\n");
+    out.push_str("- Source-free: `true`\n");
+    out.push_str("- Raw source logged: `false`\n");
+    out.push_str("- Raw prompts logged: `false`\n");
+    out.push_str("- Raw transcripts logged: `false`\n");
+    out.push_str("- Raw terminal logs logged: `false`\n");
     out
 }
 
@@ -1936,6 +2196,111 @@ mod tests {
         let report = build_report(&suite, &[trace]).expect("report");
         assert!(report.tasks[0].validation_covered);
         assert_eq!(report.summary.validation_coverage_rate, 1.0);
+    }
+
+    #[test]
+    fn benchmark_summary_compares_multiple_source_free_reports() {
+        let suite = example_suite();
+        let native = build_report(
+            &suite,
+            &[AgentTrace {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                agent: "claude-code".to_string(),
+                variant: AgentVariant::Native,
+                status: TaskStatus::Failure,
+                recommended_files: Vec::new(),
+                files_read: vec![
+                    timed_path("README.md", 10),
+                    timed_path("src/auth/session.ts", 20),
+                ],
+                files_edited: Vec::new(),
+                commands: Vec::new(),
+                tool_call_count: 8,
+                token_estimate: Some(4000),
+                elapsed_millis: Some(2000),
+                time_to_first_relevant_file_millis: None,
+                privacy: PrivacyStatus::source_free(),
+            }],
+        )
+        .expect("native report");
+        let ctxhelm = build_report(
+            &suite,
+            &[AgentTrace {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                agent: "claude-code".to_string(),
+                variant: AgentVariant::CtxhelmMcp,
+                status: TaskStatus::Success,
+                recommended_files: vec![
+                    path("src/auth/session.ts"),
+                    path("src/auth/middleware.ts"),
+                    path("tests/auth/session.test.ts"),
+                ],
+                files_read: vec![
+                    timed_path("src/auth/session.ts", 20),
+                    timed_path("src/auth/middleware.ts", 30),
+                ],
+                files_edited: vec![path("src/auth/session.ts"), path("src/auth/middleware.ts")],
+                commands: vec![CommandObservation {
+                    command_class: CommandClass::Test,
+                    command_hash: Some("cmd:test".to_string()),
+                    touched_tests: vec!["tests/auth/session.test.ts".to_string()],
+                    exit_status: Some(0),
+                    elapsed_millis: Some(700),
+                }],
+                tool_call_count: 5,
+                token_estimate: Some(2500),
+                elapsed_millis: Some(1000),
+                time_to_first_relevant_file_millis: None,
+                privacy: PrivacyStatus::source_free(),
+            }],
+        )
+        .expect("ctxhelm report");
+
+        let summary =
+            build_benchmark_summary(&native, std::slice::from_ref(&ctxhelm)).expect("summary");
+
+        assert_eq!(summary.schema_version, BENCHMARK_SUMMARY_SCHEMA_VERSION);
+        assert_eq!(summary.suite_name, "example-auth-bugs");
+        assert_eq!(summary.runs.len(), 2);
+        assert_eq!(summary.comparisons.len(), 1);
+        assert_eq!(summary.comparisons[0].success_rate_delta, 1.0);
+        assert_eq!(summary.comparisons[0].total_tool_calls_delta, -3);
+        assert_eq!(summary.comparisons[0].total_token_estimate_delta, -1500);
+        assert_eq!(summary.comparisons[0].verdict, BenchmarkVerdict::Improved);
+
+        let markdown = render_markdown_benchmark_summary(&summary);
+        assert!(markdown.contains("HelmBench Benchmark Summary"));
+        assert!(markdown.contains("Deltas From Baseline"));
+        assert!(markdown.contains("Improved"));
+    }
+
+    #[test]
+    fn benchmark_summary_rejects_non_source_free_report() {
+        let suite = example_suite();
+        let trace = AgentTrace {
+            schema_version: TRACE_SCHEMA_VERSION,
+            task_id: "auth-redirect-001".to_string(),
+            agent: "claude-code".to_string(),
+            variant: AgentVariant::Native,
+            status: TaskStatus::Skipped,
+            recommended_files: Vec::new(),
+            files_read: Vec::new(),
+            files_edited: Vec::new(),
+            commands: Vec::new(),
+            tool_call_count: 0,
+            token_estimate: None,
+            elapsed_millis: None,
+            time_to_first_relevant_file_millis: None,
+            privacy: PrivacyStatus::source_free(),
+        };
+        let mut base = build_report(&suite, std::slice::from_ref(&trace)).expect("base");
+        let head = build_report(&suite, &[trace]).expect("head");
+        base.privacy.raw_source_logged = true;
+
+        let error = build_benchmark_summary(&base, &[head]).expect_err("privacy");
+        assert!(error.to_string().contains("source-free reports"));
     }
 
     #[test]

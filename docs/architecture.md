@@ -111,6 +111,25 @@ The core report computes:
 - tool call count
 - token estimate
 
+## Benchmark Summary
+
+`compare` answers one pairwise question. `benchmark-summary` answers the larger
+evaluation question: given a baseline, how did one or more variants perform on
+the same suite?
+
+The summary artifact includes:
+
+- one baseline run summary;
+- one row per source-free run report;
+- deltas from baseline for success, validation, recommendation recall, context
+  precision, edited-file recall, irrelevant reads, tool calls, and token
+  estimate;
+- a simple verdict per variant: `improved`, `regressed`, `mixed`, or
+  `no_change`.
+
+This is the artifact to publish when showing whether ctxhelm made an agent
+better, cheaper, or less wasteful across a benchmark suite.
+
 ## Dashboard
 
 `dashboard` renders one or more source-free run reports into a static HTML file.

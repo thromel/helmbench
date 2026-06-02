@@ -1,12 +1,13 @@
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use helmbench::{
-    build_autopsy, build_report, compare_reports, events_from_agent_stream_jsonl, example_suite,
-    load_agent_events, load_suite, load_traces, project_root_for_cli, read_report,
-    render_html_dashboard, render_markdown_autopsy, render_markdown_compare,
-    render_markdown_report, trace_from_ctxhelm_prepare_json, traces_from_agent_events,
-    validate_agent_event, validate_suite, write_json, AgentEvent, AgentEventKind, AgentVariant,
-    CommandClass, PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
+    build_autopsy, build_benchmark_summary, build_report, compare_reports,
+    events_from_agent_stream_jsonl, example_suite, load_agent_events, load_suite, load_traces,
+    project_root_for_cli, read_report, render_html_dashboard, render_markdown_autopsy,
+    render_markdown_benchmark_summary, render_markdown_compare, render_markdown_report,
+    trace_from_ctxhelm_prepare_json, traces_from_agent_events, validate_agent_event,
+    validate_suite, write_json, AgentEvent, AgentEventKind, AgentVariant, CommandClass,
+    PrivacyStatus, TaskStatus, TRACE_SCHEMA_VERSION,
 };
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -252,6 +253,17 @@ enum Command {
         format: OutputFormat,
         #[arg(long)]
         out: Option<PathBuf>,
+    },
+    /// Summarize one baseline against one or more source-free run reports.
+    BenchmarkSummary {
+        #[arg(long)]
+        base: PathBuf,
+        #[arg(long, required = true)]
+        head: Vec<PathBuf>,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
+        format: OutputFormat,
     },
     /// Diagnose source-free agent behavior from task traces.
     Autopsy {
@@ -726,6 +738,26 @@ fn main() -> Result<()> {
             } else {
                 print!("{rendered}");
             }
+        }
+        Command::BenchmarkSummary {
+            base,
+            head,
+            out,
+            format,
+        } => {
+            let base_report = read_report(&base)?;
+            let head_reports = head
+                .iter()
+                .map(|path| read_report(path))
+                .collect::<Result<Vec<_>>>()?;
+            let summary = build_benchmark_summary(&base_report, &head_reports)?;
+            match format {
+                OutputFormat::Json => write_json(&summary, &out)?,
+                OutputFormat::Markdown => {
+                    write_text(&render_markdown_benchmark_summary(&summary), &out)?
+                }
+            }
+            println!("wrote {}", out.display());
         }
         Command::Autopsy {
             suite,

@@ -36,6 +36,8 @@ This repository currently implements the first MVP slice:
   payloads
 - `init-public-suite` generator for verified public-repo benchmark suites,
   starting with RefactoringMiner
+- `benchmark-summary` reports that compare one baseline against multiple
+  source-free variant reports
 - recommendation precision and recall metrics for context-plan evaluation
 
 It does **not** yet parse raw Claude Code, Codex, Cursor, or other agent
@@ -99,6 +101,17 @@ Compare reports:
 cargo run -- compare \
   --base reports/example-native.json \
   --head reports/example-ctxhelm.json \
+  --format markdown
+```
+
+Summarize a benchmark baseline against multiple variants:
+
+```bash
+cargo run -- benchmark-summary \
+  --base reports/example-native.json \
+  --head reports/example-ctxhelm.json \
+  --head reports/example-claude-code.json \
+  --out reports/example-benchmark-summary.md \
   --format markdown
 ```
 
@@ -345,6 +358,7 @@ helmbench-cli
   codex-run
   record-event
   compare
+  benchmark-summary
   autopsy
   dashboard
   doctor
