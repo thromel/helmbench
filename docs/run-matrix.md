@@ -140,6 +140,25 @@ helmbench init-git-regression-suite \
 The generated health report must show `evidenceUse: outcome_ready` before the
 suite should be used for launch-grade task-success claims.
 
+Then use `init-agent-matrix` to write the native-vs-ctxhelm real-agent matrix
+config for that generated suite:
+
+```bash
+helmbench init-agent-matrix \
+  --suite /tmp/refactoring-miner-git-regressions.json \
+  --repo /tmp/RefactoringMiner \
+  --out /tmp/refactoring-miner-git-regressions-matrix.json \
+  --out-dir /tmp/refactoring-miner-git-regressions-matrix \
+  --health-out /tmp/refactoring-miner-git-regressions-matrix-health.json \
+  --agent-preset claude-code \
+  --dangerously-skip-permissions \
+  --ctxhelm-bin ctxhelm \
+  --pack \
+  --health-check-success-commands \
+  --health-require-setup-commands \
+  --force
+```
+
 CLI values override `suite`, `repo`, `outDir`, `baseline`, and `heads` when
 provided. `qualityGate` configures the source-free quality gate written to
 `reports/quality-gate.json`; the `--min-task-count`,

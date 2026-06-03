@@ -91,6 +91,7 @@ cargo run -- run-matrix --help >/dev/null
 cargo run -- init-public-matrix --help | grep -q -- '--health-out'
 cargo run -- init-public-matrix --help | grep -q -- '--health-check-success-commands'
 cargo run -- init-git-regression-suite --help | grep -q -- '--check-success-commands'
+cargo run -- init-agent-matrix --help | grep -q -- '--health-check-success-commands'
 cargo run -- matrix-history --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
 cargo run -- suite-health --help >/dev/null
@@ -251,6 +252,24 @@ grep -q '"evidenceUse": "outcome_ready"' "$TMP_DIR/git-regressions-health.json"
 grep -q '"validationBaselineReady": true' "$TMP_DIR/git-regressions-health.json"
 grep -q '"baselineSuccessCommandFailCount": 1' "$TMP_DIR/git-regressions-health.json"
 grep -q '"sourceFree": true' "$TMP_DIR/git-regressions-health.json"
+cargo run -- init-agent-matrix \
+  --suite "$TMP_DIR/git-regressions.json" \
+  --repo "$REGRESSION_REPO" \
+  --out "$TMP_DIR/git-regressions-matrix.json" \
+  --out-dir "$TMP_DIR/git-regressions-matrix" \
+  --health-out "$TMP_DIR/git-regressions-matrix-health.json" \
+  --agent-bin fake-claude \
+  --ctxhelm-bin fake-ctxhelm \
+  --dangerously-skip-permissions \
+  --health-check-success-commands \
+  --health-require-setup-commands \
+  --force
+cargo run -- validate-matrix --config "$TMP_DIR/git-regressions-matrix.json"
+grep -q '"evidenceUse": "outcome_ready"' "$TMP_DIR/git-regressions-matrix-health.json"
+grep -q '"healthCheckSuccessCommands": true' "$TMP_DIR/git-regressions-matrix.json"
+grep -q '"healthRequireSetupCommands": true' "$TMP_DIR/git-regressions-matrix.json"
+grep -q '"preset": "claude-code"' "$TMP_DIR/git-regressions-matrix.json"
+grep -q '"ctxhelm": true' "$TMP_DIR/git-regressions-matrix.json"
 
 cargo run -- local-run \
   --suite "$TMP_DIR/demo-suite.json" \

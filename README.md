@@ -366,6 +366,24 @@ latest non-merge commits. Publish only suites whose health report records
 `evidenceUse: outcome_ready`; otherwise the run is navigation evidence, not a
 task-success benchmark.
 
+Then generate a real-agent matrix config for that suite:
+
+```bash
+cargo run -- init-agent-matrix \
+  --suite /tmp/refactoringminer-git-regressions.json \
+  --repo ../ctxhelm-proof-fixtures/RefactoringMiner \
+  --out /tmp/refactoringminer-git-regressions-matrix.json \
+  --out-dir /tmp/refactoringminer-git-regressions-matrix \
+  --health-out /tmp/refactoringminer-git-regressions-matrix-health.json \
+  --agent-preset claude-code \
+  --dangerously-skip-permissions \
+  --ctxhelm-bin ctxhelm \
+  --pack \
+  --health-check-success-commands \
+  --health-require-setup-commands \
+  --force
+```
+
 Validate a suite:
 
 ```bash
@@ -732,6 +750,7 @@ helmbench-cli
   run-matrix
   init-public-suite
   init-git-regression-suite
+  init-agent-matrix
   init-public-matrix
   suite-health
   validate-suite

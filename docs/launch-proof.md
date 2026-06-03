@@ -146,6 +146,6 @@ before any agent change and classifies the evidence as `navigation_only`, so
 seeded task setup is required before treating that suite as task-success
 evidence. Use `init-git-regression-suite` to derive seeded public tasks from
 real commits and write a health artifact with `evidenceUse: outcome_ready`.
-Then use `init-public-matrix` or a normal `run-matrix` config with
-`healthCheckSuccessCommands` and `healthRequireSetupCommands`, and run
-`verify-matrix` on the generated output.
+Then use `init-agent-matrix` to create the native-vs-ctxhelm real-agent matrix
+config with `healthCheckSuccessCommands` and `healthRequireSetupCommands`, and
+run `verify-matrix` on the generated output.

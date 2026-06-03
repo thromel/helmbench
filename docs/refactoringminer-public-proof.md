@@ -140,6 +140,24 @@ cargo run -- init-git-regression-suite \
   --force
 ```
 
+Then generate the real-agent matrix config for that seeded suite:
+
+```bash
+cargo run -- init-agent-matrix \
+  --suite /tmp/refactoring-miner-git-regressions.json \
+  --repo <refactoringminer-repo> \
+  --out /tmp/refactoring-miner-git-regressions-matrix.json \
+  --out-dir /tmp/refactoring-miner-git-regressions-matrix \
+  --health-out /tmp/refactoring-miner-git-regressions-matrix-health.json \
+  --agent-preset claude-code \
+  --dangerously-skip-permissions \
+  --ctxhelm-bin ctxhelm \
+  --pack \
+  --health-check-success-commands \
+  --health-require-setup-commands \
+  --force
+```
+
 Generate the matrix config with suite-health checked up front:
 
 ```bash

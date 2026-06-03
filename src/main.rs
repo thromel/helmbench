@@ -176,6 +176,53 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Generate a repeatable real-agent run-matrix config for any suite.
+    InitAgentMatrix {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        repo: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long)]
+        out_dir: Option<PathBuf>,
+        #[arg(long)]
+        health_out: Option<PathBuf>,
+        #[arg(long, value_enum, default_value_t = AdapterPreset::ClaudeCode)]
+        agent_preset: AdapterPreset,
+        #[arg(long)]
+        agent_bin: Option<PathBuf>,
+        #[arg(long)]
+        model: Option<String>,
+        #[arg(long)]
+        agent_arg: Vec<String>,
+        #[arg(long)]
+        dangerously_skip_permissions: bool,
+        #[arg(long)]
+        dangerously_bypass_approvals_and_sandbox: bool,
+        #[arg(long, default_value = "ctxhelm")]
+        ctxhelm_bin: PathBuf,
+        #[arg(long, default_value = "bug-fix")]
+        mode: String,
+        #[arg(long)]
+        target_agent: Option<String>,
+        #[arg(long)]
+        pack: bool,
+        #[arg(long)]
+        fail_on_regression: bool,
+        #[arg(long, default_value_t = 1)]
+        health_min_commits: u64,
+        #[arg(long)]
+        allow_dirty_health: bool,
+        #[arg(long)]
+        health_check_success_commands: bool,
+        #[arg(long)]
+        health_fail_fast_success_commands: bool,
+        #[arg(long)]
+        health_require_setup_commands: bool,
+        #[arg(long)]
+        force: bool,
+    },
     /// Generate a repeatable public-repo run-matrix config for a real agent proof.
     InitPublicMatrix {
         #[arg(long, value_enum)]
@@ -913,6 +960,55 @@ fn main() -> Result<()> {
                 check_success_commands,
                 fail_fast_success_commands,
                 timeout_seconds,
+                force,
+            })?;
+        }
+        Command::InitAgentMatrix {
+            suite,
+            repo,
+            out,
+            out_dir,
+            health_out,
+            agent_preset,
+            agent_bin,
+            model,
+            agent_arg,
+            dangerously_skip_permissions,
+            dangerously_bypass_approvals_and_sandbox,
+            ctxhelm_bin,
+            mode,
+            target_agent,
+            pack,
+            fail_on_regression,
+            health_min_commits,
+            allow_dirty_health,
+            health_check_success_commands,
+            health_fail_fast_success_commands,
+            health_require_setup_commands,
+            force,
+        } => {
+            init_agent_matrix_config(InitAgentMatrixOptions {
+                suite,
+                repo,
+                out,
+                out_dir,
+                health_out,
+                agent_preset,
+                agent_bin,
+                model,
+                agent_args: agent_arg,
+                dangerously_skip_permissions,
+                dangerously_bypass_approvals_and_sandbox,
+                ctxhelm_bin,
+                mode,
+                target_agent,
+                pack,
+                fail_on_regression,
+                health_min_commits,
+                allow_dirty_health,
+                health_check_success_commands,
+                health_fail_fast_success_commands,
+                health_require_setup_commands,
                 force,
             })?;
         }
@@ -3167,6 +3263,94 @@ struct InitPublicMatrixOptions {
     force: bool,
 }
 
+#[derive(Debug, Clone)]
+struct InitAgentMatrixOptions {
+    suite: PathBuf,
+    repo: PathBuf,
+    out: PathBuf,
+    out_dir: Option<PathBuf>,
+    health_out: Option<PathBuf>,
+    agent_preset: AdapterPreset,
+    agent_bin: Option<PathBuf>,
+    model: Option<String>,
+    agent_args: Vec<String>,
+    dangerously_skip_permissions: bool,
+    dangerously_bypass_approvals_and_sandbox: bool,
+    ctxhelm_bin: PathBuf,
+    mode: String,
+    target_agent: Option<String>,
+    pack: bool,
+    fail_on_regression: bool,
+    health_min_commits: u64,
+    allow_dirty_health: bool,
+    health_check_success_commands: bool,
+    health_fail_fast_success_commands: bool,
+    health_require_setup_commands: bool,
+    force: bool,
+}
+
+fn init_agent_matrix_config(options: InitAgentMatrixOptions) -> Result<()> {
+    ensure_output_path_available(&options.out, options.force)?;
+    if let Some(health_out) = &options.health_out {
+        ensure_output_path_available(health_out, options.force)?;
+    }
+
+    let suite = load_suite(&options.suite)
+        .with_context(|| format!("load suite {}", options.suite.display()))?;
+    validate_suite(&suite)?;
+    let health = suite_health_report(
+        Some("agent-matrix"),
+        &options.repo,
+        options.health_min_commits,
+        options.allow_dirty_health,
+        options.health_check_success_commands,
+        options.health_fail_fast_success_commands,
+        options.health_require_setup_commands,
+        &suite,
+        &[],
+    )?;
+    if let Some(health_out) = &options.health_out {
+        write_json(&health, health_out)?;
+        println!("wrote {}", health_out.display());
+    }
+    if !health.ok {
+        anyhow::bail!(
+            "agent matrix fixture is not healthy; run suite-health for details before writing {}",
+            options.out.display()
+        );
+    }
+
+    let out_dir = options
+        .out_dir
+        .unwrap_or_else(|| default_agent_matrix_out_dir(&suite));
+    let config = real_agent_matrix_config(RealAgentMatrixConfigOptions {
+        suite_path: options.suite,
+        repo: options.repo,
+        out_dir,
+        suite_task_count: suite.tasks.len(),
+        agent_preset: options.agent_preset,
+        agent_bin: options.agent_bin,
+        model: options.model,
+        agent_args: options.agent_args,
+        dangerously_skip_permissions: options.dangerously_skip_permissions,
+        dangerously_bypass_approvals_and_sandbox: options.dangerously_bypass_approvals_and_sandbox,
+        ctxhelm_bin: options.ctxhelm_bin,
+        mode: options.mode,
+        target_agent: options.target_agent,
+        pack: options.pack,
+        fail_on_regression: options.fail_on_regression,
+        health_min_commits: options.health_min_commits,
+        allow_dirty_health: options.allow_dirty_health,
+        health_check_success_commands: options.health_check_success_commands,
+        health_fail_fast_success_commands: options.health_fail_fast_success_commands,
+        health_require_setup_commands: options.health_require_setup_commands,
+    });
+
+    write_json(&config, &options.out)?;
+    println!("wrote {}", options.out.display());
+    Ok(())
+}
+
 fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
     ensure_output_path_available(&options.out, options.force)?;
     if let Some(health_out) = &options.health_out {
@@ -3211,12 +3395,65 @@ fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
         );
     }
 
-    let agent = adapter_preset_label(Some(options.agent_preset))
-        .expect("adapter preset label")
-        .to_string();
     let out_dir = options
         .out_dir
         .unwrap_or_else(|| default_public_matrix_out_dir(options.preset));
+    let config = real_agent_matrix_config(RealAgentMatrixConfigOptions {
+        suite_path,
+        repo: options.repo,
+        out_dir,
+        suite_task_count: suite.tasks.len(),
+        agent_preset: options.agent_preset,
+        agent_bin: options.agent_bin,
+        model: options.model,
+        agent_args: options.agent_args,
+        dangerously_skip_permissions: options.dangerously_skip_permissions,
+        dangerously_bypass_approvals_and_sandbox: options.dangerously_bypass_approvals_and_sandbox,
+        ctxhelm_bin: options.ctxhelm_bin,
+        mode: options.mode,
+        target_agent: options.target_agent,
+        pack: options.pack,
+        fail_on_regression: options.fail_on_regression,
+        health_min_commits: options.health_min_commits,
+        allow_dirty_health: options.allow_dirty_health,
+        health_check_success_commands: options.health_check_success_commands,
+        health_fail_fast_success_commands: options.health_fail_fast_success_commands,
+        health_require_setup_commands: options.health_require_setup_commands,
+    });
+
+    write_json(&config, &options.out)?;
+    println!("wrote {}", options.out.display());
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct RealAgentMatrixConfigOptions {
+    suite_path: PathBuf,
+    repo: PathBuf,
+    out_dir: PathBuf,
+    suite_task_count: usize,
+    agent_preset: AdapterPreset,
+    agent_bin: Option<PathBuf>,
+    model: Option<String>,
+    agent_args: Vec<String>,
+    dangerously_skip_permissions: bool,
+    dangerously_bypass_approvals_and_sandbox: bool,
+    ctxhelm_bin: PathBuf,
+    mode: String,
+    target_agent: Option<String>,
+    pack: bool,
+    fail_on_regression: bool,
+    health_min_commits: u64,
+    allow_dirty_health: bool,
+    health_check_success_commands: bool,
+    health_fail_fast_success_commands: bool,
+    health_require_setup_commands: bool,
+}
+
+fn real_agent_matrix_config(options: RealAgentMatrixConfigOptions) -> RunMatrixConfig {
+    let agent = adapter_preset_label(Some(options.agent_preset))
+        .expect("adapter preset label")
+        .to_string();
     let target_agent = options.target_agent.unwrap_or_else(|| agent.clone());
     let base = public_matrix_agent_spec(
         "native",
@@ -3247,17 +3484,17 @@ fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
     head.pack = options.pack;
     head.pack_budget = options.pack.then(|| "brief".to_string());
 
-    let config = RunMatrixConfig {
-        suite: Some(suite_path),
+    RunMatrixConfig {
+        suite: Some(options.suite_path),
         repo: Some(options.repo),
-        out_dir: Some(out_dir),
+        out_dir: Some(options.out_dir),
         setup_commands: Vec::new(),
         baseline: base,
         heads: vec![head],
         keep_workdirs: None,
         fail_on_regression: Some(options.fail_on_regression),
         quality_gate: Some(RunMatrixQualityGateConfig {
-            min_task_count: Some(suite.tasks.len()),
+            min_task_count: Some(options.suite_task_count),
             ..RunMatrixQualityGateConfig::default()
         }),
         health_min_commits: Some(options.health_min_commits),
@@ -3267,11 +3504,7 @@ fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
             .health_fail_fast_success_commands
             .then_some(true),
         health_require_setup_commands: options.health_require_setup_commands.then_some(true),
-    };
-
-    write_json(&config, &options.out)?;
-    println!("wrote {}", options.out.display());
-    Ok(())
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3650,6 +3883,13 @@ fn default_public_matrix_out_dir(preset: PublicSuitePreset) -> PathBuf {
     PathBuf::from(format!(
         ".helmbench/{}-matrix",
         public_suite_preset_name(preset)
+    ))
+}
+
+fn default_agent_matrix_out_dir(suite: &helmbench::TaskSuite) -> PathBuf {
+    PathBuf::from(format!(
+        ".helmbench/{}-agent-matrix",
+        safe_task_dir_name(&suite.name)
     ))
 }
 
@@ -9263,6 +9503,109 @@ mod tests {
         assert_eq!(health.baseline_success_command_fail_count, 1);
         assert_eq!(health.baseline_success_command_pass_count, 0);
         assert_eq!(health.tasks_failed_setup_command.len(), 0);
+    }
+
+    #[test]
+    fn init_agent_matrix_config_accepts_git_regression_suite() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).expect("repo dir");
+        write_demo_file(&repo, "app.txt", "state=old\n").expect("old file");
+        init_git_repo(&repo).expect("initial commit");
+        write_demo_file(&repo, "app.txt", "state=fixed\n").expect("fixed file");
+        let add = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("add")
+            .arg(".")
+            .status()
+            .expect("git add");
+        assert!(add.success());
+        let commit = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("-c")
+            .arg("user.name=HelmBench")
+            .arg("-c")
+            .arg("user.email=helmbench@example.test")
+            .arg("commit")
+            .arg("--quiet")
+            .arg("-m")
+            .arg("Fix seeded app behavior")
+            .status()
+            .expect("git commit");
+        assert!(commit.success());
+        let head = git_output(&repo, &["rev-parse", "HEAD"]).expect("head");
+
+        let suite_path = temp.path().join("git-regressions.json");
+        write_json(
+            &git_regression_suite(&GitRegressionSuiteOptions {
+                repo: repo.clone(),
+                suite_out: suite_path.clone(),
+                health_out: None,
+                suite_name: Some("fixture-git-regressions".to_string()),
+                success_command: "grep -q fixed app.txt".to_string(),
+                commits: vec![head],
+                max_tasks: 10,
+                min_commits: 1,
+                allow_dirty_health: false,
+                check_success_commands: false,
+                fail_fast_success_commands: false,
+                timeout_seconds: 60,
+                force: false,
+            })
+            .expect("suite"),
+            &suite_path,
+        )
+        .expect("write suite");
+
+        let config_path = temp.path().join("agent-matrix.json");
+        let health_path = temp.path().join("agent-matrix-health.json");
+        let matrix_out = temp.path().join("agent-matrix-out");
+        init_agent_matrix_config(InitAgentMatrixOptions {
+            suite: suite_path.clone(),
+            repo: repo.clone(),
+            out: config_path.clone(),
+            out_dir: Some(matrix_out.clone()),
+            health_out: Some(health_path.clone()),
+            agent_preset: AdapterPreset::ClaudeCode,
+            agent_bin: Some(PathBuf::from("fake-claude")),
+            model: Some("sonnet".to_string()),
+            agent_args: vec!["--debug".to_string()],
+            dangerously_skip_permissions: true,
+            dangerously_bypass_approvals_and_sandbox: false,
+            ctxhelm_bin: PathBuf::from("fake-ctxhelm"),
+            mode: "bug-fix".to_string(),
+            target_agent: None,
+            pack: true,
+            fail_on_regression: true,
+            health_min_commits: 1,
+            allow_dirty_health: false,
+            health_check_success_commands: true,
+            health_fail_fast_success_commands: false,
+            health_require_setup_commands: true,
+            force: false,
+        })
+        .expect("agent matrix config");
+
+        let health = read_public_suite_health(&health_path).expect("health");
+        assert_eq!(health.evidence_use, SuiteEvidenceUse::OutcomeReady);
+        let raw = std::fs::read_to_string(&config_path).expect("config");
+        let config = serde_json::from_str::<RunMatrixConfig>(&raw).expect("parse config");
+        assert_eq!(config.suite.as_ref().expect("suite"), &suite_path);
+        assert_eq!(config.repo.as_ref().expect("repo"), &repo);
+        assert_eq!(config.out_dir.as_ref().expect("out dir"), &matrix_out);
+        assert_eq!(config.baseline.agent, "claude-code");
+        assert_eq!(config.baseline.variant, AgentVariant::Native);
+        assert_eq!(config.heads[0].variant, AgentVariant::CtxhelmMcp);
+        assert!(config.heads[0].ctxhelm);
+        assert!(config.heads[0].pack);
+        assert_eq!(config.health_check_success_commands, Some(true));
+        assert_eq!(config.health_require_setup_commands, Some(true));
+        assert_eq!(
+            config.quality_gate.expect("quality").min_task_count,
+            Some(1)
+        );
     }
 
     #[test]
