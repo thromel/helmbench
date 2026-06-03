@@ -19,8 +19,8 @@ This repository currently implements the core HelmBench workflow:
 - source-free trace schema
 - published JSON Schema contracts for task suites, agent events, traces, run
   reports, compare reports, benchmark summaries, quality gates, matrix
-  history, matrix manifests, autopsy reports, suite-health reports, evidence
-  bundles, and matrix privacy reports
+  history, matrix manifests, doctor reports, autopsy reports, suite-health
+  reports, evidence bundles, and matrix privacy reports
 - suite and trace validation
 - run report generation from trace JSON
 - report comparison

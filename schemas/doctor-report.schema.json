@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/doctor-report.schema.json",
+  "title": "HelmBench Doctor Report",
+  "description": "Source-free local readiness report for HelmBench prerequisites and optional agent integrations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "repoName",
+    "requiredChecks",
+    "optionalIntegrations",
+    "directRunners",
+    "observationModes",
+    "supportedVariants",
+    "privacy",
+    "ok"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "repoName": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[/\\\\]"
+      }
+    },
+    "requiredChecks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "optionalIntegrations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/integration"
+      }
+    },
+    "directRunners": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/directRunner"
+      }
+    },
+    "observationModes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/observationMode"
+      }
+    },
+    "supportedVariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/agentVariant"
+      }
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    },
+    "ok": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "agentVariant": {
+      "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "ok"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ok": {
+          "type": "boolean"
+        }
+      }
+    },
+    "integration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "command", "available", "versionHash"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "versionHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^version:[0-9a-f]{16}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "directRunner": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "command",
+        "available",
+        "isolatedClones",
+        "injectsSourceFreeEventContract",
+        "captureStreamSupported",
+        "suppressesRawOutputByDefault",
+        "unrestrictedFlag"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "isolatedClones": {
+          "const": true
+        },
+        "injectsSourceFreeEventContract": {
+          "const": true
+        },
+        "captureStreamSupported": {
+          "const": true
+        },
+        "suppressesRawOutputByDefault": {
+          "const": true
+        },
+        "unrestrictedFlag": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "observationMode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "sourceFree", "persistsRawStream", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceFree": {
+          "const": true
+        },
+        "persistsRawStream": {
+          "const": false
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}

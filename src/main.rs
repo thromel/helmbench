@@ -23,6 +23,7 @@ const RUN_MATRIX_PRIVACY_REPORT_SCHEMA_VERSION: u32 = 1;
 const MATRIX_HISTORY_SCHEMA_VERSION: u32 = 2;
 const SUITE_HEALTH_SCHEMA_VERSION: u32 = 1;
 const EVIDENCE_BUNDLE_SCHEMA_VERSION: u32 = 1;
+const DOCTOR_REPORT_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -498,6 +499,7 @@ enum SchemaKind {
     BenchmarkSummary,
     QualityGate,
     MatrixHistory,
+    DoctorReport,
     Autopsy,
     DiffAutopsy,
     SuiteHealth,
@@ -1294,6 +1296,7 @@ fn schema_contract(kind: SchemaKind) -> &'static str {
         SchemaKind::BenchmarkSummary => include_str!("../schemas/benchmark-summary.schema.json"),
         SchemaKind::QualityGate => include_str!("../schemas/quality-gate.schema.json"),
         SchemaKind::MatrixHistory => include_str!("../schemas/matrix-history.schema.json"),
+        SchemaKind::DoctorReport => include_str!("../schemas/doctor-report.schema.json"),
         SchemaKind::Autopsy => include_str!("../schemas/autopsy.schema.json"),
         SchemaKind::DiffAutopsy => include_str!("../schemas/diff-autopsy.schema.json"),
         SchemaKind::SuiteHealth => include_str!("../schemas/suite-health.schema.json"),
@@ -1465,7 +1468,7 @@ fn build_doctor_report(root: &Path) -> DoctorReport {
     let ok = required_checks.iter().all(|check| check.ok);
 
     DoctorReport {
-        schema_version: 1,
+        schema_version: DOCTOR_REPORT_SCHEMA_VERSION,
         repo_name: repo_name(root),
         required_checks,
         optional_integrations,
@@ -7063,6 +7066,7 @@ mod tests {
             (SchemaKind::BenchmarkSummary, "HelmBench Benchmark Summary"),
             (SchemaKind::QualityGate, "HelmBench Quality Gate"),
             (SchemaKind::MatrixHistory, "HelmBench Matrix History"),
+            (SchemaKind::DoctorReport, "HelmBench Doctor Report"),
             (SchemaKind::Autopsy, "HelmBench Autopsy"),
             (SchemaKind::DiffAutopsy, "HelmBench Diff Autopsy"),
             (SchemaKind::SuiteHealth, "HelmBench Suite Health"),
@@ -7111,6 +7115,12 @@ mod tests {
                 assert_eq!(
                     value["properties"]["schemaVersion"]["const"],
                     MATRIX_HISTORY_SCHEMA_VERSION
+                );
+            }
+            if matches!(kind, SchemaKind::DoctorReport) {
+                assert_eq!(
+                    value["properties"]["schemaVersion"]["const"],
+                    DOCTOR_REPORT_SCHEMA_VERSION
                 );
             }
             if matches!(kind, SchemaKind::Autopsy) {

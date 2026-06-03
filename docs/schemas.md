@@ -19,6 +19,8 @@ Available schema kinds:
   summary.
 - `matrix-history`: source-free longitudinal trend report for verified
   `run-matrix` outputs.
+- `doctor-report`: source-free local readiness report for required checks,
+  optional integrations, direct runners, observation modes, and privacy flags.
 - `autopsy`: source-free reviewer-style diagnosis generated from agent traces.
 - `diff-autopsy`: source-free reviewer-style diagnosis of changed paths against
   one benchmark task.
