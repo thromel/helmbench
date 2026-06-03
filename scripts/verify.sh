@@ -29,6 +29,11 @@ do
   grep -q "$target" .github/workflows/release.yml
   grep -q "$target" docs/install.md
 done
+test -f docs/launch-proof.md
+test -f docs/example-benchmark-summary.md
+grep -q 'HelmBench Launch Proof' docs/launch-proof.md
+grep -q 'Low sample size: 1 task' docs/example-benchmark-summary.md
+grep -q 'raw source' docs/launch-proof.md
 
 cargo fmt --check
 cargo test

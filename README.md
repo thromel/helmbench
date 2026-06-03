@@ -11,6 +11,19 @@ HelmBench is designed as a companion to `ctxhelm`:
 - `ctxhelm` improves agent context.
 - `HelmBench` proves whether that context helped.
 
+## Proof Snapshot
+
+The checked-in source-free smoke proof shows `ctxhelm_mcp` improving the
+example Claude Code run from `0.0%` to `100.0%` task success, reducing
+irrelevant reads from `75.0%` to `33.3%`, and cutting time to first relevant
+file from `2600 ms` to `600 ms`.
+
+See [HelmBench Launch Proof](docs/launch-proof.md) for the artifact-backed
+summary, dashboard, privacy contract, and regeneration commands. This is a
+1-task smoke proof with an explicit low-sample warning; larger public-suite
+proofs should use `run-matrix` on the RefactoringMiner, Flask, ripgrep, or
+Express presets.
+
 ## Current status
 
 This repository currently implements the core HelmBench workflow:
