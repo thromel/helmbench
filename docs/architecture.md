@@ -240,6 +240,20 @@ The Markdown, JSON, and static HTML reports intentionally do not echo absolute
 matrix paths. They use source-free sequence labels so a published history
 artifact can show trend evidence without leaking local checkout locations.
 
+## Launch Readiness
+
+`launch-readiness` turns existing source-free proof artifacts into an explicit
+status report. It reads a suite plus baseline/head reports, optionally verifies
+suite-health and run-matrix artifacts, and classifies the proof as
+`launch_ready`, `smoke_proof`, or `not_ready`.
+
+This report is intentionally conservative. Low task counts, missing
+outcome-health evidence, or absent verified matrices are warnings that keep the
+status at `smoke_proof`; privacy violations and broken matrix verification are
+hard failures. The JSON and Markdown outputs store artifact labels, counts,
+rates, statuses, and source-free privacy flags, not raw source, prompts,
+transcripts, terminal logs, or absolute checkout paths.
+
 ## Quality Gate
 
 `quality-gate` turns a benchmark summary into a CI decision. It reads a

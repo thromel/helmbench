@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/launch-readiness.schema.json",
+  "title": "HelmBench Launch Readiness",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteName",
+    "status",
+    "minTaskCount",
+    "minRealAgentRows",
+    "benchmark",
+    "artifacts",
+    "checks",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "suiteName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": ["launch_ready", "smoke_proof", "not_ready"]
+    },
+    "minTaskCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "minRealAgentRows": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "benchmark": {
+      "$ref": "#/$defs/benchmark"
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/artifact"
+      }
+    },
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "benchmark": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskCount",
+        "runCount",
+        "realAgentRunCount",
+        "lowSampleWarning",
+        "bestSuccessRate",
+        "bestValidationCoverageRate",
+        "bestRecommendationRecall",
+        "bestContextPrecision",
+        "bestEditedFileRecall"
+      ],
+      "properties": {
+        "taskCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "runCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "realAgentRunCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lowSampleWarning": {
+          "type": "boolean"
+        },
+        "bestSuccessRate": {
+          "type": "number"
+        },
+        "bestValidationCoverageRate": {
+          "type": "number"
+        },
+        "bestRecommendationRecall": {
+          "type": "number"
+        },
+        "bestContextPrecision": {
+          "type": "number"
+        },
+        "bestEditedFileRecall": {
+          "type": "number"
+        }
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "label", "sourceFree"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceFree": {
+          "type": "boolean"
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "status", "evidence", "detail"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": ["pass", "warn", "fail"]
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}

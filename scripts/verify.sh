@@ -30,11 +30,13 @@ do
   grep -q "$target" docs/install.md
 done
 test -f docs/launch-proof.md
+test -f docs/launch-readiness.md
 test -f docs/example-benchmark-summary.md
 test -f docs/refactoringminer-public-proof.md
 test -f docs/refactoringminer-ctxhelm-plan.md
 test -f docs/claude-real-smoke.md
 test -f reports/claude-real-smoke.json
+test -f reports/launch-readiness.json
 test -f reports/refactoringminer-suite-health.json
 test -f reports/refactoringminer-outcome-health.json
 test -f reports/refactoringminer-ctxhelm-plan.json
@@ -44,6 +46,9 @@ grep -q 'preset=claude-code' docs/run-matrix.md
 grep -q 'init-public-matrix' README.md
 grep -q 'init-public-matrix' docs/refactoringminer-public-proof.md
 grep -q 'HelmBench Launch Proof' docs/launch-proof.md
+grep -q 'Status: \*\*smoke_proof\*\*' docs/launch-readiness.md
+grep -q '"status": "smoke_proof"' reports/launch-readiness.json
+grep -q '"lowSampleWarning": true' reports/launch-readiness.json
 grep -q 'claude-real-smoke' docs/launch-proof.md
 grep -q 'claude-real-smoke' docs/direct-agent-runs.md
 grep -q 'Low sample size: 1 task' docs/example-benchmark-summary.md
@@ -76,6 +81,7 @@ cargo run -- matrix-history --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
 cargo run -- suite-health --help >/dev/null
 cargo run -- benchmark-summary --help >/dev/null
+cargo run -- launch-readiness --help >/dev/null
 cargo run -- evidence-bundle --help >/dev/null
 cargo run -- verify-bundle --help >/dev/null
 cargo run -- verify-matrix --help >/dev/null
@@ -95,6 +101,7 @@ cargo run -- schema --kind agent-event --out "$TMP_DIR/agent-event.schema.json"
 cargo run -- schema --kind run-report --out "$TMP_DIR/run-report.schema.json"
 cargo run -- schema --kind compare-report --out "$TMP_DIR/compare-report.schema.json"
 cargo run -- schema --kind benchmark-summary --out "$TMP_DIR/benchmark-summary.schema.json"
+cargo run -- schema --kind launch-readiness --out "$TMP_DIR/launch-readiness.schema.json"
 cargo run -- schema --kind quality-gate --out "$TMP_DIR/quality-gate.schema.json"
 cargo run -- schema --kind run-matrix-config --out "$TMP_DIR/run-matrix-config.schema.json"
 cargo run -- schema --kind matrix-history --out "$TMP_DIR/matrix-history.schema.json"
@@ -113,6 +120,8 @@ grep -q '"title": "HelmBench Agent Event"' "$TMP_DIR/agent-event.schema.json"
 grep -q '"title": "HelmBench Run Report"' "$TMP_DIR/run-report.schema.json"
 grep -q '"title": "HelmBench Compare Report"' "$TMP_DIR/compare-report.schema.json"
 grep -q '"title": "HelmBench Benchmark Summary"' "$TMP_DIR/benchmark-summary.schema.json"
+grep -q '"title": "HelmBench Launch Readiness"' "$TMP_DIR/launch-readiness.schema.json"
+grep -q '"smoke_proof"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"title": "HelmBench Quality Gate"' "$TMP_DIR/quality-gate.schema.json"
 grep -q '"title": "HelmBench Run Matrix Config"' "$TMP_DIR/run-matrix-config.schema.json"
 grep -q '"adapterPreset"' "$TMP_DIR/run-matrix-config.schema.json"
@@ -135,9 +144,10 @@ grep -q '"adapterPreset"' "$TMP_DIR/run-matrix-manifest.schema.json"
 grep -q '"suiteEvidenceUse"' "$TMP_DIR/run-matrix-manifest.schema.json"
 grep -q '"title": "HelmBench Run Matrix Privacy Report"' "$TMP_DIR/run-matrix-privacy-report.schema.json"
 test -f "$TMP_DIR/all-schemas/task-suite.schema.json"
+test -f "$TMP_DIR/all-schemas/launch-readiness.schema.json"
 test -f "$TMP_DIR/all-schemas/run-matrix-privacy-report.schema.json"
 SCHEMA_COUNT="$(find "$TMP_DIR/all-schemas" -type f -name '*.schema.json' | wc -l | tr -d ' ')"
-test "$SCHEMA_COUNT" = "16"
+test "$SCHEMA_COUNT" = "17"
 
 cargo run -- init-demo-repo \
   --repo-out "$TMP_DIR/demo-repo" \
@@ -322,6 +332,25 @@ cargo run -- benchmark-summary \
   --head reports/example-claude-code.json \
   --out "$TMP_DIR/benchmark-summary.json" \
   --format json
+
+cargo run -- launch-readiness \
+  --suite suites/example-auth-bugs.json \
+  --base-report reports/example-native.json \
+  --head-report reports/example-ctxhelm.json \
+  --head-report reports/example-claude-code.json \
+  --out "$TMP_DIR/launch-readiness.md" \
+  --format markdown
+
+cargo run -- launch-readiness \
+  --suite suites/example-auth-bugs.json \
+  --base-report reports/example-native.json \
+  --head-report reports/example-ctxhelm.json \
+  --head-report reports/example-claude-code.json \
+  --out "$TMP_DIR/launch-readiness.json" \
+  --format json
+grep -q 'Status: \*\*smoke_proof\*\*' "$TMP_DIR/launch-readiness.md"
+grep -q '"status": "smoke_proof"' "$TMP_DIR/launch-readiness.json"
+grep -q '"sourceFree": true' "$TMP_DIR/launch-readiness.json"
 
 cargo run -- quality-gate \
   --summary "$TMP_DIR/benchmark-summary.json" \

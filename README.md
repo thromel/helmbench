@@ -18,11 +18,13 @@ example Claude Code run from `0.0%` to `100.0%` task success, reducing
 irrelevant reads from `75.0%` to `33.3%`, and cutting time to first relevant
 file from `2600 ms` to `600 ms`.
 
-See [HelmBench Launch Proof](docs/launch-proof.md) for the artifact-backed
-summary, dashboard, privacy contract, and regeneration commands. This is a
-1-task smoke proof with an explicit low-sample warning; larger public-suite
-proofs should use `run-matrix` on the RefactoringMiner, Flask, ripgrep, or
-Express presets.
+See [HelmBench Launch Proof](docs/launch-proof.md) and the generated
+[Launch Readiness](docs/launch-readiness.md) report for the artifact-backed
+summary, dashboard, privacy contract, and regeneration commands. The current
+readiness status is `smoke_proof`: it is a 1-task proof with explicit warnings
+for the missing 10-task outcome matrix and matching outcome-health evidence.
+Larger public-suite proofs should use `run-matrix` on the RefactoringMiner,
+Flask, ripgrep, or Express presets.
 
 The checked-in [RefactoringMiner public recommendation proof](docs/refactoringminer-public-proof.md)
 runs `ctxhelm prepare-task` over a healthy 10-task public suite and records
@@ -44,8 +46,9 @@ This repository currently implements the core HelmBench workflow:
 - source-free trace schema
 - published JSON Schema contracts for task suites, agent events, traces, run
   reports, compare reports, benchmark summaries, quality gates, matrix
-  configs, matrix history, matrix manifests, doctor reports, autopsy reports,
-  suite-health reports, evidence bundles, and matrix privacy reports
+  configs, matrix history, matrix manifests, launch-readiness reports, doctor
+  reports, autopsy reports, suite-health reports, evidence bundles, and matrix
+  privacy reports
 - suite and trace validation
 - run report generation from trace JSON
 - report comparison
@@ -87,6 +90,8 @@ This repository currently implements the core HelmBench workflow:
   local adapter variants and emits reports, comparisons, dashboard, quality
   gate, suite-health, per-run autopsies, privacy report, reproduction guide,
   evidence bundle artifacts, and source-free reproducibility provenance
+- `launch-readiness` report that classifies checked-in proof artifacts as
+  `launch_ready`, `smoke_proof`, or `not_ready` without storing source
 - first-class `run-matrix` row presets for Claude Code and Codex, so real
   agent matrices can inject the source-free event contract without hand-written
   adapter commands
@@ -713,6 +718,7 @@ helmbench-cli
   record-event
   compare
   benchmark-summary
+  launch-readiness
   matrix-history
   quality-gate
   evidence-bundle

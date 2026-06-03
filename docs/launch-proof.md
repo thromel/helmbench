@@ -21,7 +21,10 @@ HelmBench can compare coding-agent behavior across variants and report:
 The current checked-in proof is intentionally small: `1` task from
 `suites/example-auth-bugs.json`. Treat the deltas as a directional smoke proof,
 not a statistically powered benchmark. The generated summary records the same
-low-sample warning.
+low-sample warning. The generated
+[launch-readiness report](launch-readiness.md) classifies the current checked-in
+proof as `smoke_proof`, with explicit warnings for the missing 10-task outcome
+matrix and matching outcome-health evidence.
 
 HelmBench also includes a real direct-agent smoke run over
 `suites/local-run-smoke.json`. That proof launches Claude Code through
@@ -69,6 +72,9 @@ Best checked-in ctxhelm-guided row: `claude-code / ctxhelm_mcp`
 - Static dashboard: [`docs/example-dashboard.html`](example-dashboard.html)
 - Comparison report: [`docs/example-compare.md`](example-compare.md)
 - Autopsy report: [`docs/example-autopsy.md`](example-autopsy.md)
+- Launch readiness Markdown: [`docs/launch-readiness.md`](launch-readiness.md)
+- Launch readiness JSON:
+  [`reports/launch-readiness.json`](../reports/launch-readiness.json)
 
 ## Regenerate
 
@@ -85,6 +91,22 @@ cargo run -- dashboard \
   --report reports/example-ctxhelm.json \
   --report reports/example-claude-code.json \
   --out docs/example-dashboard.html
+
+cargo run -- launch-readiness \
+  --suite suites/example-auth-bugs.json \
+  --base-report reports/example-native.json \
+  --head-report reports/example-ctxhelm.json \
+  --head-report reports/example-claude-code.json \
+  --out docs/launch-readiness.md \
+  --format markdown
+
+cargo run -- launch-readiness \
+  --suite suites/example-auth-bugs.json \
+  --base-report reports/example-native.json \
+  --head-report reports/example-ctxhelm.json \
+  --head-report reports/example-claude-code.json \
+  --out reports/launch-readiness.json \
+  --format json
 
 ./scripts/verify.sh
 ```

@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "suiteName": "example-auth-bugs",
+  "status": "smoke_proof",
+  "minTaskCount": 10,
+  "minRealAgentRows": 1,
+  "benchmark": {
+    "taskCount": 1,
+    "runCount": 3,
+    "realAgentRunCount": 3,
+    "lowSampleWarning": true,
+    "bestSuccessRate": 1.0,
+    "bestValidationCoverageRate": 1.0,
+    "bestRecommendationRecall": 1.0,
+    "bestContextPrecision": 0.5,
+    "bestEditedFileRecall": 1.0
+  },
+  "artifacts": [
+    {
+      "kind": "suite",
+      "label": "suite:ea0afd9fc6dc6762",
+      "sourceFree": true
+    },
+    {
+      "kind": "base_report",
+      "label": "base_report:5f76f396d2220151",
+      "sourceFree": true
+    },
+    {
+      "kind": "head_report",
+      "label": "head_report:7ccc8f4cb3498567",
+      "sourceFree": true
+    },
+    {
+      "kind": "head_report",
+      "label": "head_report:03339f5e8144cbb4",
+      "sourceFree": true
+    }
+  ],
+  "checks": [
+    {
+      "name": "suite contract",
+      "status": "pass",
+      "evidence": "suite",
+      "detail": "suite `example-auth-bugs` validates with 1 task(s)"
+    },
+    {
+      "name": "source-free reports",
+      "status": "pass",
+      "evidence": "run_reports",
+      "detail": "3 report(s) accepted by benchmark-summary"
+    },
+    {
+      "name": "recommended task count",
+      "status": "warn",
+      "evidence": "benchmark_summary",
+      "detail": "1 task(s) observed; launch target is 10"
+    },
+    {
+      "name": "real-agent rows",
+      "status": "pass",
+      "evidence": "benchmark_summary",
+      "detail": "3 real-agent row(s) observed; launch target is 1"
+    },
+    {
+      "name": "outcome-health evidence",
+      "status": "warn",
+      "evidence": "suite_health",
+      "detail": "no matching suite-health artifact was supplied"
+    },
+    {
+      "name": "verified run matrix",
+      "status": "warn",
+      "evidence": "run_matrix",
+      "detail": "no verified run-matrix artifact was supplied"
+    },
+    {
+      "name": "privacy boundary",
+      "status": "pass",
+      "evidence": "privacy",
+      "detail": "artifacts store paths, counts, statuses, hashes, and source-free flags only"
+    }
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

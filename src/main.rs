@@ -24,6 +24,7 @@ const MATRIX_HISTORY_SCHEMA_VERSION: u32 = 2;
 const SUITE_HEALTH_SCHEMA_VERSION: u32 = 1;
 const EVIDENCE_BUNDLE_SCHEMA_VERSION: u32 = 1;
 const DOCTOR_REPORT_SCHEMA_VERSION: u32 = 1;
+const LAUNCH_READINESS_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -435,6 +436,27 @@ enum Command {
         #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
         format: OutputFormat,
     },
+    /// Summarize whether source-free artifacts are launch-ready or still smoke proof.
+    LaunchReadiness {
+        #[arg(long)]
+        suite: PathBuf,
+        #[arg(long)]
+        base_report: PathBuf,
+        #[arg(long, required = true)]
+        head_report: Vec<PathBuf>,
+        #[arg(long)]
+        health: Vec<PathBuf>,
+        #[arg(long)]
+        matrix: Vec<PathBuf>,
+        #[arg(long, default_value_t = helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS)]
+        min_task_count: usize,
+        #[arg(long, default_value_t = 1)]
+        min_real_agent_rows: usize,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
+        format: OutputFormat,
+    },
     /// Build a source-free evidence bundle from suite, health, and run reports.
     EvidenceBundle {
         #[arg(long)]
@@ -564,6 +586,7 @@ enum SchemaKind {
     RunReport,
     CompareReport,
     BenchmarkSummary,
+    LaunchReadiness,
     QualityGate,
     RunMatrixConfig,
     MatrixHistory,
@@ -1280,6 +1303,34 @@ fn main() -> Result<()> {
             }
             println!("wrote {}", out.display());
         }
+        Command::LaunchReadiness {
+            suite,
+            base_report,
+            head_report,
+            health,
+            matrix,
+            min_task_count,
+            min_real_agent_rows,
+            out,
+            format,
+        } => {
+            let report = build_launch_readiness_report(
+                &suite,
+                &base_report,
+                &head_report,
+                &health,
+                &matrix,
+                min_task_count,
+                min_real_agent_rows,
+            )?;
+            match format {
+                OutputFormat::Json => write_json(&report, &out)?,
+                OutputFormat::Markdown => {
+                    write_text(&render_markdown_launch_readiness(&report), &out)?
+                }
+            }
+            println!("wrote {}", out.display());
+        }
         Command::EvidenceBundle {
             suite,
             health,
@@ -1458,6 +1509,7 @@ fn schema_contract(kind: SchemaKind) -> &'static str {
         SchemaKind::RunReport => include_str!("../schemas/run-report.schema.json"),
         SchemaKind::CompareReport => include_str!("../schemas/compare-report.schema.json"),
         SchemaKind::BenchmarkSummary => include_str!("../schemas/benchmark-summary.schema.json"),
+        SchemaKind::LaunchReadiness => include_str!("../schemas/launch-readiness.schema.json"),
         SchemaKind::QualityGate => include_str!("../schemas/quality-gate.schema.json"),
         SchemaKind::RunMatrixConfig => include_str!("../schemas/run-matrix-config.schema.json"),
         SchemaKind::MatrixHistory => include_str!("../schemas/matrix-history.schema.json"),
@@ -1483,6 +1535,7 @@ fn all_schema_kinds() -> &'static [SchemaKind] {
         SchemaKind::RunReport,
         SchemaKind::CompareReport,
         SchemaKind::BenchmarkSummary,
+        SchemaKind::LaunchReadiness,
         SchemaKind::QualityGate,
         SchemaKind::RunMatrixConfig,
         SchemaKind::MatrixHistory,
@@ -1504,6 +1557,7 @@ fn schema_contract_filename(kind: SchemaKind) -> &'static str {
         SchemaKind::RunReport => "run-report.schema.json",
         SchemaKind::CompareReport => "compare-report.schema.json",
         SchemaKind::BenchmarkSummary => "benchmark-summary.schema.json",
+        SchemaKind::LaunchReadiness => "launch-readiness.schema.json",
         SchemaKind::QualityGate => "quality-gate.schema.json",
         SchemaKind::RunMatrixConfig => "run-matrix-config.schema.json",
         SchemaKind::MatrixHistory => "matrix-history.schema.json",
@@ -1798,6 +1852,409 @@ fn render_markdown_doctor_report(root: &Path, report: &DoctorReport) -> String {
     out.push_str("- Raw transcripts logged: `false`\n");
     out.push_str("- Raw terminal logs logged: `false`\n");
     out
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LaunchReadinessReport {
+    schema_version: u32,
+    suite_name: String,
+    status: LaunchReadinessStatus,
+    min_task_count: usize,
+    min_real_agent_rows: usize,
+    benchmark: LaunchReadinessBenchmark,
+    artifacts: Vec<LaunchReadinessArtifact>,
+    checks: Vec<LaunchReadinessCheck>,
+    privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum LaunchReadinessStatus {
+    LaunchReady,
+    SmokeProof,
+    NotReady,
+}
+
+impl std::fmt::Display for LaunchReadinessStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LaunchReady => write!(f, "launch_ready"),
+            Self::SmokeProof => write!(f, "smoke_proof"),
+            Self::NotReady => write!(f, "not_ready"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum LaunchReadinessCheckStatus {
+    Pass,
+    Warn,
+    Fail,
+}
+
+impl std::fmt::Display for LaunchReadinessCheckStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Pass => write!(f, "pass"),
+            Self::Warn => write!(f, "warn"),
+            Self::Fail => write!(f, "fail"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LaunchReadinessCheck {
+    name: String,
+    status: LaunchReadinessCheckStatus,
+    evidence: String,
+    detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LaunchReadinessArtifact {
+    kind: String,
+    label: String,
+    source_free: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LaunchReadinessBenchmark {
+    task_count: usize,
+    run_count: usize,
+    real_agent_run_count: usize,
+    low_sample_warning: bool,
+    best_success_rate: f32,
+    best_validation_coverage_rate: f32,
+    best_recommendation_recall: f32,
+    best_context_precision: f32,
+    best_edited_file_recall: f32,
+}
+
+fn build_launch_readiness_report(
+    suite_path: &Path,
+    base_report_path: &Path,
+    head_report_paths: &[PathBuf],
+    health_paths: &[PathBuf],
+    matrix_paths: &[PathBuf],
+    min_task_count: usize,
+    min_real_agent_rows: usize,
+) -> Result<LaunchReadinessReport> {
+    let suite = load_suite(suite_path)?;
+    validate_suite(&suite)?;
+
+    let base_report = read_report(base_report_path)?;
+    let head_reports = head_report_paths
+        .iter()
+        .map(|path| read_report(path))
+        .collect::<Result<Vec<_>>>()?;
+    let summary = build_benchmark_summary(&base_report, &head_reports)?;
+
+    let mut artifacts = vec![launch_artifact("suite", suite_path)];
+    artifacts.push(launch_artifact("base_report", base_report_path));
+    artifacts.extend(
+        head_report_paths
+            .iter()
+            .map(|path| launch_artifact("head_report", path)),
+    );
+
+    let mut checks = Vec::new();
+    checks.push(launch_check(
+        "suite contract",
+        LaunchReadinessCheckStatus::Pass,
+        "suite".to_string(),
+        format!(
+            "suite `{}` validates with {} task(s)",
+            suite.name,
+            suite.tasks.len()
+        ),
+    ));
+    checks.push(launch_check(
+        "source-free reports",
+        LaunchReadinessCheckStatus::Pass,
+        "run_reports".to_string(),
+        format!(
+            "{} report(s) accepted by benchmark-summary",
+            summary.runs.len()
+        ),
+    ));
+
+    let real_agent_run_count = summary
+        .runs
+        .iter()
+        .filter(|run| launch_agent_label_is_real(&run.agent))
+        .count();
+    let best = summary
+        .runs
+        .iter()
+        .max_by(|left, right| {
+            left.success_rate
+                .partial_cmp(&right.success_rate)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| {
+                    left.validation_coverage_rate
+                        .partial_cmp(&right.validation_coverage_rate)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
+        })
+        .context("benchmark summary has no runs")?;
+
+    checks.push(launch_check(
+        "recommended task count",
+        if summary.confidence.task_count >= min_task_count {
+            LaunchReadinessCheckStatus::Pass
+        } else {
+            LaunchReadinessCheckStatus::Warn
+        },
+        "benchmark_summary".to_string(),
+        format!(
+            "{} task(s) observed; launch target is {}",
+            summary.confidence.task_count, min_task_count
+        ),
+    ));
+    checks.push(launch_check(
+        "real-agent rows",
+        if real_agent_run_count >= min_real_agent_rows {
+            LaunchReadinessCheckStatus::Pass
+        } else {
+            LaunchReadinessCheckStatus::Warn
+        },
+        "benchmark_summary".to_string(),
+        format!(
+            "{} real-agent row(s) observed; launch target is {}",
+            real_agent_run_count, min_real_agent_rows
+        ),
+    ));
+
+    let mut matching_health = Vec::new();
+    for path in health_paths {
+        let health = read_public_suite_health(path)?;
+        validate_public_suite_health_report(&health)?;
+        if !privacy_status_is_source_free(&health.privacy) {
+            anyhow::bail!("launch readiness health artifact is not source-free");
+        }
+        artifacts.push(launch_artifact("health", path));
+        if health.suite_name == suite.name {
+            matching_health.push(health);
+        }
+    }
+    let health_status = if matching_health.is_empty() {
+        LaunchReadinessCheckStatus::Warn
+    } else if matching_health
+        .iter()
+        .any(|health| health.evidence_use == SuiteEvidenceUse::Unhealthy || !health.ok)
+    {
+        LaunchReadinessCheckStatus::Fail
+    } else if matching_health
+        .iter()
+        .any(|health| health.evidence_use == SuiteEvidenceUse::OutcomeReady)
+    {
+        LaunchReadinessCheckStatus::Pass
+    } else {
+        LaunchReadinessCheckStatus::Warn
+    };
+    let health_detail = if matching_health.is_empty() {
+        "no matching suite-health artifact was supplied".to_string()
+    } else {
+        let uses = matching_health
+            .iter()
+            .map(|health| health.evidence_use.to_string())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!("matching suite-health evidenceUse: {uses}")
+    };
+    checks.push(launch_check(
+        "outcome-health evidence",
+        health_status,
+        "suite_health".to_string(),
+        health_detail,
+    ));
+
+    let mut verified_matrices = 0usize;
+    let mut matrix_failures = 0usize;
+    for path in matrix_paths {
+        match verify_run_matrix(path) {
+            Ok(manifest) => {
+                verified_matrices += 1;
+                artifacts.push(launch_artifact("matrix", path));
+                artifacts.push(LaunchReadinessArtifact {
+                    kind: "matrix_evidence_use".to_string(),
+                    label: manifest.suite_evidence_use.to_string(),
+                    source_free: true,
+                });
+            }
+            Err(_) => {
+                matrix_failures += 1;
+                artifacts.push(launch_artifact("matrix", path));
+            }
+        }
+    }
+    checks.push(launch_check(
+        "verified run matrix",
+        if matrix_failures > 0 {
+            LaunchReadinessCheckStatus::Fail
+        } else if verified_matrices > 0 {
+            LaunchReadinessCheckStatus::Pass
+        } else {
+            LaunchReadinessCheckStatus::Warn
+        },
+        "run_matrix".to_string(),
+        if verified_matrices > 0 || matrix_failures > 0 {
+            format!("{verified_matrices} verified matrix output(s), {matrix_failures} failure(s)")
+        } else {
+            "no verified run-matrix artifact was supplied".to_string()
+        },
+    ));
+
+    checks.push(launch_check(
+        "privacy boundary",
+        LaunchReadinessCheckStatus::Pass,
+        "privacy".to_string(),
+        "artifacts store paths, counts, statuses, hashes, and source-free flags only".to_string(),
+    ));
+
+    let status = if checks
+        .iter()
+        .any(|check| check.status == LaunchReadinessCheckStatus::Fail)
+    {
+        LaunchReadinessStatus::NotReady
+    } else if checks
+        .iter()
+        .any(|check| check.status == LaunchReadinessCheckStatus::Warn)
+    {
+        LaunchReadinessStatus::SmokeProof
+    } else {
+        LaunchReadinessStatus::LaunchReady
+    };
+
+    Ok(LaunchReadinessReport {
+        schema_version: LAUNCH_READINESS_SCHEMA_VERSION,
+        suite_name: suite.name,
+        status,
+        min_task_count,
+        min_real_agent_rows,
+        benchmark: LaunchReadinessBenchmark {
+            task_count: summary.confidence.task_count,
+            run_count: summary.runs.len(),
+            real_agent_run_count,
+            low_sample_warning: summary.confidence.low_sample_warning,
+            best_success_rate: best.success_rate,
+            best_validation_coverage_rate: best.validation_coverage_rate,
+            best_recommendation_recall: best.recommendation_recall,
+            best_context_precision: best.context_precision,
+            best_edited_file_recall: best.edited_file_recall,
+        },
+        artifacts,
+        checks,
+        privacy: PrivacyStatus::source_free(),
+    })
+}
+
+fn render_markdown_launch_readiness(report: &LaunchReadinessReport) -> String {
+    let mut out = String::new();
+    out.push_str("# HelmBench Launch Readiness\n\n");
+    out.push_str(&format!("Suite: `{}`\n\n", report.suite_name));
+    out.push_str(&format!("Status: **{}**\n\n", report.status));
+
+    out.push_str("## Benchmark\n\n");
+    out.push_str("| Metric | Value |\n");
+    out.push_str("| --- | ---: |\n");
+    out.push_str(&format!("| Tasks | {} |\n", report.benchmark.task_count));
+    out.push_str(&format!("| Runs | {} |\n", report.benchmark.run_count));
+    out.push_str(&format!(
+        "| Real-agent rows | {} |\n",
+        report.benchmark.real_agent_run_count
+    ));
+    out.push_str(&format!(
+        "| Best success rate | {} |\n",
+        launch_pct(report.benchmark.best_success_rate)
+    ));
+    out.push_str(&format!(
+        "| Best validation coverage | {} |\n",
+        launch_pct(report.benchmark.best_validation_coverage_rate)
+    ));
+    out.push_str(&format!(
+        "| Best recommendation recall | {} |\n",
+        launch_pct(report.benchmark.best_recommendation_recall)
+    ));
+    out.push_str(&format!(
+        "| Best context precision | {} |\n",
+        launch_pct(report.benchmark.best_context_precision)
+    ));
+    out.push_str(&format!(
+        "| Best edited-file recall | {} |\n",
+        launch_pct(report.benchmark.best_edited_file_recall)
+    ));
+
+    out.push_str("\n## Checks\n\n");
+    out.push_str("| Check | Status | Detail |\n");
+    out.push_str("| --- | --- | --- |\n");
+    for check in &report.checks {
+        out.push_str(&format!(
+            "| {} | `{}` | {} |\n",
+            check.name, check.status, check.detail
+        ));
+    }
+
+    out.push_str("\n## Artifacts\n\n");
+    out.push_str("| Kind | Label | Source-free |\n");
+    out.push_str("| --- | --- | --- |\n");
+    for artifact in &report.artifacts {
+        out.push_str(&format!(
+            "| `{}` | `{}` | {} |\n",
+            artifact.kind,
+            artifact.label,
+            yes_no(artifact.source_free)
+        ));
+    }
+
+    out.push_str("\n## Privacy\n\n");
+    out.push_str("- Source-free: `true`\n");
+    out.push_str("- Raw source logged: `false`\n");
+    out.push_str("- Raw prompts logged: `false`\n");
+    out.push_str("- Raw transcripts logged: `false`\n");
+    out.push_str("- Raw terminal logs logged: `false`\n");
+    out
+}
+
+fn launch_check(
+    name: &str,
+    status: LaunchReadinessCheckStatus,
+    evidence: String,
+    detail: String,
+) -> LaunchReadinessCheck {
+    LaunchReadinessCheck {
+        name: name.to_string(),
+        status,
+        evidence,
+        detail,
+    }
+}
+
+fn launch_artifact(kind: &str, path: &Path) -> LaunchReadinessArtifact {
+    LaunchReadinessArtifact {
+        kind: kind.to_string(),
+        label: source_free_hash(kind, &path.display().to_string()),
+        source_free: true,
+    }
+}
+
+fn launch_agent_label_is_real(agent: &str) -> bool {
+    let normalized = agent.to_ascii_lowercase();
+    matches!(
+        normalized.as_str(),
+        "claude-code" | "claude" | "codex" | "cursor" | "devin" | "copilot"
+    )
+}
+
+fn launch_pct(value: f32) -> String {
+    format!("{:.1}%", value * 100.0)
 }
 
 fn repo_name(root: &Path) -> String {
@@ -8416,6 +8873,7 @@ mod tests {
             (SchemaKind::RunReport, "HelmBench Run Report"),
             (SchemaKind::CompareReport, "HelmBench Compare Report"),
             (SchemaKind::BenchmarkSummary, "HelmBench Benchmark Summary"),
+            (SchemaKind::LaunchReadiness, "HelmBench Launch Readiness"),
             (SchemaKind::QualityGate, "HelmBench Quality Gate"),
             (SchemaKind::RunMatrixConfig, "HelmBench Run Matrix Config"),
             (SchemaKind::MatrixHistory, "HelmBench Matrix History"),
@@ -8456,6 +8914,12 @@ mod tests {
                 assert_eq!(
                     value["properties"]["schemaVersion"]["const"],
                     helmbench::BENCHMARK_SUMMARY_SCHEMA_VERSION
+                );
+            }
+            if matches!(kind, SchemaKind::LaunchReadiness) {
+                assert_eq!(
+                    value["properties"]["schemaVersion"]["const"],
+                    LAUNCH_READINESS_SCHEMA_VERSION
                 );
             }
             if matches!(kind, SchemaKind::QualityGate) {
@@ -9347,6 +9811,45 @@ mod tests {
         let json = serde_json::to_string(&report).expect("json");
         assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));
         assert!(!json.contains("rawTranscriptLogged\":true"));
+    }
+
+    #[test]
+    fn launch_readiness_report_classifies_checked_in_smoke_proof_source_free() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let report = build_launch_readiness_report(
+            &root.join("suites/example-auth-bugs.json"),
+            &root.join("reports/example-native.json"),
+            &[root.join("reports/example-ctxhelm.json")],
+            &[],
+            &[],
+            helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS,
+            2,
+        )
+        .expect("launch readiness");
+
+        assert_eq!(report.schema_version, LAUNCH_READINESS_SCHEMA_VERSION);
+        assert_eq!(report.suite_name, "example-auth-bugs");
+        assert_eq!(report.status, LaunchReadinessStatus::SmokeProof);
+        assert_eq!(report.benchmark.task_count, 1);
+        assert_eq!(report.benchmark.real_agent_run_count, 2);
+        assert!(report.benchmark.low_sample_warning);
+        assert!(report.privacy.source_free);
+        assert!(report.checks.iter().any(|check| {
+            check.name == "recommended task count"
+                && check.status == LaunchReadinessCheckStatus::Warn
+        }));
+        assert!(report.checks.iter().any(|check| {
+            check.name == "verified run matrix" && check.status == LaunchReadinessCheckStatus::Warn
+        }));
+
+        let rendered = render_markdown_launch_readiness(&report);
+        assert!(rendered.contains("Status: **smoke_proof**"));
+        assert!(rendered.contains("Best success rate"));
+
+        let json = serde_json::to_string(&report).expect("json");
+        assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));
+        assert!(!json.contains("rawSourceLogged\":true"));
+        assert!(json.contains("\"sourceFree\":true"));
     }
 
     #[test]
