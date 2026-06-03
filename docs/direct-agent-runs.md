@@ -42,6 +42,11 @@ helmbench claude-run \
   --out-dir traces/claude-run
 ```
 
+A checked-in source-free smoke artifact from this flow is available at
+[`reports/claude-real-smoke.json`](../reports/claude-real-smoke.json), with a
+Markdown rendering at [`docs/claude-real-smoke.md`](claude-real-smoke.md). It is
+an observed one-task launch proof, not a statistically meaningful benchmark.
+
 Options:
 
 - `--claude-bin`: path to the Claude Code CLI.

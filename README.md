@@ -28,6 +28,11 @@ The checked-in [RefactoringMiner public recommendation proof](docs/refactoringmi
 runs `ctxhelm prepare-task` over a healthy 10-task public suite and records
 `61.3%` average recommendation recall with source-free artifacts.
 
+The checked-in [real Claude Code smoke report](docs/claude-real-smoke.md)
+launches Claude Code through `claude-run` on the local smoke suite and records
+`100.0%` task success with one relevant file read, zero irrelevant reads, and
+source-free privacy flags.
+
 ## Current status
 
 This repository currently implements the core HelmBench workflow:
@@ -52,6 +57,9 @@ This repository currently implements the core HelmBench workflow:
   trace JSON
 - `claude-run` and `codex-run` launch presets that run agents non-interactively
   inside isolated clones using the same source-free event contract
+- checked-in real Claude Code smoke proof generated through the direct launch
+  preset, with raw stdout/stderr suppressed and only source-free telemetry
+  persisted
 - `stream-trace` importer that converts structured Claude/Codex-style JSONL
   tool streams into source-free traces without storing command text or tool
   payloads

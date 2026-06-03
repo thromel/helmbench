@@ -5,7 +5,7 @@
   "tasks": [
     {
       "id": "demo-auth-001",
-      "prompt": "Fix the demo auth redirect fixture.",
+      "prompt": "Fix the demo auth redirect fixture by inspecting examples/demo-app/auth.txt and updating the fixture so it contains the word fixed.",
       "expectedFiles": [
         "examples/demo-app/auth.txt"
       ],

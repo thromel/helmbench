@@ -23,6 +23,12 @@ The current checked-in proof is intentionally small: `1` task from
 not a statistically powered benchmark. The generated summary records the same
 low-sample warning.
 
+HelmBench also includes a real direct-agent smoke run over
+`suites/local-run-smoke.json`. That proof launches Claude Code through
+`claude-run`, suppresses raw stdout/stderr, records only source-free telemetry,
+infers edits from git status, and validates the isolated clone after the agent
+exits.
+
 ## Current Source-Free Result
 
 Baseline: `claude-code / native`
@@ -49,6 +55,10 @@ Best checked-in ctxhelm-guided row: `claude-code / ctxhelm_mcp`
   [`reports/example-ctxhelm.json`](../reports/example-ctxhelm.json)
 - Claude Code event-import report:
   [`reports/example-claude-code.json`](../reports/example-claude-code.json)
+- Real Claude Code smoke report:
+  [`reports/claude-real-smoke.json`](../reports/claude-real-smoke.json)
+- Real Claude Code smoke Markdown:
+  [`docs/claude-real-smoke.md`](claude-real-smoke.md)
 - Generated benchmark summary:
   [`docs/example-benchmark-summary.md`](example-benchmark-summary.md)
 - Static dashboard: [`docs/example-dashboard.html`](example-dashboard.html)

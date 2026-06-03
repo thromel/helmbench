@@ -33,6 +33,8 @@ test -f docs/launch-proof.md
 test -f docs/example-benchmark-summary.md
 test -f docs/refactoringminer-public-proof.md
 test -f docs/refactoringminer-ctxhelm-plan.md
+test -f docs/claude-real-smoke.md
+test -f reports/claude-real-smoke.json
 test -f reports/refactoringminer-suite-health.json
 test -f reports/refactoringminer-ctxhelm-plan.json
 test -f suites/refactoring-miner-public.json
@@ -41,8 +43,13 @@ grep -q 'preset=claude-code' docs/run-matrix.md
 grep -q 'init-public-matrix' README.md
 grep -q 'init-public-matrix' docs/refactoringminer-public-proof.md
 grep -q 'HelmBench Launch Proof' docs/launch-proof.md
+grep -q 'claude-real-smoke' docs/launch-proof.md
+grep -q 'claude-real-smoke' docs/direct-agent-runs.md
 grep -q 'Low sample size: 1 task' docs/example-benchmark-summary.md
 grep -q 'raw source' docs/launch-proof.md
+grep -q '"successRate": 1.0' reports/claude-real-smoke.json
+grep -q '"sourceFree": true' reports/claude-real-smoke.json
+grep -q 'Success rate: `100.0%`' docs/claude-real-smoke.md
 grep -q '"ok": true' reports/refactoringminer-suite-health.json
 grep -q '"taskCount": 10' reports/refactoringminer-ctxhelm-plan.json
 grep -q '"sourceFree": true' reports/refactoringminer-ctxhelm-plan.json
