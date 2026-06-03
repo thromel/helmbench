@@ -1,0 +1,134 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/agent-event.schema.json",
+  "title": "HelmBench Agent Event",
+  "description": "Source-free JSONL event contract emitted by agent adapters.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "taskId", "eventKind"],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "eventKind": {
+      "$ref": "#/$defs/eventKind"
+    },
+    "path": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "commandClass": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/commandClass"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "commandHash": {
+      "type": ["string", "null"]
+    },
+    "touchedTests": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/safeRelativePath"
+      }
+    },
+    "exitStatus": {
+      "type": ["integer", "null"]
+    },
+    "status": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/taskStatus"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "tokenEstimate": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "elapsedMillis": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "observedAtMillis": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "safeRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^/"
+          },
+          {
+            "pattern": "^[A-Za-z]:"
+          },
+          {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        ]
+      }
+    },
+    "eventKind": {
+      "enum": ["recommended_file", "file_read", "file_edit", "command", "status", "usage"]
+    },
+    "commandClass": {
+      "enum": ["test", "build", "lint", "typecheck", "other"]
+    },
+    "taskStatus": {
+      "enum": ["success", "failure", "skipped"]
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}

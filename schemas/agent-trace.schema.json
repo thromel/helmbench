@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/agent-trace.schema.json",
+  "title": "HelmBench Agent Trace",
+  "description": "Source-free per-task agent behavior trace.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "taskId",
+    "agent",
+    "variant",
+    "status",
+    "recommendedFiles",
+    "filesRead",
+    "filesEdited",
+    "commands",
+    "toolCallCount",
+    "tokenEstimate",
+    "elapsedMillis",
+    "timeToFirstRelevantFileMillis",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "variant": {
+      "$ref": "#/$defs/agentVariant"
+    },
+    "status": {
+      "$ref": "#/$defs/taskStatus"
+    },
+    "recommendedFiles": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pathObservation"
+      }
+    },
+    "filesRead": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pathObservation"
+      }
+    },
+    "filesEdited": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/pathObservation"
+      }
+    },
+    "commands": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/commandObservation"
+      }
+    },
+    "toolCallCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tokenEstimate": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "elapsedMillis": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "timeToFirstRelevantFileMillis": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "safeRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^/"
+          },
+          {
+            "pattern": "^[A-Za-z]:"
+          },
+          {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        ]
+      }
+    },
+    "agentVariant": {
+      "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "taskStatus": {
+      "enum": ["success", "failure", "skipped"]
+    },
+    "commandClass": {
+      "enum": ["test", "build", "lint", "typecheck", "other"]
+    },
+    "pathObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "pathHash", "observedAtMillis"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "pathHash": {
+          "type": ["string", "null"]
+        },
+        "observedAtMillis": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "commandObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commandClass", "commandHash", "touchedTests", "exitStatus", "elapsedMillis"],
+      "properties": {
+        "commandClass": {
+          "$ref": "#/$defs/commandClass"
+        },
+        "commandHash": {
+          "type": ["string", "null"]
+        },
+        "touchedTests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/safeRelativePath"
+          }
+        },
+        "exitStatus": {
+          "type": ["integer", "null"]
+        },
+        "elapsedMillis": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}

@@ -39,6 +39,13 @@ enum Command {
         #[arg(long, default_value = "suites/example-auth-bugs.json")]
         out: PathBuf,
     },
+    /// Write a published JSON Schema contract.
+    Schema {
+        #[arg(long, value_enum)]
+        kind: SchemaKind,
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     /// Create a tiny reproducible benchmark repo and matching suite.
     InitDemoRepo {
         #[arg(long, default_value = ".helmbench/demo-repo")]
@@ -479,6 +486,15 @@ enum MatrixHistoryFormat {
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
+enum SchemaKind {
+    TaskSuite,
+    AgentTrace,
+    AgentEvent,
+    RunReport,
+    RunMatrixPrivacyReport,
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
 enum TraceVariant {
     Native,
     NativeSearch,
@@ -573,6 +589,16 @@ fn main() -> Result<()> {
             validate_suite(&suite)?;
             write_json(&suite, &out)?;
             println!("wrote {}", out.display());
+        }
+        Command::Schema { kind, out } => {
+            let schema = schema_contract(kind);
+            match out {
+                Some(path) => {
+                    write_text(schema, &path)?;
+                    println!("wrote {}", path.display());
+                }
+                None => println!("{schema}"),
+            }
         }
         Command::InitDemoRepo {
             repo_out,
@@ -1244,6 +1270,18 @@ fn write_text(content: &str, path: &PathBuf) -> Result<()> {
         std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     }
     std::fs::write(path, content).with_context(|| format!("write {}", path.display()))
+}
+
+fn schema_contract(kind: SchemaKind) -> &'static str {
+    match kind {
+        SchemaKind::TaskSuite => include_str!("../schemas/task-suite.schema.json"),
+        SchemaKind::AgentTrace => include_str!("../schemas/agent-trace.schema.json"),
+        SchemaKind::AgentEvent => include_str!("../schemas/agent-event.schema.json"),
+        SchemaKind::RunReport => include_str!("../schemas/run-report.schema.json"),
+        SchemaKind::RunMatrixPrivacyReport => {
+            include_str!("../schemas/run-matrix-privacy-report.schema.json")
+        }
+    }
 }
 
 #[cfg(test)]
@@ -6905,6 +6943,34 @@ mod tests {
             parse_agent_variant("native-search").expect("hyphen"),
             AgentVariant::NativeSearch
         );
+    }
+
+    #[test]
+    fn schema_contracts_are_valid_json() {
+        let contracts = [
+            (SchemaKind::TaskSuite, "HelmBench Task Suite"),
+            (SchemaKind::AgentTrace, "HelmBench Agent Trace"),
+            (SchemaKind::AgentEvent, "HelmBench Agent Event"),
+            (SchemaKind::RunReport, "HelmBench Run Report"),
+            (
+                SchemaKind::RunMatrixPrivacyReport,
+                "HelmBench Run Matrix Privacy Report",
+            ),
+        ];
+
+        for (kind, title) in contracts {
+            let raw = schema_contract(kind);
+            let value = serde_json::from_str::<serde_json::Value>(raw).expect("schema json");
+            assert_eq!(
+                value["$schema"],
+                "https://json-schema.org/draft/2020-12/schema"
+            );
+            assert_eq!(value["title"], title);
+            assert!(value["$id"]
+                .as_str()
+                .expect("schema id")
+                .starts_with("https://github.com/thromel/helmbench/schemas/"));
+        }
     }
 
     #[test]

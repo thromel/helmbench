@@ -17,6 +17,7 @@ cargo test
 cargo clippy --all-targets -- -D warnings
 
 cargo run -- --help >/dev/null
+cargo run -- schema --help >/dev/null
 cargo run -- demo-run --help >/dev/null
 cargo run -- validate-matrix --help >/dev/null
 cargo run -- run-matrix --help >/dev/null
@@ -36,6 +37,17 @@ cargo run -- doctor --repo . --format json --out "$TMP_DIR/doctor.json"
 grep -q '"ok": true' "$TMP_DIR/doctor.json"
 grep -q '"sourceFree": true' "$TMP_DIR/doctor.json"
 grep -q '"directRunners"' "$TMP_DIR/doctor.json"
+
+cargo run -- schema --kind task-suite --out "$TMP_DIR/task-suite.schema.json"
+cargo run -- schema --kind agent-trace --out "$TMP_DIR/agent-trace.schema.json"
+cargo run -- schema --kind agent-event --out "$TMP_DIR/agent-event.schema.json"
+cargo run -- schema --kind run-report --out "$TMP_DIR/run-report.schema.json"
+cargo run -- schema --kind run-matrix-privacy-report --out "$TMP_DIR/run-matrix-privacy-report.schema.json"
+grep -q '"title": "HelmBench Task Suite"' "$TMP_DIR/task-suite.schema.json"
+grep -q '"title": "HelmBench Agent Trace"' "$TMP_DIR/agent-trace.schema.json"
+grep -q '"title": "HelmBench Agent Event"' "$TMP_DIR/agent-event.schema.json"
+grep -q '"title": "HelmBench Run Report"' "$TMP_DIR/run-report.schema.json"
+grep -q '"title": "HelmBench Run Matrix Privacy Report"' "$TMP_DIR/run-matrix-privacy-report.schema.json"
 
 cargo run -- init-demo-repo \
   --repo-out "$TMP_DIR/demo-repo" \
@@ -222,6 +234,11 @@ test -f "$TMP_DIR/diff-autopsy.md"
 test -f "$TMP_DIR/dashboard.html"
 test -f "$TMP_DIR/suite-health.json"
 test -f "$TMP_DIR/suite-health.md"
+test -f "$TMP_DIR/task-suite.schema.json"
+test -f "$TMP_DIR/agent-trace.schema.json"
+test -f "$TMP_DIR/agent-event.schema.json"
+test -f "$TMP_DIR/run-report.schema.json"
+test -f "$TMP_DIR/run-matrix-privacy-report.schema.json"
 test -f "$TMP_DIR/benchmark-summary.md"
 test -f "$TMP_DIR/benchmark-summary.json"
 test -f "$TMP_DIR/quality-gate.md"
@@ -234,7 +251,9 @@ test -f "$TMP_DIR/full-demo/docs/dashboard.html"
 test -f "$TMP_DIR/matrix/reports/benchmark-summary.json"
 test -f "$TMP_DIR/matrix/reports/suite-health.json"
 test -f "$TMP_DIR/matrix/reports/quality-gate.json"
+test -f "$TMP_DIR/matrix/reports/privacy-report.json"
 test -f "$TMP_DIR/matrix/docs/dashboard.html"
+test -f "$TMP_DIR/matrix/docs/privacy-report.md"
 test -f "$TMP_DIR/matrix/docs/guided-autopsy.md"
 test -f "$TMP_DIR/matrix/docs/reproduction.md"
 test -f "$TMP_DIR/matrix/evidence/health.json"
@@ -243,6 +262,8 @@ test -f "$TMP_DIR/matrix/matrix-manifest.json"
 test -f "$TMP_DIR/matrix-config/reports/benchmark-summary.json"
 test -f "$TMP_DIR/matrix-config/reports/suite-health.json"
 test -f "$TMP_DIR/matrix-config/reports/quality-gate.json"
+test -f "$TMP_DIR/matrix-config/reports/privacy-report.json"
+test -f "$TMP_DIR/matrix-config/docs/privacy-report.md"
 test -f "$TMP_DIR/matrix-config/docs/guided-autopsy.md"
 test -f "$TMP_DIR/matrix-config/docs/reproduction.md"
 test -f "$TMP_DIR/matrix-config/evidence/health.json"

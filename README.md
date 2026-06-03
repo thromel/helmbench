@@ -17,6 +17,8 @@ This repository currently implements the core HelmBench workflow:
 
 - task suite schema
 - source-free trace schema
+- published JSON Schema contracts for task suites, agent events, traces, run
+  reports, and matrix privacy reports
 - suite and trace validation
 - run report generation from trace JSON
 - report comparison
@@ -116,6 +118,12 @@ Create an example suite:
 
 ```bash
 cargo run -- init-suite --out suites/example-auth-bugs.json
+```
+
+Write a JSON Schema contract:
+
+```bash
+cargo run -- schema --kind agent-trace --out /tmp/agent-trace.schema.json
 ```
 
 Create a reproducible demo benchmark repo plus matching suite:
@@ -576,6 +584,7 @@ helmbench-core
 
 helmbench-cli
   init-suite
+  schema
   init-demo-repo
   demo-run
   run-matrix

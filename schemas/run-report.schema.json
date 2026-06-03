@@ -1,0 +1,295 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/run-report.schema.json",
+  "title": "HelmBench Run Report",
+  "description": "Source-free aggregate report for one agent and variant.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "suiteName", "agent", "variant", "summary", "tasks", "privacy"],
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "suiteName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "variant": {
+      "$ref": "#/$defs/agentVariant"
+    },
+    "summary": {
+      "$ref": "#/$defs/reportSummary"
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/taskReport"
+      }
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "agentVariant": {
+      "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "taskStatus": {
+      "enum": ["success", "failure", "skipped"]
+    },
+    "rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "optionalNonNegativeInteger": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "optionalNonNegativeNumber": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "commandSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "totalCommandCount",
+        "testCommandCount",
+        "buildCommandCount",
+        "lintCommandCount",
+        "typecheckCommandCount",
+        "otherCommandCount",
+        "successfulCommandCount",
+        "failedCommandCount"
+      ],
+      "properties": {
+        "totalCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "testCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "buildCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "lintCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "typecheckCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "otherCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "successfulCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "failedCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "reportSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskCount",
+        "successCount",
+        "successRate",
+        "totalFilesRead",
+        "totalIrrelevantFileReads",
+        "irrelevantReadRate",
+        "averageRecommendationPrecision",
+        "averageRecommendationRecall",
+        "averageContextPrecision",
+        "averageEditedFileRecall",
+        "validationCoverageRate",
+        "averageTimeToFirstRelevantFileMillis",
+        "totalToolCalls",
+        "totalTokenEstimate",
+        "commandSummary"
+      ],
+      "properties": {
+        "taskCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "successCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "successRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "totalFilesRead": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "totalIrrelevantFileReads": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "irrelevantReadRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "averageRecommendationPrecision": {
+          "$ref": "#/$defs/rate"
+        },
+        "averageRecommendationRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "averageContextPrecision": {
+          "$ref": "#/$defs/rate"
+        },
+        "averageEditedFileRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "validationCoverageRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "averageTimeToFirstRelevantFileMillis": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "totalToolCalls": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "totalTokenEstimate": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "commandSummary": {
+          "$ref": "#/$defs/commandSummary"
+        }
+      }
+    },
+    "taskReport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "status",
+        "expectedFileCount",
+        "expectedTestCount",
+        "recommendedFileCount",
+        "relevantRecommendedFileCount",
+        "irrelevantRecommendedFileCount",
+        "recommendationPrecision",
+        "recommendationRecall",
+        "filesReadCount",
+        "relevantFilesReadCount",
+        "irrelevantFileReadCount",
+        "filesEditedCount",
+        "expectedFilesEditedCount",
+        "contextPrecision",
+        "editedFileRecall",
+        "validationCovered",
+        "commandSummary",
+        "toolCallCount",
+        "tokenEstimate",
+        "elapsedMillis",
+        "timeToFirstRelevantFileMillis"
+      ],
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "$ref": "#/$defs/taskStatus"
+        },
+        "expectedFileCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "expectedTestCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "recommendedFileCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "relevantRecommendedFileCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "irrelevantRecommendedFileCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "recommendationPrecision": {
+          "$ref": "#/$defs/rate"
+        },
+        "recommendationRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "filesReadCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "relevantFilesReadCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "irrelevantFileReadCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "filesEditedCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "expectedFilesEditedCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "contextPrecision": {
+          "$ref": "#/$defs/rate"
+        },
+        "editedFileRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "validationCovered": {
+          "type": "boolean"
+        },
+        "commandSummary": {
+          "$ref": "#/$defs/commandSummary"
+        },
+        "toolCallCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "tokenEstimate": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "elapsedMillis": {
+          "$ref": "#/$defs/optionalNonNegativeInteger"
+        },
+        "timeToFirstRelevantFileMillis": {
+          "$ref": "#/$defs/optionalNonNegativeInteger"
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}

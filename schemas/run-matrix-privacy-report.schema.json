@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/run-matrix-privacy-report.schema.json",
+  "title": "HelmBench Run Matrix Privacy Report",
+  "description": "Source-free privacy report for a run-matrix output.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteName",
+    "taskCount",
+    "runCount",
+    "traceCount",
+    "recordedMetadata",
+    "forbiddenRawData",
+    "safeguards",
+    "runs",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "suiteName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taskCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "runCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "traceCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "recordedMetadata": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "forbiddenRawData": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "safeguards": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/privacyRun"
+      }
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "safeRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^/"
+          },
+          {
+            "pattern": "^[A-Za-z]:"
+          },
+          {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        ]
+      }
+    },
+    "agentVariant": {
+      "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "privacyRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "agent",
+        "variant",
+        "reportPath",
+        "traceDir",
+        "traceCount",
+        "sourceFreeTraceCount",
+        "reportSourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "variant": {
+          "$ref": "#/$defs/agentVariant"
+        },
+        "reportPath": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "traceDir": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "traceCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sourceFreeTraceCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reportSourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}
