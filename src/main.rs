@@ -158,11 +158,17 @@ enum Command {
         #[arg(long)]
         suite_name: Option<String>,
         #[arg(long)]
-        success_command: String,
+        success_command: Option<String>,
+        #[arg(long)]
+        success_command_template: Option<String>,
         #[arg(long)]
         commit: Vec<String>,
         #[arg(long, default_value_t = helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS)]
         max_tasks: usize,
+        #[arg(long, default_value_t = 250)]
+        scan_commits: usize,
+        #[arg(long)]
+        require_changed_tests: bool,
         #[arg(long, default_value_t = 1)]
         min_commits: u64,
         #[arg(long)]
@@ -938,8 +944,11 @@ fn main() -> Result<()> {
             health_out,
             suite_name,
             success_command,
+            success_command_template,
             commit,
             max_tasks,
+            scan_commits,
+            require_changed_tests,
             min_commits,
             allow_dirty_health,
             check_success_commands,
@@ -953,8 +962,11 @@ fn main() -> Result<()> {
                 health_out,
                 suite_name,
                 success_command,
+                success_command_template,
                 commits: commit,
                 max_tasks,
+                scan_commits,
+                require_changed_tests,
                 min_commits,
                 allow_dirty_health,
                 check_success_commands,
@@ -3030,9 +3042,12 @@ struct GitRegressionSuiteOptions {
     suite_out: PathBuf,
     health_out: Option<PathBuf>,
     suite_name: Option<String>,
-    success_command: String,
+    success_command: Option<String>,
+    success_command_template: Option<String>,
     commits: Vec<String>,
     max_tasks: usize,
+    scan_commits: usize,
+    require_changed_tests: bool,
     min_commits: u64,
     allow_dirty_health: bool,
     check_success_commands: bool,
@@ -3045,8 +3060,25 @@ fn init_git_regression_suite(options: GitRegressionSuiteOptions) -> Result<()> {
     if options.max_tasks == 0 {
         anyhow::bail!("--max-tasks must be greater than zero");
     }
-    if options.success_command.trim().is_empty() {
-        anyhow::bail!("--success-command must not be empty");
+    if options.scan_commits == 0 {
+        anyhow::bail!("--scan-commits must be greater than zero");
+    }
+    if options
+        .success_command
+        .as_deref()
+        .is_some_and(|command| command.trim().is_empty())
+    {
+        anyhow::bail!("--success-command must not be empty when supplied");
+    }
+    if options
+        .success_command_template
+        .as_deref()
+        .is_some_and(|command| command.trim().is_empty())
+    {
+        anyhow::bail!("--success-command-template must not be empty when supplied");
+    }
+    if options.success_command.is_none() && options.success_command_template.is_none() {
+        anyhow::bail!("provide --success-command or --success-command-template");
     }
     ensure_output_path_available(&options.suite_out, options.force)?;
     if let Some(path) = &options.health_out {
@@ -3093,7 +3125,7 @@ fn git_regression_suite(options: &GitRegressionSuiteOptions) -> Result<helmbench
         .suite_name
         .clone()
         .unwrap_or_else(|| format!("{}-git-regressions", safe_task_dir_name(repo_name)));
-    let commits = git_regression_commits(&options.repo, &options.commits, options.max_tasks)?;
+    let commits = git_regression_commits(&options.repo, &options.commits, options.scan_commits)?;
     let mut tasks = Vec::new();
     for commit in commits {
         let changed_files = git_changed_files(&options.repo, &commit.hash)?;
@@ -3105,6 +3137,9 @@ fn git_regression_suite(options: &GitRegressionSuiteOptions) -> Result<helmbench
             .filter(|path| looks_like_test_path(path))
             .cloned()
             .collect::<Vec<_>>();
+        if options.require_changed_tests && expected_tests.is_empty() {
+            continue;
+        }
         let mut expected_files = changed_files
             .iter()
             .filter(|path| !looks_like_test_path(path))
@@ -3114,6 +3149,8 @@ fn git_regression_suite(options: &GitRegressionSuiteOptions) -> Result<helmbench
             expected_files = changed_files.clone();
         }
         let short_hash = short_commit_hash(&commit.hash);
+        let success_command =
+            git_regression_success_command(options, &changed_files, &expected_tests)?;
         tasks.push(helmbench::BenchTask {
             id: format!("git-regression-{short_hash}"),
             prompt: format!(
@@ -3122,7 +3159,7 @@ fn git_regression_suite(options: &GitRegressionSuiteOptions) -> Result<helmbench
             ),
             expected_files,
             expected_tests,
-            success_command: Some(options.success_command.clone()),
+            success_command: Some(success_command),
             setup_commands: vec![format!("git revert --no-commit {}", commit.hash)],
             tags: vec![
                 "public_repo".to_string(),
@@ -3211,6 +3248,66 @@ fn git_changed_files(repo: &Path, commit: &str) -> Result<Vec<String>> {
     paths.sort();
     paths.dedup();
     Ok(paths)
+}
+
+fn git_regression_success_command(
+    options: &GitRegressionSuiteOptions,
+    changed_files: &[String],
+    changed_tests: &[String],
+) -> Result<String> {
+    if let Some(template) = &options.success_command_template {
+        let rendered = render_success_command_template(template, changed_files, changed_tests);
+        if rendered.trim().is_empty() {
+            anyhow::bail!("rendered success command template is empty");
+        }
+        Ok(rendered)
+    } else {
+        Ok(options
+            .success_command
+            .clone()
+            .context("missing success command")?)
+    }
+}
+
+fn render_success_command_template(
+    template: &str,
+    changed_files: &[String],
+    changed_tests: &[String],
+) -> String {
+    let changed_files_args = shell_words(changed_files);
+    let changed_tests_args = shell_words(changed_tests);
+    let gradle_test_filters = gradle_test_filters(changed_tests);
+    template
+        .replace("{changed_files}", &changed_files_args)
+        .replace("{changed_tests}", &changed_tests_args)
+        .replace("{gradle_test_filters}", &gradle_test_filters)
+}
+
+fn shell_words(values: &[String]) -> String {
+    values
+        .iter()
+        .map(|value| shell_escape(value))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn gradle_test_filters(changed_tests: &[String]) -> String {
+    changed_tests
+        .iter()
+        .filter_map(|path| java_test_class_name(path))
+        .map(|class| format!("--tests {}", shell_escape(&class)))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn java_test_class_name(path: &str) -> Option<String> {
+    let without_prefix = path
+        .strip_prefix("src/test/java/")
+        .or_else(|| path.strip_prefix("src/test/kotlin/"))?;
+    let without_ext = without_prefix
+        .strip_suffix(".java")
+        .or_else(|| without_prefix.strip_suffix(".kt"))?;
+    Some(without_ext.replace('/', "."))
 }
 
 fn looks_like_test_path(path: &str) -> bool {
@@ -9474,9 +9571,12 @@ mod tests {
             suite_out: suite_path.clone(),
             health_out: Some(health_path.clone()),
             suite_name: Some("fixture-git-regressions".to_string()),
-            success_command: "grep -q fixed app.txt".to_string(),
+            success_command: Some("grep -q fixed app.txt".to_string()),
+            success_command_template: None,
             commits: vec![head.clone()],
             max_tasks: 10,
+            scan_commits: 10,
+            require_changed_tests: false,
             min_commits: 1,
             allow_dirty_health: false,
             check_success_commands: true,
@@ -9503,6 +9603,103 @@ mod tests {
         assert_eq!(health.baseline_success_command_fail_count, 1);
         assert_eq!(health.baseline_success_command_pass_count, 0);
         assert_eq!(health.tasks_failed_setup_command.len(), 0);
+    }
+
+    #[test]
+    fn git_regression_suite_can_template_changed_test_commands() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).expect("repo dir");
+        write_demo_file(&repo, "src/main/java/App.java", "class App {}\n").expect("app file");
+        init_git_repo(&repo).expect("initial commit");
+
+        write_demo_file(
+            &repo,
+            "src/main/java/App.java",
+            "class App { int value() { return 1; }}\n",
+        )
+        .expect("code-only change");
+        let add = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("add")
+            .arg(".")
+            .status()
+            .expect("git add");
+        assert!(add.success());
+        let commit = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("-c")
+            .arg("user.name=HelmBench")
+            .arg("-c")
+            .arg("user.email=helmbench@example.test")
+            .arg("commit")
+            .arg("--quiet")
+            .arg("-m")
+            .arg("Change app only")
+            .status()
+            .expect("git commit");
+        assert!(commit.success());
+
+        write_demo_file(
+            &repo,
+            "src/test/java/org/example/AppTest.java",
+            "package org.example; class AppTest {}\n",
+        )
+        .expect("test file");
+        let add = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("add")
+            .arg(".")
+            .status()
+            .expect("git add");
+        assert!(add.success());
+        let commit = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("-c")
+            .arg("user.name=HelmBench")
+            .arg("-c")
+            .arg("user.email=helmbench@example.test")
+            .arg("commit")
+            .arg("--quiet")
+            .arg("-m")
+            .arg("Add app regression test")
+            .status()
+            .expect("git commit");
+        assert!(commit.success());
+
+        let suite = git_regression_suite(&GitRegressionSuiteOptions {
+            repo,
+            suite_out: temp.path().join("suite.json"),
+            health_out: None,
+            suite_name: Some("templated-git-regressions".to_string()),
+            success_command: None,
+            success_command_template: Some("./gradlew test {gradle_test_filters}".to_string()),
+            commits: Vec::new(),
+            max_tasks: 1,
+            scan_commits: 2,
+            require_changed_tests: true,
+            min_commits: 1,
+            allow_dirty_health: false,
+            check_success_commands: false,
+            fail_fast_success_commands: false,
+            timeout_seconds: 60,
+            force: false,
+        })
+        .expect("suite");
+
+        assert_eq!(suite.tasks.len(), 1);
+        assert_eq!(
+            suite.tasks[0].expected_tests,
+            vec!["src/test/java/org/example/AppTest.java"]
+        );
+        assert_eq!(
+            suite.tasks[0].success_command.as_deref(),
+            Some("./gradlew test --tests 'org.example.AppTest'")
+        );
     }
 
     #[test]
@@ -9544,9 +9741,12 @@ mod tests {
                 suite_out: suite_path.clone(),
                 health_out: None,
                 suite_name: Some("fixture-git-regressions".to_string()),
-                success_command: "grep -q fixed app.txt".to_string(),
+                success_command: Some("grep -q fixed app.txt".to_string()),
+                success_command_template: None,
                 commits: vec![head],
                 max_tasks: 10,
+                scan_commits: 10,
+                require_changed_tests: false,
                 min_commits: 1,
                 allow_dirty_health: false,
                 check_success_commands: false,

@@ -354,8 +354,10 @@ cargo run -- init-git-regression-suite \
   --repo ../ctxhelm-proof-fixtures/RefactoringMiner \
   --suite-out /tmp/refactoringminer-git-regressions.json \
   --health-out /tmp/refactoringminer-git-regressions-health.json \
-  --success-command './gradlew test' \
+  --success-command-template './gradlew test {gradle_test_filters}' \
+  --require-changed-tests \
   --max-tasks 10 \
+  --scan-commits 500 \
   --check-success-commands \
   --fail-fast-success-commands \
   --force
@@ -364,7 +366,9 @@ cargo run -- init-git-regression-suite \
 Use repeated `--commit <sha>` values when you want a fixed suite instead of the
 latest non-merge commits. Publish only suites whose health report records
 `evidenceUse: outcome_ready`; otherwise the run is navigation evidence, not a
-task-success benchmark.
+task-success benchmark. Success-command templates support `{changed_files}`,
+`{changed_tests}`, and `{gradle_test_filters}`; the last form turns changed
+Java/Kotlin test paths into Gradle `--tests` filters.
 
 Then generate a real-agent matrix config for that suite:
 

@@ -130,15 +130,19 @@ helmbench init-git-regression-suite \
   --repo /tmp/RefactoringMiner \
   --suite-out /tmp/refactoring-miner-git-regressions.json \
   --health-out /tmp/refactoring-miner-git-regressions-health.json \
-  --success-command './gradlew test' \
+  --success-command-template './gradlew test {gradle_test_filters}' \
+  --require-changed-tests \
   --max-tasks 10 \
+  --scan-commits 500 \
   --check-success-commands \
   --fail-fast-success-commands \
   --force
 ```
 
 The generated health report must show `evidenceUse: outcome_ready` before the
-suite should be used for launch-grade task-success claims.
+suite should be used for launch-grade task-success claims. Templates support
+`{changed_files}`, `{changed_tests}`, and `{gradle_test_filters}` for targeted
+per-task validation.
 
 Then use `init-agent-matrix` to write the native-vs-ctxhelm real-agent matrix
 config for that generated suite:

@@ -133,8 +133,10 @@ cargo run -- init-git-regression-suite \
   --repo <refactoringminer-repo> \
   --suite-out /tmp/refactoring-miner-git-regressions.json \
   --health-out /tmp/refactoring-miner-git-regressions-health.json \
-  --success-command './gradlew test' \
+  --success-command-template './gradlew test {gradle_test_filters}' \
+  --require-changed-tests \
   --max-tasks 10 \
+  --scan-commits 500 \
   --check-success-commands \
   --fail-fast-success-commands \
   --force
