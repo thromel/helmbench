@@ -146,7 +146,7 @@ baseline and variant results share identical clone, validation, trace, and
 privacy behavior.
 
 When a matrix row sets `ctxhelm=true`, HelmBench calls ctxhelm before the
-adapter command and records the returned target files/tests as source-free
+adapter command or preset and records the returned target files/tests as source-free
 recommendation events. With `pack=true`, it also calls `ctxhelm get-pack` and
 records only source-free pack metadata such as token estimates.
 
@@ -154,6 +154,10 @@ records only source-free pack metadata such as token estimates.
 start the installed agent CLI non-interactively, suppress raw stdout/stderr, and
 inject instructions that ask the agent to emit source-free `record-event` calls.
 HelmBench still owns edited-file inference and validation recording.
+
+Matrix rows can use those same launchers with `preset=claude-code` or
+`preset=codex`. The matrix manifest stores hashes for the generated adapter
+command and ctxhelm config, not raw launch commands, prompts, or transcripts.
 
 `stream-trace` covers agents that can emit structured JSONL tool streams. It
 parses those streams in memory, extracts safe file-read/file-edit/command

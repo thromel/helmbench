@@ -93,6 +93,9 @@
     "agentVariant": {
       "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
     },
+    "adapterPreset": {
+      "enum": ["claude-code", "codex"]
+    },
     "provenance": {
       "type": "object",
       "additionalProperties": false,
@@ -147,6 +150,7 @@
         "ctxhelmEnabled",
         "packEnabled",
         "streamCaptureEnabled",
+        "adapterPreset",
         "adapterCommandHash",
         "ctxhelmConfigHash"
       ],
@@ -199,6 +203,16 @@
         },
         "streamCaptureEnabled": {
           "type": "boolean"
+        },
+        "adapterPreset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/adapterPreset"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "adapterCommandHash": {
           "anyOf": [

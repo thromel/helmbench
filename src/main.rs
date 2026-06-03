@@ -85,7 +85,7 @@ enum Command {
         repo: Option<PathBuf>,
         #[arg(long)]
         out_dir: Option<PathBuf>,
-        /// Run spec: name=<id>,agent=<agent>,variant=<native|native_search|ctxhelm_plan|ctxhelm_mcp|ctxhelm_pack|other>[,command=<adapter command>]
+        /// Run spec: name=<id>,agent=<agent>,variant=<native|native_search|ctxhelm_plan|ctxhelm_mcp|ctxhelm_pack|other>[,command=<adapter command>|preset=<claude-code|codex>]
         #[arg(long)]
         baseline: Option<String>,
         /// Repeated run spec with the same format as --baseline.
@@ -2837,7 +2837,25 @@ struct RunMatrixSpec {
     variant: AgentVariant,
     ctxhelm: Option<CtxhelmRunConfig>,
     adapter_command: Option<String>,
+    adapter_preset: Option<AdapterPresetRunConfig>,
     capture_stream: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+enum AdapterPreset {
+    ClaudeCode,
+    Codex,
+}
+
+#[derive(Debug, Clone)]
+struct AdapterPresetRunConfig {
+    preset: AdapterPreset,
+    bin: PathBuf,
+    model: Option<String>,
+    args: Vec<String>,
+    dangerously_skip_permissions: bool,
+    dangerously_bypass_approvals_and_sandbox: bool,
 }
 
 struct RunMatrixResult {
@@ -2889,6 +2907,7 @@ struct RunMatrixManifestRun {
     ctxhelm_enabled: bool,
     pack_enabled: bool,
     stream_capture_enabled: bool,
+    adapter_preset: Option<AdapterPreset>,
     adapter_command_hash: Option<String>,
     ctxhelm_config_hash: Option<String>,
 }
@@ -3093,6 +3112,18 @@ struct RunMatrixConfigSpec {
     pack_budget: Option<String>,
     #[serde(default, alias = "adapterCommand")]
     command: Option<String>,
+    #[serde(default)]
+    preset: Option<AdapterPreset>,
+    #[serde(default, alias = "adapterBin")]
+    bin: Option<PathBuf>,
+    #[serde(default)]
+    model: Option<String>,
+    #[serde(default, alias = "adapterArgs")]
+    args: Vec<String>,
+    #[serde(default)]
+    dangerously_skip_permissions: bool,
+    #[serde(default)]
+    dangerously_bypass_approvals_and_sandbox: bool,
     #[serde(default)]
     capture_stream: bool,
 }
@@ -3330,6 +3361,22 @@ fn run_matrix_spec_from_config(config: &RunMatrixConfigSpec) -> Result<RunMatrix
         anyhow::bail!("run spec agent must not be empty");
     }
     let safe_name = safe_task_dir_name(&config.name);
+    let adapter_preset = config.preset.map(|preset| AdapterPresetRunConfig {
+        preset,
+        bin: config
+            .bin
+            .clone()
+            .unwrap_or_else(|| default_preset_bin(preset)),
+        model: config.model.clone(),
+        args: config.args.clone(),
+        dangerously_skip_permissions: config.dangerously_skip_permissions,
+        dangerously_bypass_approvals_and_sandbox: config.dangerously_bypass_approvals_and_sandbox,
+    });
+    let adapter_command = adapter_command_from_preset(
+        config.command.clone(),
+        adapter_preset.as_ref(),
+        config.capture_stream,
+    )?;
     Ok(RunMatrixSpec {
         name: config.name.clone(),
         safe_name,
@@ -3365,7 +3412,8 @@ fn run_matrix_spec_from_config(config: &RunMatrixConfigSpec) -> Result<RunMatrix
                 .clone()
                 .unwrap_or_else(|| "brief".to_string()),
         }),
-        adapter_command: config.command.clone(),
+        adapter_command,
+        adapter_preset,
         capture_stream: config.capture_stream,
     })
 }
@@ -3840,6 +3888,11 @@ fn run_matrix_manifest_run(
             .as_ref()
             .is_some_and(|ctxhelm| ctxhelm.include_pack),
         stream_capture_enabled: result.spec.capture_stream,
+        adapter_preset: result
+            .spec
+            .adapter_preset
+            .as_ref()
+            .map(|config| config.preset),
         adapter_command_hash: result
             .spec
             .adapter_command
@@ -3984,16 +4037,17 @@ fn render_markdown_matrix_reproduction(manifest: &RunMatrixManifest) -> String {
     }
 
     out.push_str("## Runs\n\n");
-    out.push_str("| Run | Agent | Variant | ctxhelm | Pack | Stream | Report | Trace Dir | Autopsy | Comparison JSON | Comparison Markdown | Adapter Hash | ctxhelm Hash |\n");
+    out.push_str("| Run | Agent | Variant | Preset | ctxhelm | Pack | Stream | Report | Trace Dir | Autopsy | Comparison JSON | Comparison Markdown | Adapter Hash | ctxhelm Hash |\n");
     out.push_str(
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n",
     );
     for run in std::iter::once(&manifest.baseline).chain(manifest.heads.iter()) {
         out.push_str(&format!(
-            "| `{}` | `{}` | `{:?}` | {} | {} | {} | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` |\n",
+            "| `{}` | `{}` | `{:?}` | `{}` | {} | {} | {} | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` |\n",
             run.name,
             run.agent,
             run.variant,
+            adapter_preset_label(run.adapter_preset).unwrap_or("none"),
             yes_no(run.ctxhelm_enabled),
             yes_no(run.pack_enabled),
             yes_no(run.stream_capture_enabled),
@@ -5110,6 +5164,12 @@ fn parse_run_matrix_spec(raw: &str) -> Result<RunMatrixSpec> {
     let mut agent = None;
     let mut variant = None;
     let mut command = None;
+    let mut preset = None;
+    let mut preset_bin = None;
+    let mut preset_model = None;
+    let mut preset_args = Vec::new();
+    let mut dangerously_skip_permissions = false;
+    let mut dangerously_bypass_approvals_and_sandbox = false;
     let mut use_ctxhelm = false;
     let mut ctxhelm_bin = PathBuf::from("ctxhelm");
     let mut mode = "explain".to_string();
@@ -5182,6 +5242,20 @@ fn parse_run_matrix_spec(raw: &str) -> Result<RunMatrixSpec> {
                     command = Some(value.to_string());
                 }
             }
+            "preset" => preset = Some(parse_adapter_preset(value)?),
+            "bin" | "adapter_bin" => preset_bin = Some(PathBuf::from(value)),
+            "model" => preset_model = non_empty_string(value),
+            "arg" | "adapter_arg" => {
+                if !value.is_empty() {
+                    preset_args.push(value.to_string());
+                }
+            }
+            "dangerously_skip_permissions" => {
+                dangerously_skip_permissions = parse_bool_field(key, value)?;
+            }
+            "dangerously_bypass_approvals_and_sandbox" => {
+                dangerously_bypass_approvals_and_sandbox = parse_bool_field(key, value)?;
+            }
             "capture_stream" => {
                 capture_stream = parse_bool_field(key, value)?;
             }
@@ -5198,6 +5272,16 @@ fn parse_run_matrix_spec(raw: &str) -> Result<RunMatrixSpec> {
         anyhow::bail!("run spec agent must not be empty");
     }
     let safe_name = safe_task_dir_name(&name);
+    let adapter_preset = preset.map(|preset| AdapterPresetRunConfig {
+        preset,
+        bin: preset_bin.unwrap_or_else(|| default_preset_bin(preset)),
+        model: preset_model,
+        args: preset_args,
+        dangerously_skip_permissions,
+        dangerously_bypass_approvals_and_sandbox,
+    });
+    let adapter_command =
+        adapter_command_from_preset(command, adapter_preset.as_ref(), capture_stream)?;
     Ok(RunMatrixSpec {
         name,
         safe_name,
@@ -5214,9 +5298,68 @@ fn parse_run_matrix_spec(raw: &str) -> Result<RunMatrixSpec> {
             include_pack: pack,
             pack_budget,
         }),
-        adapter_command: command,
+        adapter_command,
+        adapter_preset,
         capture_stream,
     })
+}
+
+fn parse_adapter_preset(value: &str) -> Result<AdapterPreset> {
+    match value {
+        "claude-code" | "claude" => Ok(AdapterPreset::ClaudeCode),
+        "codex" => Ok(AdapterPreset::Codex),
+        _ => anyhow::bail!("preset must be claude-code or codex, got `{value}`"),
+    }
+}
+
+fn adapter_preset_label(preset: Option<AdapterPreset>) -> Option<&'static str> {
+    match preset {
+        Some(AdapterPreset::ClaudeCode) => Some("claude-code"),
+        Some(AdapterPreset::Codex) => Some("codex"),
+        None => None,
+    }
+}
+
+fn default_preset_bin(preset: AdapterPreset) -> PathBuf {
+    match preset {
+        AdapterPreset::ClaudeCode => PathBuf::from("claude"),
+        AdapterPreset::Codex => PathBuf::from("codex"),
+    }
+}
+
+fn adapter_command_from_preset(
+    explicit_command: Option<String>,
+    preset: Option<&AdapterPresetRunConfig>,
+    capture_stream: bool,
+) -> Result<Option<String>> {
+    match (explicit_command, preset) {
+        (Some(_), Some(_)) => anyhow::bail!("run spec cannot combine command and preset"),
+        (Some(command), None) => Ok(Some(command)),
+        (None, None) => Ok(None),
+        (None, Some(config)) => {
+            let helmbench_bin = current_helmbench_bin()?;
+            let suppress_output = !capture_stream;
+            let command = match config.preset {
+                AdapterPreset::ClaudeCode => claude_adapter_command(
+                    &helmbench_bin,
+                    &config.bin,
+                    config.model.as_deref(),
+                    &config.args,
+                    config.dangerously_skip_permissions,
+                    suppress_output,
+                ),
+                AdapterPreset::Codex => codex_adapter_command(
+                    &helmbench_bin,
+                    &config.bin,
+                    config.model.as_deref(),
+                    &config.args,
+                    config.dangerously_bypass_approvals_and_sandbox,
+                    suppress_output,
+                ),
+            };
+            Ok(Some(command))
+        }
+    }
 }
 
 fn parse_bool_field(name: &str, value: &str) -> Result<bool> {
@@ -5368,6 +5511,7 @@ fn run_demo_pipeline_with_adapter(
             variant: AgentVariant::Native,
             ctxhelm: None,
             adapter_command: None,
+            adapter_preset: None,
             capture_stream: false,
         },
         report: native_report.clone(),
@@ -5382,6 +5526,7 @@ fn run_demo_pipeline_with_adapter(
             variant: AgentVariant::CtxhelmMcp,
             ctxhelm: None,
             adapter_command: Some(adapter_command.clone()),
+            adapter_preset: None,
             capture_stream: false,
         },
         report: guided_report.clone(),
@@ -6844,6 +6989,10 @@ mod tests {
         assert_eq!(manifest["heads"][0]["ctxhelmEnabled"], false);
         assert_eq!(manifest["heads"][0]["packEnabled"], false);
         assert_eq!(
+            manifest["heads"][0]["adapterPreset"],
+            serde_json::Value::Null
+        );
+        assert_eq!(
             manifest["heads"][0]["adapterCommandHash"],
             serde_json::json!(command_hash(&adapter_command))
         );
@@ -6862,6 +7011,10 @@ mod tests {
         );
         assert_eq!(manifest["heads"][1]["ctxhelmEnabled"], true);
         assert_eq!(manifest["heads"][1]["packEnabled"], true);
+        assert_eq!(
+            manifest["heads"][1]["adapterPreset"],
+            serde_json::Value::Null
+        );
         assert_eq!(
             manifest["heads"][1]["adapterCommandHash"],
             serde_json::json!(command_hash(&adapter_command))
@@ -7078,7 +7231,11 @@ mod tests {
                         "ctxhelmBin": "fake-ctxhelm",
                         "pack": true,
                         "packBudget": "brief",
-                        "command": "sh fake-agent.sh"
+                        "preset": "claude-code",
+                        "bin": "fake-agent.sh",
+                        "model": "sonnet",
+                        "args": ["--debug"],
+                        "dangerouslySkipPermissions": true
                     }
                 ]
             })
@@ -7159,6 +7316,32 @@ mod tests {
                 .expect("ctxhelm")
                 .include_pack
         );
+        assert_eq!(
+            request.heads[0]
+                .adapter_preset
+                .as_ref()
+                .expect("preset")
+                .preset,
+            AdapterPreset::ClaudeCode
+        );
+        assert_eq!(
+            request.heads[0]
+                .adapter_preset
+                .as_ref()
+                .expect("preset")
+                .bin,
+            PathBuf::from("fake-agent.sh")
+        );
+        assert!(request.heads[0]
+            .adapter_command
+            .as_ref()
+            .expect("adapter command")
+            .contains("--model 'sonnet'"));
+        assert!(request.heads[0]
+            .adapter_command
+            .as_ref()
+            .expect("adapter command")
+            .contains("--dangerously-skip-permissions"));
 
         let override_request = build_run_matrix_request(
             Some(&config_path),
@@ -7231,6 +7414,40 @@ mod tests {
         );
         assert_eq!(override_request.health_min_commits, 3);
         assert!(override_request.allow_dirty_health);
+    }
+
+    #[test]
+    fn run_matrix_spec_parser_builds_adapter_preset_command() {
+        let spec = parse_run_matrix_spec(
+            "name=claude-guided,agent=claude-code,variant=ctxhelm_mcp,preset=claude-code,bin=fake-claude,model=sonnet,arg=--debug,dangerously_skip_permissions=true,capture_stream=false",
+        )
+        .expect("parse spec");
+
+        assert_eq!(spec.safe_name, "claude-guided");
+        assert_eq!(spec.variant, AgentVariant::CtxhelmMcp);
+        assert_eq!(
+            spec.adapter_preset.as_ref().expect("preset").preset,
+            AdapterPreset::ClaudeCode
+        );
+        assert_eq!(
+            spec.adapter_preset.as_ref().expect("preset").bin,
+            PathBuf::from("fake-claude")
+        );
+        let command = spec.adapter_command.as_ref().expect("adapter command");
+        assert!(command.contains("'fake-claude'"));
+        assert!(command.contains("--model 'sonnet'"));
+        assert!(command.contains("'--debug'"));
+        assert!(command.contains("--dangerously-skip-permissions"));
+        assert!(command.contains("record-event"));
+        assert!(command.contains(">/dev/null 2>/dev/null"));
+
+        let err = parse_run_matrix_spec(
+            "name=bad,agent=claude-code,variant=native,preset=claude-code,command=claude --print",
+        )
+        .expect_err("reject command plus preset");
+        assert!(err
+            .to_string()
+            .contains("cannot combine command and preset"));
     }
 
     #[test]

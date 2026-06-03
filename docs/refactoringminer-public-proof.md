@@ -99,6 +99,9 @@ raw transcripts, raw terminal logs, raw MCP payloads, or ctxhelm pack snippets.
 ## Next Step
 
 The next launch-grade proof is a full `run-matrix` over this same 10-task suite
-with at least one real agent baseline and one ctxhelm-guided agent row. This
+with at least one real agent baseline and one ctxhelm-guided agent row. Use the
+`preset=claude-code` or `preset=codex` matrix rows from
+[`docs/run-matrix.md`](run-matrix.md) so HelmBench injects the source-free event
+contract instead of relying on hand-written adapter commands. This
 recommendation proof establishes the public-suite target and source-free
 measurement contract first.

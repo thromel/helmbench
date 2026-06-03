@@ -57,6 +57,9 @@
     "agentVariant": {
       "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
     },
+    "adapterPreset": {
+      "enum": ["claude-code", "codex"]
+    },
     "optionalNumber": {
       "type": "number"
     },
@@ -121,6 +124,41 @@
         "adapterCommand": {
           "type": "string",
           "minLength": 1
+        },
+        "preset": {
+          "$ref": "#/$defs/adapterPreset"
+        },
+        "bin": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapterBin": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "adapterArgs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "dangerouslySkipPermissions": {
+          "type": "boolean"
+        },
+        "dangerouslyBypassApprovalsAndSandbox": {
+          "type": "boolean"
         },
         "captureStream": {
           "type": "boolean"

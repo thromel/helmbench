@@ -12,8 +12,8 @@ helmbench run-matrix \
   --repo /tmp/helmbench-demo-repo \
   --out-dir /tmp/helmbench-matrix \
   --baseline "name=native,agent=demo-baseline,variant=native" \
-  --head "name=native-search,agent=demo-search,variant=native_search,command=HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-agent.sh" \
-  --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,command=HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-agent.sh" \
+  --head "name=native-search,agent=demo-search,variant=native_search,preset=claude-code,bin=scripts/demo-local-agent.sh,dangerously_skip_permissions=true" \
+  --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,ctxhelm=true,ctxhelm_bin=scripts/demo-ctxhelm.sh,pack=true,pack_budget=brief,preset=claude-code,bin=scripts/demo-local-agent.sh,dangerously_skip_permissions=true" \
   --force
 ```
 
@@ -59,7 +59,9 @@ Config format:
       "name": "native-search",
       "agent": "demo-search",
       "variant": "native_search",
-      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-local-agent.sh"
+      "preset": "claude-code",
+      "bin": "scripts/demo-local-agent.sh",
+      "dangerouslySkipPermissions": true
     },
     {
       "name": "guided",
@@ -69,7 +71,9 @@ Config format:
       "ctxhelmBin": "scripts/demo-ctxhelm.sh",
       "pack": true,
       "packBudget": "brief",
-      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-local-agent.sh"
+      "preset": "claude-code",
+      "bin": "scripts/demo-local-agent.sh",
+      "dangerouslySkipPermissions": true
     }
   ]
 }
@@ -114,6 +118,17 @@ Run specs use comma-separated `key=value` fields:
   `ctxhelm get-pack --format json` and stores only source-free pack metadata;
 - `pack_budget`: optional pack budget, default `brief`;
 - `command`: optional adapter command executed inside each isolated task clone;
+- `preset`: optional direct-agent adapter preset, either `claude-code` or
+  `codex`; when present HelmBench generates the same source-free launch command
+  used by `claude-run` or `codex-run`;
+- `bin` / `adapter_bin`: optional binary path for a preset, defaulting to
+  `claude` or `codex`;
+- `model`: optional model passed to the preset command;
+- `args` / `adapterArgs`: optional extra CLI arguments for the preset command;
+- `dangerouslySkipPermissions`: for `claude-code`, pass Claude Code's
+  non-interactive permission bypass flag for isolated benchmark clones;
+- `dangerouslyBypassApprovalsAndSandbox`: for `codex`, pass Codex's
+  unrestricted mode for externally isolated benchmark clones;
 - `capture_stream`: optional `true`/`false`; when true, HelmBench captures
   adapter stdout as structured JSONL, converts it to source-free events, and
   discards the raw stream. In JSON config this field is `captureStream`.
@@ -121,6 +136,9 @@ Run specs use comma-separated `key=value` fields:
 The baseline command can be omitted. In that case HelmBench still clones the
 repo, runs the task validation command, infers edited files, and records a
 source-free baseline trace.
+Do not combine `command` and `preset` in the same run row; presets are the safer
+path for real Claude/Codex matrices because they inject the source-free
+`record-event` instructions automatically.
 
 ## Outputs
 
@@ -254,8 +272,8 @@ helmbench run-matrix \
   --suite /tmp/refactoringminer-suite.json \
   --repo /tmp/RefactoringMiner \
   --out-dir /tmp/refactoringminer-matrix \
-  --baseline "name=native,agent=claude-code,variant=native,command=claude --print" \
-  --head "name=ctxhelm,agent=claude-code,variant=ctxhelm_mcp,ctxhelm=true,mode=bug-fix,target_agent=claude-code,pack=true,pack_budget=brief,command=claude --print" \
+  --baseline "name=native,agent=claude-code,variant=native,preset=claude-code,dangerously_skip_permissions=true" \
+  --head "name=ctxhelm,agent=claude-code,variant=ctxhelm_mcp,ctxhelm=true,mode=bug-fix,target_agent=claude-code,pack=true,pack_budget=brief,preset=claude-code,dangerously_skip_permissions=true" \
   --force
 ```
 

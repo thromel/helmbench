@@ -69,6 +69,9 @@ This repository currently implements the core HelmBench workflow:
   local adapter variants and emits reports, comparisons, dashboard, quality
   gate, suite-health, per-run autopsies, privacy report, reproduction guide,
   evidence bundle artifacts, and source-free reproducibility provenance
+- first-class `run-matrix` row presets for Claude Code and Codex, so real
+  agent matrices can inject the source-free event contract without hand-written
+  adapter commands
 - `matrix-history` longitudinal comparison and static HTML trend dashboards for
   verified run-matrix outputs
 - `diff-autopsy` reviewer report that compares a git worktree, branch diff, or
@@ -176,8 +179,8 @@ cargo run -- run-matrix \
   --repo /tmp/helmbench-demo-repo \
   --out-dir /tmp/helmbench-matrix \
   --baseline "name=native,agent=demo-baseline,variant=native" \
-  --head "name=native-search,agent=demo-search,variant=native_search,command=HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-agent.sh" \
-  --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,command=HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-agent.sh" \
+  --head "name=native-search,agent=demo-search,variant=native_search,preset=claude-code,bin=scripts/demo-local-agent.sh,dangerously_skip_permissions=true" \
+  --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,ctxhelm=true,ctxhelm_bin=scripts/demo-ctxhelm.sh,pack=true,pack_budget=brief,preset=claude-code,bin=scripts/demo-local-agent.sh,dangerously_skip_permissions=true" \
   --force
 
 cargo run -- verify-bundle \
@@ -211,7 +214,8 @@ HELMBENCH_BIN=$(pwd)/target/debug/helmbench \
 The checked-in `suites/demo-matrix.json` is self-contained for a fresh
 HelmBench checkout. It runs the tracked `local-run-smoke` suite against this
 repo, compares native, native-search, and ctxhelm-guided rows, and uses
-`scripts/demo-ctxhelm.sh` as a deterministic source-free ctxhelm shim.
+`scripts/demo-local-agent.sh` through the `claude-code` matrix preset plus
+`scripts/demo-ctxhelm.sh` as deterministic source-free shims.
 
 Every successful matrix run writes `matrix-manifest.json`, a source-free
 top-level index of run labels, suite-health, report paths,

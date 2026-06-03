@@ -53,6 +53,18 @@ Options:
   convert it to source-free events, and discard the raw stream.
 - `--keep-workdirs`: preserve cloned task workdirs for debugging.
 
+For comparative benchmark runs, use the same launcher through `run-matrix`:
+
+```bash
+helmbench run-matrix \
+  --suite suites/refactoring-miner-public.json \
+  --repo /tmp/RefactoringMiner \
+  --baseline "name=native,agent=claude-code,variant=native,preset=claude-code,dangerously_skip_permissions=true" \
+  --head "name=ctxhelm,agent=claude-code,variant=ctxhelm_mcp,ctxhelm=true,mode=bug-fix,target_agent=claude-code,pack=true,preset=claude-code,dangerously_skip_permissions=true" \
+  --out-dir /tmp/refactoringminer-matrix \
+  --force
+```
+
 ## Codex
 
 ```bash
@@ -74,6 +86,9 @@ Options:
 - `--capture-stream`: capture stdout as structured JSONL tool metadata,
   convert it to source-free events, and discard the raw stream.
 - `--keep-workdirs`: preserve cloned task workdirs for debugging.
+
+`run-matrix` also supports `preset=codex` rows with optional `bin`, `model`,
+`args`, and `dangerously_bypass_approvals_and_sandbox` fields.
 
 ## Telemetry Limits
 

@@ -36,6 +36,8 @@ test -f docs/refactoringminer-ctxhelm-plan.md
 test -f reports/refactoringminer-suite-health.json
 test -f reports/refactoringminer-ctxhelm-plan.json
 test -f suites/refactoring-miner-public.json
+grep -q '"preset": "claude-code"' suites/demo-matrix.json
+grep -q 'preset=claude-code' docs/run-matrix.md
 grep -q 'HelmBench Launch Proof' docs/launch-proof.md
 grep -q 'Low sample size: 1 task' docs/example-benchmark-summary.md
 grep -q 'raw source' docs/launch-proof.md
@@ -96,6 +98,8 @@ grep -q '"title": "HelmBench Compare Report"' "$TMP_DIR/compare-report.schema.js
 grep -q '"title": "HelmBench Benchmark Summary"' "$TMP_DIR/benchmark-summary.schema.json"
 grep -q '"title": "HelmBench Quality Gate"' "$TMP_DIR/quality-gate.schema.json"
 grep -q '"title": "HelmBench Run Matrix Config"' "$TMP_DIR/run-matrix-config.schema.json"
+grep -q '"adapterPreset"' "$TMP_DIR/run-matrix-config.schema.json"
+grep -q '"claude-code"' "$TMP_DIR/run-matrix-config.schema.json"
 grep -q '"title": "HelmBench Matrix History"' "$TMP_DIR/matrix-history.schema.json"
 grep -q '"title": "HelmBench Doctor Report"' "$TMP_DIR/doctor-report.schema.json"
 grep -q '"title": "HelmBench Autopsy"' "$TMP_DIR/autopsy.schema.json"
@@ -103,6 +107,7 @@ grep -q '"title": "HelmBench Diff Autopsy"' "$TMP_DIR/diff-autopsy.schema.json"
 grep -q '"title": "HelmBench Suite Health"' "$TMP_DIR/suite-health.schema.json"
 grep -q '"title": "HelmBench Evidence Bundle"' "$TMP_DIR/evidence-bundle.schema.json"
 grep -q '"title": "HelmBench Run Matrix Manifest"' "$TMP_DIR/run-matrix-manifest.schema.json"
+grep -q '"adapterPreset"' "$TMP_DIR/run-matrix-manifest.schema.json"
 grep -q '"title": "HelmBench Run Matrix Privacy Report"' "$TMP_DIR/run-matrix-privacy-report.schema.json"
 test -f "$TMP_DIR/all-schemas/task-suite.schema.json"
 test -f "$TMP_DIR/all-schemas/run-matrix-privacy-report.schema.json"
@@ -409,6 +414,7 @@ grep -q '"ctxhelmEnabled": true' "$TMP_DIR/matrix-config/matrix-manifest.json"
 grep -q '"packEnabled": true' "$TMP_DIR/matrix-config/matrix-manifest.json"
 grep -q '"ctxhelmEnabled": true' "$TMP_DIR/checked-in-matrix/matrix-manifest.json"
 grep -q '"packEnabled": true' "$TMP_DIR/checked-in-matrix/matrix-manifest.json"
+grep -q '"adapterPreset": "claude-code"' "$TMP_DIR/checked-in-matrix/matrix-manifest.json"
 grep -q '"totalTokenEstimate": 642' "$TMP_DIR/matrix/reports/guided.json"
 grep -q '"totalTokenEstimate": 642' "$TMP_DIR/matrix-config/reports/guided.json"
 grep -q '"totalTokenEstimate": 64' "$TMP_DIR/checked-in-matrix/reports/guided.json"
