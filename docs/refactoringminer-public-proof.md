@@ -99,8 +99,9 @@ raw transcripts, raw terminal logs, raw MCP payloads, or ctxhelm pack snippets.
 ## Next Step
 
 The next launch-grade proof is a full `run-matrix` over this same 10-task suite
-with at least one real agent baseline and one ctxhelm-guided agent row. Use the
-`preset=claude-code` or `preset=codex` matrix rows from
+with at least one real agent baseline and one ctxhelm-guided agent row, but
+only after the validation baseline is checked. Use the `preset=claude-code` or
+`preset=codex` matrix rows from
 [`docs/run-matrix.md`](run-matrix.md) so HelmBench injects the source-free event
 contract instead of relying on hand-written adapter commands.
 
@@ -122,6 +123,13 @@ cargo run -- init-public-matrix \
 cargo run -- validate-matrix \
   --config /tmp/refactoring-miner-matrix.json
 
+cargo run -- suite-health \
+  --suite suites/refactoring-miner-public.json \
+  --repo <refactoringminer-repo> \
+  --out /tmp/refactoring-miner-outcome-health.json \
+  --min-commits 1000 \
+  --check-success-commands
+
 cargo run -- run-matrix \
   --config /tmp/refactoring-miner-matrix.json \
   --force
@@ -129,4 +137,6 @@ cargo run -- run-matrix \
 
 This recommendation proof establishes the public-suite target and source-free
 measurement contract first; `init-public-matrix` is the repeatable bridge from
-that target to real agent outcome evidence.
+that target to real agent outcome evidence. If the success commands already
+pass before any agent changes, treat the matrix as navigation/validation
+behavior evidence, not task-success evidence, until seeded task setup is added.

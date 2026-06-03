@@ -28,7 +28,8 @@ Available schema kinds:
 - `diff-autopsy`: source-free reviewer-style diagnosis of changed paths against
   one benchmark task.
 - `suite-health`: source-free preflight report proving a suite is usable
-  against a local git repository before benchmark results are trusted.
+  against a local git repository before benchmark results are trusted,
+  optionally including validation-baseline command hashes and statuses.
 - `evidence-bundle`: source-free manifest for publishable benchmark evidence,
   including artifact paths, byte counts, and content hashes.
 - `run-matrix-manifest`: top-level source-free identity and artifact index for

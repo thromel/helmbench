@@ -103,6 +103,33 @@
         "minLength": 1
       }
     },
+    "successCommandCheckRequested": {
+      "type": "boolean"
+    },
+    "successCommandCheckReady": {
+      "type": "boolean"
+    },
+    "validationBaselineReady": {
+      "type": "boolean"
+    },
+    "baselineSuccessCommandPassCount": {
+      "$ref": "#/$defs/nonNegativeInteger"
+    },
+    "baselineSuccessCommandFailCount": {
+      "$ref": "#/$defs/nonNegativeInteger"
+    },
+    "baselineSuccessCommandTimeoutCount": {
+      "$ref": "#/$defs/nonNegativeInteger"
+    },
+    "baselineSuccessCommandSkippedCount": {
+      "$ref": "#/$defs/nonNegativeInteger"
+    },
+    "baselineSuccessCommands": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/successCommandBaseline"
+      }
+    },
     "ok": {
       "type": "boolean"
     },
@@ -136,6 +163,40 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/safeRelativePath"
+      }
+    },
+    "successCommandBaseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "commandClass",
+        "commandHash",
+        "exitStatus",
+        "elapsedMillis",
+        "timedOut"
+      ],
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commandClass": {
+          "enum": ["test", "build", "lint", "typecheck", "other"]
+        },
+        "commandHash": {
+          "type": "string",
+          "pattern": "^cmd:"
+        },
+        "exitStatus": {
+          "type": ["integer", "null"]
+        },
+        "elapsedMillis": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "timedOut": {
+          "type": "boolean"
+        }
       }
     },
     "privacy": {

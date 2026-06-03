@@ -195,6 +195,8 @@ enum Command {
         min_commits: u64,
         #[arg(long)]
         allow_dirty: bool,
+        #[arg(long)]
+        check_success_commands: bool,
     },
     /// Validate a HelmBench suite contract.
     ValidateSuite { suite: PathBuf },
@@ -849,9 +851,18 @@ fn main() -> Result<()> {
             format,
             min_commits,
             allow_dirty,
+            check_success_commands,
         } => {
             let suite = load_suite(&suite)?;
-            let health = suite_health_report(None, &repo, min_commits, allow_dirty, &suite, &[])?;
+            let health = suite_health_report(
+                None,
+                &repo,
+                min_commits,
+                allow_dirty,
+                check_success_commands,
+                &suite,
+                &[],
+            )?;
             match format {
                 OutputFormat::Json => write_json(&health, &out)?,
                 OutputFormat::Markdown => write_text(&render_markdown_suite_health(&health), &out)?,
@@ -1809,8 +1820,35 @@ struct PublicSuiteHealth {
     missing_expected_files: Vec<String>,
     missing_expected_tests: Vec<String>,
     tasks_missing_success_command: Vec<String>,
+    #[serde(default)]
+    success_command_check_requested: bool,
+    #[serde(default)]
+    success_command_check_ready: bool,
+    #[serde(default)]
+    validation_baseline_ready: bool,
+    #[serde(default)]
+    baseline_success_command_pass_count: usize,
+    #[serde(default)]
+    baseline_success_command_fail_count: usize,
+    #[serde(default)]
+    baseline_success_command_timeout_count: usize,
+    #[serde(default)]
+    baseline_success_command_skipped_count: usize,
+    #[serde(default)]
+    baseline_success_commands: Vec<SuccessCommandBaseline>,
     ok: bool,
     privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct SuccessCommandBaseline {
+    task_id: String,
+    command_class: CommandClass,
+    command_hash: String,
+    exit_status: Option<i32>,
+    elapsed_millis: u64,
+    timed_out: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2070,6 +2108,18 @@ fn validate_public_suite_health(path: &Path) -> Result<()> {
     {
         helmbench::validate_safe_relative_path_for_cli(checked)?;
     }
+    for result in &health.baseline_success_commands {
+        if result.task_id.trim().is_empty() {
+            anyhow::bail!("health baseline command taskId must not be empty");
+        }
+        if !result.command_hash.starts_with("cmd:") {
+            anyhow::bail!(
+                "health baseline command for `{}` has unsupported commandHash `{}`",
+                result.task_id,
+                result.command_hash
+            );
+        }
+    }
     Ok(())
 }
 
@@ -2201,6 +2251,7 @@ fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
         &options.repo,
         options.health_min_commits,
         options.allow_dirty_health,
+        false,
         &suite,
         public_suite_anchor_files(options.preset),
     )?;
@@ -2327,6 +2378,7 @@ fn public_suite_health(
         repo,
         min_commits,
         false,
+        false,
         suite,
         public_suite_anchor_files(preset),
     )
@@ -2337,6 +2389,7 @@ fn suite_health_report(
     repo: &Path,
     min_commits: u64,
     allow_dirty: bool,
+    check_success_commands: bool,
     suite: &helmbench::TaskSuite,
     anchor_files: &[&str],
 ) -> Result<PublicSuiteHealth> {
@@ -2390,6 +2443,37 @@ fn suite_health_report(
         .map(|task| task.expected_tests.len())
         .sum::<usize>();
     let validation_ready = tasks_missing_success_command.is_empty();
+    let baseline_success_commands = if check_success_commands {
+        success_command_baseline(repo, suite)?
+    } else {
+        Vec::new()
+    };
+    let baseline_success_command_pass_count = baseline_success_commands
+        .iter()
+        .filter(|result| !result.timed_out && result.exit_status == Some(0))
+        .count();
+    let baseline_success_command_timeout_count = baseline_success_commands
+        .iter()
+        .filter(|result| result.timed_out)
+        .count();
+    let baseline_success_command_skipped_count = if check_success_commands {
+        suite
+            .tasks
+            .len()
+            .saturating_sub(baseline_success_commands.len())
+    } else {
+        0
+    };
+    let baseline_success_command_fail_count = baseline_success_commands
+        .len()
+        .saturating_sub(baseline_success_command_pass_count)
+        .saturating_sub(baseline_success_command_timeout_count);
+    let success_command_check_ready =
+        check_success_commands && validation_ready && baseline_success_command_skipped_count == 0;
+    let validation_baseline_ready = success_command_check_ready
+        && baseline_success_command_fail_count == suite.tasks.len()
+        && baseline_success_command_pass_count == 0
+        && baseline_success_command_timeout_count == 0;
 
     let head = git_output(repo, &["rev-parse", "HEAD"]).ok();
     let commit_count = git_output(repo, &["rev-list", "--count", "HEAD"])
@@ -2405,6 +2489,7 @@ fn suite_health_report(
         && (!dirty || allow_dirty)
         && fsck_ok
         && validation_ready
+        && (!check_success_commands || validation_baseline_ready)
         && missing_files.is_empty()
         && missing_expected_files.is_empty()
         && missing_expected_tests.is_empty();
@@ -2429,9 +2514,82 @@ fn suite_health_report(
         missing_expected_files,
         missing_expected_tests,
         tasks_missing_success_command,
+        success_command_check_requested: check_success_commands,
+        success_command_check_ready,
+        validation_baseline_ready,
+        baseline_success_command_pass_count,
+        baseline_success_command_fail_count,
+        baseline_success_command_timeout_count,
+        baseline_success_command_skipped_count,
+        baseline_success_commands,
         ok,
         privacy: PrivacyStatus::source_free(),
     })
+}
+
+fn success_command_baseline(
+    repo: &Path,
+    suite: &helmbench::TaskSuite,
+) -> Result<Vec<SuccessCommandBaseline>> {
+    let temp = TempDirGuard::create("helmbench-success-baseline")?;
+    let mut results = Vec::new();
+    for task in &suite.tasks {
+        let Some(command) = task
+            .success_command
+            .as_deref()
+            .filter(|command| !command.trim().is_empty())
+        else {
+            continue;
+        };
+        let task_dir = temp.path().join(safe_task_dir_name(&task.id));
+        clone_repo(repo, &task_dir)?;
+        let result = run_shell(command, &task_dir, &[], task.timeout_seconds)?;
+        results.push(SuccessCommandBaseline {
+            task_id: task.id.clone(),
+            command_class: infer_command_class(command),
+            command_hash: command_hash(command),
+            exit_status: result.exit_status,
+            elapsed_millis: result.elapsed_millis,
+            timed_out: result.timed_out,
+        });
+    }
+    Ok(results)
+}
+
+struct TempDirGuard {
+    path: PathBuf,
+}
+
+impl TempDirGuard {
+    fn create(prefix: &str) -> Result<Self> {
+        for attempt in 0..100 {
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|duration| duration.as_nanos())
+                .unwrap_or_default();
+            let path = std::env::temp_dir()
+                .join(format!("{prefix}-{}-{nanos}-{attempt}", std::process::id()));
+            match std::fs::create_dir(&path) {
+                Ok(()) => return Ok(Self { path }),
+                Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+                Err(error) => {
+                    return Err(error)
+                        .with_context(|| format!("create temp dir {}", path.display()));
+                }
+            }
+        }
+        anyhow::bail!("could not create unique temp dir for {prefix}")
+    }
+
+    fn path(&self) -> &Path {
+        &self.path
+    }
+}
+
+impl Drop for TempDirGuard {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.path);
+    }
 }
 
 fn public_suite_for_preset(preset: PublicSuitePreset) -> helmbench::TaskSuite {
@@ -2545,6 +2703,23 @@ fn render_markdown_suite_health(health: &PublicSuiteHealth) -> String {
         "| Validation commands ready | {} |\n",
         yes_no(health.validation_ready)
     ));
+    out.push_str(&format!(
+        "| Success commands checked | {} |\n",
+        yes_no(health.success_command_check_requested)
+    ));
+    out.push_str(&format!(
+        "| Validation baseline ready | {} |\n",
+        yes_no(health.validation_baseline_ready)
+    ));
+    if health.success_command_check_requested {
+        out.push_str(&format!(
+            "| Baseline success commands pass / fail / timeout / skipped | {} / {} / {} / {} |\n",
+            health.baseline_success_command_pass_count,
+            health.baseline_success_command_fail_count,
+            health.baseline_success_command_timeout_count,
+            health.baseline_success_command_skipped_count
+        ));
+    }
     out.push_str("\n## Missing Evidence\n\n");
     append_markdown_list(&mut out, "Missing files", &health.missing_files);
     append_markdown_list(
@@ -2562,6 +2737,30 @@ fn render_markdown_suite_health(health: &PublicSuiteHealth) -> String {
         "Tasks missing success commands",
         &health.tasks_missing_success_command,
     );
+    if health.success_command_check_requested {
+        out.push_str("\n## Validation Baseline\n\n");
+        out.push_str(
+            "A task-success benchmark is outcome-ready when validation commands fail before the agent runs and pass only after the agent's changes.\n\n",
+        );
+        out.push_str("| Task | Class | Status | Timed out | Elapsed ms |\n");
+        out.push_str("| --- | --- | ---: | --- | ---: |\n");
+        for result in &health.baseline_success_commands {
+            out.push_str(&format!(
+                "| `{}` | `{}` | {} | {} | {} |\n",
+                result.task_id,
+                command_class_label(&result.command_class),
+                result
+                    .exit_status
+                    .map(|status| status.to_string())
+                    .unwrap_or_else(|| "unknown".to_string()),
+                yes_no(result.timed_out),
+                result.elapsed_millis
+            ));
+        }
+        if health.baseline_success_commands.is_empty() {
+            out.push_str("| none | `other` |  | no | 0 |\n");
+        }
+    }
     out.push_str("\n## Privacy\n\n");
     out.push_str("- Source-free: `true`\n");
     out.push_str("- Raw source logged: `false`\n");
@@ -2569,6 +2768,16 @@ fn render_markdown_suite_health(health: &PublicSuiteHealth) -> String {
     out.push_str("- Raw transcripts logged: `false`\n");
     out.push_str("- Raw terminal logs logged: `false`\n");
     out
+}
+
+fn command_class_label(class: &CommandClass) -> &'static str {
+    match class {
+        CommandClass::Test => "test",
+        CommandClass::Build => "build",
+        CommandClass::Lint => "lint",
+        CommandClass::Typecheck => "typecheck",
+        CommandClass::Other => "other",
+    }
 }
 
 fn append_markdown_list(out: &mut String, title: &str, values: &[String]) {
@@ -3721,6 +3930,7 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         &request.repo,
         request.health_min_commits,
         request.allow_dirty_health,
+        false,
         &suite,
         &[],
     )?;
@@ -8175,7 +8385,8 @@ mod tests {
         init_demo_repo(&repo, &suite_path, false).expect("demo repo");
         let suite = load_suite(&suite_path).expect("suite");
 
-        let health = suite_health_report(None, &repo, 1, false, &suite, &[]).expect("suite health");
+        let health =
+            suite_health_report(None, &repo, 1, false, false, &suite, &[]).expect("suite health");
 
         assert!(health.ok);
         assert_eq!(health.preset, "custom");
@@ -8192,6 +8403,54 @@ mod tests {
         let rendered = render_markdown_suite_health(&health);
         assert!(rendered.contains("Status: **healthy**"));
         assert!(rendered.contains("Raw source logged: `false`"));
+    }
+
+    #[test]
+    fn suite_health_can_gate_validation_baseline_without_command_text() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).expect("repo");
+        write_demo_file(&repo, "src/target.txt", "current\n").expect("target");
+        write_demo_file(&repo, "tests/target.test", "fixture\n").expect("test");
+        init_git_repo(&repo).expect("git repo");
+
+        let mut suite = helmbench::TaskSuite {
+            schema_version: helmbench::SUITE_SCHEMA_VERSION,
+            name: "baseline-suite".to_string(),
+            description: String::new(),
+            tasks: vec![helmbench::BenchTask {
+                id: "needs-agent-change".to_string(),
+                prompt: "Fix the target.".to_string(),
+                expected_files: vec!["src/target.txt".to_string()],
+                expected_tests: vec!["tests/target.test".to_string()],
+                success_command: Some("test -f fixed.txt".to_string()),
+                tags: Vec::new(),
+                timeout_seconds: Some(30),
+            }],
+        };
+
+        let failing = suite_health_report(None, &repo, 1, false, true, &suite, &[])
+            .expect("failing baseline health");
+        assert!(failing.ok);
+        assert!(failing.success_command_check_requested);
+        assert!(failing.success_command_check_ready);
+        assert!(failing.validation_baseline_ready);
+        assert_eq!(failing.baseline_success_command_fail_count, 1);
+        assert_eq!(failing.baseline_success_command_pass_count, 0);
+        assert_eq!(failing.baseline_success_commands.len(), 1);
+        assert!(failing.baseline_success_commands[0]
+            .command_hash
+            .starts_with("cmd:"));
+
+        suite.tasks[0].success_command = Some("test -f src/target.txt".to_string());
+        let passing = suite_health_report(None, &repo, 1, false, true, &suite, &[])
+            .expect("passing baseline health");
+        assert!(!passing.ok);
+        assert!(!passing.validation_baseline_ready);
+        assert_eq!(passing.baseline_success_command_pass_count, 1);
+        let rendered = render_markdown_suite_health(&passing);
+        assert!(rendered.contains("Validation baseline"));
+        assert!(!rendered.contains("test -f src/target.txt"));
     }
 
     #[test]
@@ -8216,7 +8475,8 @@ mod tests {
             }],
         };
 
-        let health = suite_health_report(None, &repo, 1, false, &suite, &[]).expect("suite health");
+        let health =
+            suite_health_report(None, &repo, 1, false, false, &suite, &[]).expect("suite health");
 
         assert!(!health.ok);
         assert_eq!(health.missing_expected_files, vec!["src/missing.rs"]);
@@ -8301,6 +8561,14 @@ mod tests {
                 missing_expected_files: Vec::new(),
                 missing_expected_tests: Vec::new(),
                 tasks_missing_success_command: Vec::new(),
+                success_command_check_requested: false,
+                success_command_check_ready: false,
+                validation_baseline_ready: false,
+                baseline_success_command_pass_count: 0,
+                baseline_success_command_fail_count: 0,
+                baseline_success_command_timeout_count: 0,
+                baseline_success_command_skipped_count: 0,
+                baseline_success_commands: Vec::new(),
                 ok: true,
                 privacy: PrivacyStatus::source_free(),
             },

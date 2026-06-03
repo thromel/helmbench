@@ -216,6 +216,11 @@ passes the source-free suite-health gate, so the generated real-agent proof path
 keeps the same privacy and reproducibility contract as the recommendation
 trace flow.
 
+Before using a public-suite matrix for task-success claims, run
+`suite-health --check-success-commands`. Public suite tasks are only outcome
+ready when validation fails before the agent runs; otherwise, the matrix should
+be described as navigation and validation-behavior evidence.
+
 ## Health Failures
 
 If the repository is dirty, corrupt, too shallow, or missing expected anchor

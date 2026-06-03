@@ -36,7 +36,10 @@ guide, dashboard, and verifiable evidence bundle.
 that expected files and tests exist in the target repo, every task has a
 validation command, git metadata is readable, and the checkout is clean unless
 explicitly allowed. The resulting health report is source-free and can be
-included in evidence bundles.
+included in evidence bundles. With `--check-success-commands`, it also runs
+validation commands in isolated clones and reports whether they fail before any
+agent changes, which is required before treating task-success numbers as
+outcome evidence.
 
 `run-matrix` runs the same suite-health check before launching any row. The
 health JSON is saved under `reports/suite-health.json`, referenced from

@@ -102,4 +102,6 @@ one real agent baseline and one ctxhelm-guided agent row, then publishing the
 verified matrix directory and evidence bundle. That is the path from
 recommendation proof to launch-grade agent outcome evidence. Use
 `init-public-matrix` to generate that matrix config after the RefactoringMiner
-fixture passes suite health, then run `verify-matrix` on the generated output.
+fixture passes suite health, run `suite-health --check-success-commands` to
+prove validation does not already pass before the agent runs, then run
+`verify-matrix` on the generated output.

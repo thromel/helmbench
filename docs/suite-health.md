@@ -26,6 +26,23 @@ helmbench suite-health \
   --format markdown
 ```
 
+For outcome benchmark proof, check whether each task's validation command fails
+before any agent runs:
+
+```bash
+helmbench suite-health \
+  --suite suites/my-suite.json \
+  --repo ~/work/example-repo \
+  --out /tmp/example-health.json \
+  --check-success-commands
+```
+
+With this flag, HelmBench runs each `successCommand` inside an isolated clone
+and stores only source-free command metadata: task id, command class, command
+hash, exit status, timeout status, and elapsed milliseconds. If validation
+already passes before the agent edits the repo, `validationBaselineReady` is
+`false` and the health command exits non-zero after writing the report.
+
 By default, HelmBench requires a clean checkout and at least one commit. For
 local exploratory runs, a dirty checkout can be allowed explicitly:
 
@@ -49,10 +66,11 @@ The report records only source-free metadata:
 - expected file/test counts;
 - missing expected files and tests;
 - tasks missing `successCommand`;
+- optional validation-baseline status for `successCommand`s;
 - source-free privacy flags.
 
 It does not store raw source, prompts beyond suite task prompts, transcripts,
-terminal logs, or command text.
+terminal logs, stdout/stderr, or command text.
 
 ## Healthy Criteria
 
@@ -65,6 +83,11 @@ A suite is healthy when:
 - git fsck passes;
 - every expected file and expected test exists;
 - every task has a non-empty `successCommand`.
+
+When `--check-success-commands` is enabled, the suite is additionally healthy
+only when every `successCommand` fails before the agent runs. This prevents
+publishing task-success claims for suites whose validation commands already pass
+on a clean checkout.
 
 If the suite is unhealthy, HelmBench writes the report first and then exits
 non-zero. This makes it useful in CI because the failure still leaves a

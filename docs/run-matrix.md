@@ -128,6 +128,12 @@ and fails if the suite/repo preflight is unhealthy. This keeps publishable
 matrix evidence tied to a checked git repo, expected file/test existence,
 success-command coverage, and source-free privacy flags.
 
+For task-success claims, run `suite-health --check-success-commands` before
+publishing a real-agent matrix. That explicit gate runs validation commands in
+isolated clones and proves they fail before the agent changes the repo. If they
+already pass, treat the matrix as navigation/validation-behavior evidence, not
+outcome evidence.
+
 Run specs use comma-separated `key=value` fields:
 
 - `name`: stable run identifier used in output paths;

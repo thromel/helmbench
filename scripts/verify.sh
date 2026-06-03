@@ -146,6 +146,14 @@ cargo run -- suite-health \
   --out "$TMP_DIR/suite-health.md" \
   --format markdown
 
+cargo run -- suite-health \
+  --suite "$TMP_DIR/demo-suite.json" \
+  --repo "$TMP_DIR/demo-repo" \
+  --out "$TMP_DIR/suite-health-baseline.json" \
+  --check-success-commands
+grep -q '"successCommandCheckRequested": true' "$TMP_DIR/suite-health-baseline.json"
+grep -q '"validationBaselineReady": true' "$TMP_DIR/suite-health-baseline.json"
+
 cargo run -- local-run \
   --suite "$TMP_DIR/demo-suite.json" \
   --repo "$TMP_DIR/demo-repo" \

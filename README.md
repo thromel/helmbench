@@ -73,6 +73,9 @@ This repository currently implements the core HelmBench workflow:
   configs, with source-free fixture health checked before the config is written
 - `suite-health` checks any source-free suite against a local git repo before
   benchmark results are trusted
+- opt-in `suite-health --check-success-commands` gate that runs validation
+  commands in isolated clones and flags suites whose success commands already
+  pass before any agent changes
 - `demo-run` one-command deterministic demo pipeline with reports, dashboard,
   privacy report, quality gate, and evidence bundle
 - `run-matrix` benchmark coordinator that runs one baseline plus one or more
@@ -328,6 +331,10 @@ cargo run -- suite-health \
 configured minimum, expected files/tests exist, success commands are present,
 and the checkout is clean unless `--allow-dirty` is set. The report is
 source-free and can be included in evidence bundles.
+
+For outcome claims, add `--check-success-commands`. HelmBench will run each
+validation command in an isolated clone and fail the health check if validation
+already passes before an agent changes the repo.
 
 Build reports from source-free traces:
 
