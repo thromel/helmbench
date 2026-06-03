@@ -38,7 +38,8 @@ This repository currently implements the core HelmBench workflow:
   matrix runs that parses structured stdout in memory and persists only
   source-free events
 - `init-public-suite` generator for verified public-repo benchmark suites,
-  currently RefactoringMiner, Flask, and ripgrep
+  currently including a 10-task RefactoringMiner suite plus Flask and ripgrep
+  presets
 - `suite-health` checks any source-free suite against a local git repo before
   benchmark results are trusted
 - `demo-run` one-command deterministic demo pipeline with reports, dashboard,
@@ -179,7 +180,9 @@ Add `ctxhelm=true` to a `--head` spec when the row should call
 recommendation and token metadata.
 
 Generate a source-free public benchmark suite after checking fixture health.
-Supported presets are `refactoring-miner`, `flask`, and `ripgrep`:
+Supported presets are `refactoring-miner`, `flask`, and `ripgrep`. The
+RefactoringMiner preset emits 10 tasks, enough to clear HelmBench's recommended
+minimum benchmark size without a low-sample warning:
 
 ```bash
 cargo run -- init-public-suite \

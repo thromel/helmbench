@@ -6,8 +6,9 @@ writes a source-free health report before the suite is trusted.
 The command is for larger, recruiter-readable runs where the tiny demo fixture
 is too small to prove navigation quality. Current presets:
 
-- `refactoring-miner`: Java/Gradle codebase with a long Git history and real
-  MCP, web diff, AST diff, and git-history components.
+- `refactoring-miner`: Java/Gradle codebase with a long Git history and a
+  10-task suite spanning MCP, web diff, AST diff, CLI, and git-history
+  components.
 - `flask`: Python web framework with focused config, blueprint/routing,
   templating, and CLI task areas.
 - `ripgrep`: Rust CLI/workspace codebase with ignore traversal, pattern
@@ -48,14 +49,21 @@ preset-specific defaults:
 - `suites/ripgrep-public.json`
 - `.helmbench/ripgrep-public-suite-health.json`
 
-## Included Tasks
+## RefactoringMiner Tasks
 
-The RefactoringMiner preset currently emits four source-free tasks:
+The RefactoringMiner preset emits 10 source-free tasks, enough to clear
+HelmBench's recommended minimum benchmark size:
 
 - `rm-mcp-intent-validation-001`
 - `rm-mcp-tools-contract-001`
 - `rm-webdiff-viewed-files-001`
 - `rm-git-history-merge-001`
+- `rm-mcp-service-repository-001`
+- `rm-mcp-server-startup-001`
+- `rm-astdiff-comments-001`
+- `rm-astdiff-python-001`
+- `rm-astdiff-matchers-001`
+- `rm-cli-command-line-001`
 
 Each task contains expected source files, expected test files, tags, timeout
 metadata, and a targeted Gradle `successCommand`. The suite is meant to compare

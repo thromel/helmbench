@@ -2044,6 +2044,100 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                 tags: vec!["public_repo".to_string(), "git_history".to_string(), "bug_fix".to_string()],
                 timeout_seconds: Some(1200),
             },
+            helmbench::BenchTask {
+                id: "rm-mcp-service-repository-001".to_string(),
+                prompt: "Tighten MCP service repository handling while preserving analysis and refactoring result contracts.".to_string(),
+                expected_files: vec![
+                    "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java".to_string(),
+                    "src/main/java/org/refactoringminer/mcp/McpAnalysisResult.java".to_string(),
+                    "src/main/java/org/refactoringminer/mcp/McpRefactoringResult.java".to_string(),
+                ],
+                expected_tests: vec![
+                    "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServiceTest.java".to_string(),
+                    "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServiceRepositoryTest.java".to_string(),
+                ],
+                success_command: Some("./gradlew test --tests org.refactoringminer.mcp.RefactoringMinerMcpServiceTest --tests org.refactoringminer.mcp.RefactoringMinerMcpServiceRepositoryTest".to_string()),
+                tags: vec!["public_repo".to_string(), "mcp".to_string(), "repository".to_string(), "bug_fix".to_string()],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "rm-mcp-server-startup-001".to_string(),
+                prompt: "Improve MCP server startup and web-diff launcher behavior without changing unrelated tool contracts.".to_string(),
+                expected_files: vec![
+                    "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpServer.java".to_string(),
+                    "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java".to_string(),
+                    "src/main/java/org/refactoringminer/mcp/DiffBrowserLauncher.java".to_string(),
+                ],
+                expected_tests: vec![
+                    "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServerStartupTest.java".to_string(),
+                    "src/test/java/org/refactoringminer/mcp/WebDiffBrowserLauncherTest.java".to_string(),
+                ],
+                success_command: Some("./gradlew test --tests org.refactoringminer.mcp.RefactoringMinerMcpServerStartupTest --tests org.refactoringminer.mcp.WebDiffBrowserLauncherTest".to_string()),
+                tags: vec!["public_repo".to_string(), "mcp".to_string(), "startup".to_string(), "feature".to_string()],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "rm-astdiff-comments-001".to_string(),
+                prompt: "Adjust AST diff comment handling while keeping comment-aware and comment-ignoring visitor behavior targeted.".to_string(),
+                expected_files: vec![
+                    "src/main/java/org/refactoringminer/astDiff/visitors/JdtVisitor.java".to_string(),
+                    "src/main/java/org/refactoringminer/astDiff/visitors/JdtWithCommentsVisitor.java".to_string(),
+                    "src/main/java/org/refactoringminer/astDiff/matchers/ProjectASTDiffer.java".to_string(),
+                ],
+                expected_tests: vec![
+                    "src/test/java/org/refactoringminer/astDiff/tests/ConsideringCommentsVisitorTest.java".to_string(),
+                    "src/test/java/org/refactoringminer/astDiff/tests/IgnoringCommentsVisitorTest.java".to_string(),
+                ],
+                success_command: Some("./gradlew test --tests org.refactoringminer.astDiff.tests.ConsideringCommentsVisitorTest --tests org.refactoringminer.astDiff.tests.IgnoringCommentsVisitorTest".to_string()),
+                tags: vec!["public_repo".to_string(), "ast_diff".to_string(), "comments".to_string(), "bug_fix".to_string()],
+                timeout_seconds: Some(1200),
+            },
+            helmbench::BenchTask {
+                id: "rm-astdiff-python-001".to_string(),
+                prompt: "Improve Python AST diff parsing or stringification while preserving parser tree regression coverage.".to_string(),
+                expected_files: vec![
+                    "src/main/java/extension/ast/builder/python/PyASTBuilder.java".to_string(),
+                    "src/main/java/extension/ast/stringifier/PyASTFlattener.java".to_string(),
+                    "src/main/java/extension/base/LangSupportedEnum.java".to_string(),
+                ],
+                expected_tests: vec![
+                    "src/test/java/org/refactoringminer/astDiff/tests/PythonDiffTest.java".to_string(),
+                    "src/test/java/org/refactoringminer/astDiff/tests/TreeFromParserTest.java".to_string(),
+                ],
+                success_command: Some("./gradlew test --tests org.refactoringminer.astDiff.tests.PythonDiffTest --tests org.refactoringminer.astDiff.tests.TreeFromParserTest".to_string()),
+                tags: vec!["public_repo".to_string(), "ast_diff".to_string(), "python".to_string(), "feature".to_string()],
+                timeout_seconds: Some(1200),
+            },
+            helmbench::BenchTask {
+                id: "rm-astdiff-matchers-001".to_string(),
+                prompt: "Tune AST tree matching behavior while preserving specific-case and matcher regression coverage.".to_string(),
+                expected_files: vec![
+                    "src/main/java/org/refactoringminer/astDiff/matchers/TreeMatcher.java".to_string(),
+                    "src/main/java/org/refactoringminer/astDiff/matchers/statement/CompositeMatcher.java".to_string(),
+                    "src/main/java/org/refactoringminer/astDiff/matchers/statement/LeafMatcher.java".to_string(),
+                ],
+                expected_tests: vec![
+                    "src/test/java/org/refactoringminer/astDiff/tests/TreeMatcherTest.java".to_string(),
+                    "src/test/java/org/refactoringminer/astDiff/tests/SpecificCasesTest.java".to_string(),
+                ],
+                success_command: Some("./gradlew test --tests org.refactoringminer.astDiff.tests.TreeMatcherTest --tests org.refactoringminer.astDiff.tests.SpecificCasesTest".to_string()),
+                tags: vec!["public_repo".to_string(), "ast_diff".to_string(), "matcher".to_string(), "refactor".to_string()],
+                timeout_seconds: Some(1200),
+            },
+            helmbench::BenchTask {
+                id: "rm-cli-command-line-001".to_string(),
+                prompt: "Improve command-line refactoring detection behavior without changing unrelated API contracts.".to_string(),
+                expected_files: vec![
+                    "src/main/java/org/refactoringminer/RefactoringMiner.java".to_string(),
+                    "src/main/java/org/refactoringminer/api/GitHistoryRefactoringMiner.java".to_string(),
+                ],
+                expected_tests: vec![
+                    "src/test/java/org/refactoringminer/test/TestCommandLine.java".to_string(),
+                ],
+                success_command: Some("./gradlew test --tests org.refactoringminer.test.TestCommandLine".to_string()),
+                tags: vec!["public_repo".to_string(), "cli".to_string(), "git_history".to_string(), "bug_fix".to_string()],
+                timeout_seconds: Some(1200),
+            },
         ],
     }
 }
@@ -6228,7 +6322,7 @@ mod tests {
         validate_suite(&suite).expect("suite");
 
         assert_eq!(suite.name, "refactoringminer-public");
-        assert_eq!(suite.tasks.len(), 4);
+        assert_eq!(suite.tasks.len(), 10);
         assert!(suite
             .tasks
             .iter()
@@ -6236,9 +6330,15 @@ mod tests {
         assert!(suite.tasks.iter().any(|task| task.expected_files.contains(
             &"src/main/java/org/refactoringminer/mcp/McpIntentValidator.java".to_string()
         )));
+        assert!(suite.tasks.iter().any(|task| task.expected_files.contains(
+            &"src/main/java/org/refactoringminer/astDiff/matchers/TreeMatcher.java".to_string()
+        )));
         assert!(suite.tasks.iter().any(|task| task
             .expected_tests
             .contains(&"src/test/java/gui/MarkAsViewedTest.java".to_string())));
+        assert!(suite.tasks.iter().any(|task| task.expected_tests.contains(
+            &"src/test/java/org/refactoringminer/test/TestCommandLine.java".to_string()
+        )));
     }
 
     #[test]
