@@ -38,6 +38,11 @@ Config format:
   "outDir": ".helmbench/matrix-demo",
   "setupCommands": [],
   "failOnRegression": true,
+  "qualityGate": {
+    "maxAverageTimeToFirstRelevantFileMillisDelta": 0,
+    "maxTotalToolCallsDelta": 0,
+    "maxTotalTokenEstimateDelta": 0
+  },
   "healthMinCommits": 1,
   "allowDirtyHealth": false,
   "baseline": {
@@ -61,10 +66,13 @@ Config format:
 ```
 
 CLI values override `suite`, `repo`, `outDir`, `baseline`, and `heads` when
-provided. `healthMinCommits` and `allowDirtyHealth` control the matrix
-suite-health gate. `setupCommands` from the config run before additional
-`--setup-command` values. Config paths are resolved from the current working
-directory.
+provided. `qualityGate` configures the source-free quality gate written to
+`reports/quality-gate.json`; the `--max-average-time-to-first-relevant-file-millis-delta`,
+`--max-total-tool-calls-delta`, and `--max-total-token-estimate-delta` CLI
+flags override those optional caps for one run. `healthMinCommits` and
+`allowDirtyHealth` control the matrix suite-health gate. `setupCommands` from
+the config run before additional `--setup-command` values. Config paths are
+resolved from the current working directory.
 
 Before any agent row executes, `run-matrix` writes `reports/suite-health.json`
 and fails if the suite/repo preflight is unhealthy. This keeps publishable
@@ -167,7 +175,7 @@ Markdown/HTML artifact, and evidence manifest exists, and then verifies the
 nested evidence bundle hashes.
 
 Use `--fail-on-regression` when this command runs in CI and should exit
-non-zero if the default quality gate fails.
+non-zero if the configured quality gate fails.
 
 ## Longitudinal History
 

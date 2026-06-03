@@ -83,6 +83,12 @@ enum Command {
         keep_workdirs: bool,
         #[arg(long)]
         fail_on_regression: bool,
+        #[arg(long)]
+        max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
+        #[arg(long)]
+        max_total_tool_calls_delta: Option<i64>,
+        #[arg(long)]
+        max_total_token_estimate_delta: Option<i64>,
         #[arg(long, default_value_t = 1)]
         health_min_commits: u64,
         #[arg(long)]
@@ -571,6 +577,9 @@ fn main() -> Result<()> {
                 false,
                 1,
                 false,
+                None,
+                None,
+                None,
             )?;
             let suite = validate_run_matrix_request(&request)?;
             println!(
@@ -593,6 +602,9 @@ fn main() -> Result<()> {
             force,
             keep_workdirs,
             fail_on_regression,
+            max_average_time_to_first_relevant_file_millis_delta,
+            max_total_tool_calls_delta,
+            max_total_token_estimate_delta,
             health_min_commits,
             allow_dirty_health,
         } => {
@@ -609,6 +621,9 @@ fn main() -> Result<()> {
                 fail_on_regression,
                 health_min_commits,
                 allow_dirty_health,
+                max_average_time_to_first_relevant_file_millis_delta,
+                max_total_tool_calls_delta,
+                max_total_token_estimate_delta,
             )?;
             run_matrix(&request)?;
             println!("wrote {}", request.out_dir.display());
@@ -2230,6 +2245,7 @@ struct RunMatrixRequest {
     force: bool,
     keep_workdirs: bool,
     fail_on_regression: bool,
+    quality_gate_config: QualityGateConfig,
     health_min_commits: u64,
     allow_dirty_health: bool,
 }
@@ -2249,6 +2265,8 @@ struct RunMatrixConfig {
     keep_workdirs: Option<bool>,
     #[serde(default)]
     fail_on_regression: Option<bool>,
+    #[serde(default)]
+    quality_gate: Option<RunMatrixQualityGateConfig>,
     #[serde(default)]
     health_min_commits: Option<u64>,
     #[serde(default)]
@@ -2287,6 +2305,29 @@ struct RunMatrixConfigSpec {
     capture_stream: bool,
 }
 
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunMatrixQualityGateConfig {
+    #[serde(default)]
+    min_success_rate_delta: Option<f32>,
+    #[serde(default)]
+    min_validation_coverage_rate_delta: Option<f32>,
+    #[serde(default)]
+    max_irrelevant_read_rate_delta: Option<f32>,
+    #[serde(default)]
+    min_recommendation_recall_delta: Option<f32>,
+    #[serde(default)]
+    min_context_precision_delta: Option<f32>,
+    #[serde(default)]
+    min_edited_file_recall_delta: Option<f32>,
+    #[serde(default)]
+    max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
+    #[serde(default)]
+    max_total_tool_calls_delta: Option<i64>,
+    #[serde(default)]
+    max_total_token_estimate_delta: Option<i64>,
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_run_matrix_request(
     config_path: Option<&Path>,
@@ -2301,6 +2342,9 @@ fn build_run_matrix_request(
     fail_on_regression: bool,
     health_min_commits: u64,
     allow_dirty_health: bool,
+    max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
+    max_total_tool_calls_delta: Option<i64>,
+    max_total_token_estimate_delta: Option<i64>,
 ) -> Result<RunMatrixRequest> {
     let config = config_path
         .map(load_run_matrix_config)
@@ -2372,6 +2416,14 @@ fn build_run_matrix_request(
             .as_ref()
             .and_then(|config| config.allow_dirty_health)
             .unwrap_or(false);
+    let quality_gate_config = run_matrix_quality_gate_config(
+        config
+            .as_ref()
+            .and_then(|config| config.quality_gate.as_ref()),
+        max_average_time_to_first_relevant_file_millis_delta,
+        max_total_tool_calls_delta,
+        max_total_token_estimate_delta,
+    );
 
     validate_run_matrix_specs(&baseline, &heads)?;
     Ok(RunMatrixRequest {
@@ -2384,9 +2436,59 @@ fn build_run_matrix_request(
         force,
         keep_workdirs,
         fail_on_regression,
+        quality_gate_config,
         health_min_commits,
         allow_dirty_health,
     })
+}
+
+fn run_matrix_quality_gate_config(
+    config: Option<&RunMatrixQualityGateConfig>,
+    max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
+    max_total_tool_calls_delta: Option<i64>,
+    max_total_token_estimate_delta: Option<i64>,
+) -> QualityGateConfig {
+    let mut gate = QualityGateConfig::default();
+    if let Some(config) = config {
+        if let Some(value) = config.min_success_rate_delta {
+            gate.min_success_rate_delta = value;
+        }
+        if let Some(value) = config.min_validation_coverage_rate_delta {
+            gate.min_validation_coverage_rate_delta = value;
+        }
+        if let Some(value) = config.max_irrelevant_read_rate_delta {
+            gate.max_irrelevant_read_rate_delta = value;
+        }
+        if let Some(value) = config.min_recommendation_recall_delta {
+            gate.min_recommendation_recall_delta = value;
+        }
+        if let Some(value) = config.min_context_precision_delta {
+            gate.min_context_precision_delta = value;
+        }
+        if let Some(value) = config.min_edited_file_recall_delta {
+            gate.min_edited_file_recall_delta = value;
+        }
+        if let Some(value) = config.max_average_time_to_first_relevant_file_millis_delta {
+            gate.max_average_time_to_first_relevant_file_millis_delta = Some(value);
+        }
+        if let Some(value) = config.max_total_tool_calls_delta {
+            gate.max_total_tool_calls_delta = Some(value);
+        }
+        if let Some(value) = config.max_total_token_estimate_delta {
+            gate.max_total_token_estimate_delta = Some(value);
+        }
+    }
+    if max_average_time_to_first_relevant_file_millis_delta.is_some() {
+        gate.max_average_time_to_first_relevant_file_millis_delta =
+            max_average_time_to_first_relevant_file_millis_delta;
+    }
+    if max_total_tool_calls_delta.is_some() {
+        gate.max_total_tool_calls_delta = max_total_tool_calls_delta;
+    }
+    if max_total_token_estimate_delta.is_some() {
+        gate.max_total_token_estimate_delta = max_total_token_estimate_delta;
+    }
+    gate
 }
 
 fn load_run_matrix_config(path: &Path) -> Result<RunMatrixConfig> {
@@ -2548,7 +2650,7 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         &docs_dir.join("benchmark-summary.md"),
     )?;
 
-    let gate = evaluate_quality_gate(&summary, &QualityGateConfig::default())?;
+    let gate = evaluate_quality_gate(&summary, &request.quality_gate_config)?;
     let quality_gate_json_path = reports_dir.join("quality-gate.json");
     write_json(&gate, &quality_gate_json_path)?;
     let quality_gate_markdown_path = docs_dir.join("quality-gate.md");
@@ -5136,6 +5238,9 @@ mod tests {
             true,
             1,
             false,
+            None,
+            None,
+            None,
         )
         .expect("matrix request");
         run_matrix(&request).expect("run matrix");
@@ -5330,6 +5435,11 @@ mod tests {
                 "failOnRegression": true,
                 "healthMinCommits": 2,
                 "allowDirtyHealth": true,
+                "qualityGate": {
+                    "maxAverageTimeToFirstRelevantFileMillisDelta": 0.0,
+                    "maxTotalToolCallsDelta": 0,
+                    "maxTotalTokenEstimateDelta": 0
+                },
                 "baseline": {
                     "name": "native",
                     "agent": "demo-baseline",
@@ -5365,6 +5475,9 @@ mod tests {
             false,
             1,
             false,
+            None,
+            None,
+            None,
         )
         .expect("request");
 
@@ -5373,6 +5486,20 @@ mod tests {
         assert_eq!(request.out_dir, PathBuf::from("matrix-out"));
         assert!(request.force);
         assert!(request.fail_on_regression);
+        assert_eq!(
+            request
+                .quality_gate_config
+                .max_average_time_to_first_relevant_file_millis_delta,
+            Some(0.0)
+        );
+        assert_eq!(
+            request.quality_gate_config.max_total_tool_calls_delta,
+            Some(0)
+        );
+        assert_eq!(
+            request.quality_gate_config.max_total_token_estimate_delta,
+            Some(0)
+        );
         assert_eq!(request.health_min_commits, 2);
         assert!(request.allow_dirty_health);
         assert_eq!(request.setup_commands, vec!["printf setup >/dev/null"]);
@@ -5408,6 +5535,9 @@ mod tests {
             true,
             3,
             false,
+            Some(-10.0),
+            Some(5),
+            Some(100),
         )
         .expect("override request");
         assert_eq!(
@@ -5424,6 +5554,24 @@ mod tests {
         );
         assert!(override_request.keep_workdirs);
         assert!(override_request.fail_on_regression);
+        assert_eq!(
+            override_request
+                .quality_gate_config
+                .max_average_time_to_first_relevant_file_millis_delta,
+            Some(-10.0)
+        );
+        assert_eq!(
+            override_request
+                .quality_gate_config
+                .max_total_tool_calls_delta,
+            Some(5)
+        );
+        assert_eq!(
+            override_request
+                .quality_gate_config
+                .max_total_token_estimate_delta,
+            Some(100)
+        );
         assert_eq!(override_request.health_min_commits, 3);
         assert!(override_request.allow_dirty_health);
     }
@@ -5470,6 +5618,9 @@ mod tests {
             false,
             1,
             false,
+            None,
+            None,
+            None,
         )
         .expect("request");
         let suite = validate_run_matrix_request(&request).expect("valid matrix");

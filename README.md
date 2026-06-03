@@ -165,6 +165,8 @@ Every successful matrix run writes `matrix-manifest.json`, a source-free
 top-level index of run labels, suite-health, report paths,
 dashboard/evidence artifacts, quality-gate status, and evidence verification
 status.
+Matrix configs can include a `qualityGate` block, including an optional cap for
+average time-to-first-relevant-file delta.
 Use `verify-matrix --matrix <out-dir>` to validate the manifest, referenced
 artifacts, and nested evidence bundle before publishing results.
 
