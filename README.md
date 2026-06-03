@@ -92,7 +92,16 @@ Check local prerequisites and optional agent integrations:
 
 ```bash
 cargo run -- doctor --repo .
+
+cargo run -- doctor \
+  --repo . \
+  --format json \
+  --out /tmp/helmbench-doctor.json
 ```
+
+The JSON doctor report is source-free. It records required checks, optional
+`ctxhelm`/Claude/Codex availability, direct-runner readiness, supported
+observation modes, and privacy flags without storing raw version strings.
 
 Install from source:
 
@@ -344,6 +353,8 @@ cargo run -- diff-autopsy \
 Run direct agent presets:
 
 ```bash
+cargo run -- doctor --repo . --format json --out /tmp/helmbench-doctor.json
+
 cargo run -- claude-run \
   --suite suites/local-run-smoke.json \
   --repo . \

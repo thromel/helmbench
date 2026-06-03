@@ -457,6 +457,10 @@ enum Command {
     Doctor {
         #[arg(long)]
         repo: Option<PathBuf>,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
+        format: OutputFormat,
+        #[arg(long)]
+        out: Option<PathBuf>,
     },
 }
 
@@ -1224,9 +1228,9 @@ fn main() -> Result<()> {
             write_text(&rendered, &out)?;
             println!("wrote {}", out.display());
         }
-        Command::Doctor { repo } => {
+        Command::Doctor { repo, format, out } => {
             let root = project_root_for_cli(repo)?;
-            run_doctor(&root)?;
+            write_doctor_report(&root, format, out.as_ref())?;
         }
     }
     Ok(())
@@ -1239,69 +1243,284 @@ fn write_text(content: &str, path: &PathBuf) -> Result<()> {
     std::fs::write(path, content).with_context(|| format!("write {}", path.display()))
 }
 
+#[cfg(test)]
 fn run_doctor(root: &Path) -> Result<()> {
-    println!("helmbench doctor");
-    println!("- repo: {}", root.display());
-    println!("- privacy: source-free reports enforced");
+    write_doctor_report(root, OutputFormat::Markdown, None)
+}
 
-    let mut required_ok = true;
-    required_ok &= print_check("git available", command_available("git"));
-    required_ok &= print_check("cargo available", command_available("cargo"));
-    required_ok &= print_check("repo is a git checkout", git_repo_ok(root));
-    required_ok &= print_check("Cargo.toml exists", root.join("Cargo.toml").exists());
-    required_ok &= print_check(
-        "verification script exists",
-        root.join("scripts/verify.sh").exists(),
-    );
-    required_ok &= print_check(
-        "CI workflow exists",
-        root.join(".github/workflows/ci.yml").exists(),
-    );
-    required_ok &= print_check(
-        "release workflow exists",
-        root.join(".github/workflows/release.yml").exists(),
-    );
-    required_ok &= print_check(
-        "example suite loads",
-        load_suite(&root.join("suites/example-auth-bugs.json")).is_ok(),
-    );
-    required_ok &= print_check(
-        "example native report is source-free",
-        read_report(&root.join("reports/example-native.json")).is_ok(),
-    );
-    required_ok &= print_check(
-        "example ctxhelm report is source-free",
-        read_report(&root.join("reports/example-ctxhelm.json")).is_ok(),
-    );
+fn write_doctor_report(root: &Path, format: OutputFormat, out: Option<&PathBuf>) -> Result<()> {
+    let report = build_doctor_report(root);
+    let rendered = match format {
+        OutputFormat::Json => serde_json::to_string_pretty(&report)?,
+        OutputFormat::Markdown => render_markdown_doctor_report(root, &report),
+    };
 
-    println!("- optional integrations:");
-    print_optional("ctxhelm available", command_available("ctxhelm"));
-    print_optional("claude available", command_available("claude"));
-    print_optional("codex available", command_available("codex"));
-
-    println!("- supported variants:");
-    for variant in [
-        AgentVariant::Native,
-        AgentVariant::CtxhelmPlan,
-        AgentVariant::CtxhelmMcp,
-        AgentVariant::CtxhelmPack,
-    ] {
-        println!("  - {:?}", variant);
+    if let Some(out) = out {
+        write_text(&rendered, out)?;
+        println!("wrote {}", out.display());
+    } else {
+        println!("{rendered}");
     }
 
-    if !required_ok {
+    if !report.ok {
         anyhow::bail!("doctor found missing required HelmBench prerequisites");
     }
     Ok(())
 }
 
-fn print_check(label: &str, ok: bool) -> bool {
-    println!("- {}: {}", label, if ok { "ok" } else { "error" });
-    ok
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DoctorReport {
+    schema_version: u32,
+    repo_name: String,
+    required_checks: Vec<DoctorCheck>,
+    optional_integrations: Vec<DoctorIntegration>,
+    direct_runners: Vec<DoctorDirectRunner>,
+    observation_modes: Vec<DoctorObservationMode>,
+    supported_variants: Vec<AgentVariant>,
+    privacy: PrivacyStatus,
+    ok: bool,
 }
 
-fn print_optional(label: &str, ok: bool) {
-    println!("  - {}: {}", label, if ok { "ok" } else { "warn" });
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DoctorCheck {
+    name: String,
+    ok: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DoctorIntegration {
+    name: String,
+    command: String,
+    available: bool,
+    version_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DoctorDirectRunner {
+    name: String,
+    command: String,
+    available: bool,
+    isolated_clones: bool,
+    injects_source_free_event_contract: bool,
+    capture_stream_supported: bool,
+    suppresses_raw_output_by_default: bool,
+    unrestricted_flag: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DoctorObservationMode {
+    name: String,
+    source_free: bool,
+    persists_raw_stream: bool,
+    description: String,
+}
+
+fn build_doctor_report(root: &Path) -> DoctorReport {
+    let required_checks = vec![
+        doctor_check("git available", command_available("git")),
+        doctor_check("cargo available", command_available("cargo")),
+        doctor_check("repo is a git checkout", git_repo_ok(root)),
+        doctor_check("Cargo.toml exists", root.join("Cargo.toml").exists()),
+        doctor_check(
+            "verification script exists",
+            root.join("scripts/verify.sh").exists(),
+        ),
+        doctor_check(
+            "CI workflow exists",
+            root.join(".github/workflows/ci.yml").exists(),
+        ),
+        doctor_check(
+            "release workflow exists",
+            root.join(".github/workflows/release.yml").exists(),
+        ),
+        doctor_check(
+            "example suite loads",
+            load_suite(&root.join("suites/example-auth-bugs.json")).is_ok(),
+        ),
+        doctor_check(
+            "example native report is source-free",
+            read_report(&root.join("reports/example-native.json")).is_ok(),
+        ),
+        doctor_check(
+            "example ctxhelm report is source-free",
+            read_report(&root.join("reports/example-ctxhelm.json")).is_ok(),
+        ),
+    ];
+    let optional_integrations = vec![
+        doctor_integration("ctxhelm", "ctxhelm"),
+        doctor_integration("claude-code", "claude"),
+        doctor_integration("codex", "codex"),
+    ];
+    let direct_runners = vec![
+        doctor_direct_runner("claude-run", "claude", "--dangerously-skip-permissions"),
+        doctor_direct_runner(
+            "codex-run",
+            "codex",
+            "--dangerously-bypass-approvals-and-sandbox",
+        ),
+    ];
+    let observation_modes = vec![
+        DoctorObservationMode {
+            name: "record-event".to_string(),
+            source_free: true,
+            persists_raw_stream: false,
+            description: "agent or hook appends validated source-free events".to_string(),
+        },
+        DoctorObservationMode {
+            name: "capture-stream".to_string(),
+            source_free: true,
+            persists_raw_stream: false,
+            description: "structured stdout is parsed in memory and discarded".to_string(),
+        },
+        DoctorObservationMode {
+            name: "git-diff-inference".to_string(),
+            source_free: true,
+            persists_raw_stream: false,
+            description: "edited files are inferred from git status after each isolated run"
+                .to_string(),
+        },
+        DoctorObservationMode {
+            name: "validation-command-summary".to_string(),
+            source_free: true,
+            persists_raw_stream: false,
+            description: "success commands are stored by class/hash/exit status".to_string(),
+        },
+    ];
+    let supported_variants = vec![
+        AgentVariant::Native,
+        AgentVariant::CtxhelmPlan,
+        AgentVariant::CtxhelmMcp,
+        AgentVariant::CtxhelmPack,
+    ];
+    let ok = required_checks.iter().all(|check| check.ok);
+
+    DoctorReport {
+        schema_version: 1,
+        repo_name: repo_name(root),
+        required_checks,
+        optional_integrations,
+        direct_runners,
+        observation_modes,
+        supported_variants,
+        privacy: PrivacyStatus::source_free(),
+        ok,
+    }
+}
+
+fn doctor_check(name: &str, ok: bool) -> DoctorCheck {
+    DoctorCheck {
+        name: name.to_string(),
+        ok,
+    }
+}
+
+fn doctor_integration(name: &str, command: &str) -> DoctorIntegration {
+    let version_hash = command_version_hash(command);
+    DoctorIntegration {
+        name: name.to_string(),
+        command: command.to_string(),
+        available: version_hash.is_some(),
+        version_hash,
+    }
+}
+
+fn doctor_direct_runner(name: &str, command: &str, unrestricted_flag: &str) -> DoctorDirectRunner {
+    DoctorDirectRunner {
+        name: name.to_string(),
+        command: command.to_string(),
+        available: command_available(command),
+        isolated_clones: true,
+        injects_source_free_event_contract: true,
+        capture_stream_supported: true,
+        suppresses_raw_output_by_default: true,
+        unrestricted_flag: Some(unrestricted_flag.to_string()),
+    }
+}
+
+fn render_markdown_doctor_report(root: &Path, report: &DoctorReport) -> String {
+    let mut out = String::new();
+    out.push_str("# HelmBench Doctor\n\n");
+    out.push_str(&format!("Repo: `{}`\n\n", root.display()));
+    out.push_str("Privacy: source-free reports enforced\n\n");
+    out.push_str(&format!(
+        "Status: **{}**\n\n",
+        if report.ok { "ok" } else { "error" }
+    ));
+
+    out.push_str("## Required Checks\n\n");
+    for check in &report.required_checks {
+        out.push_str(&format!(
+            "- {}: `{}`\n",
+            check.name,
+            if check.ok { "ok" } else { "error" }
+        ));
+    }
+
+    out.push_str("\n## Optional Integrations\n\n");
+    for integration in &report.optional_integrations {
+        out.push_str(&format!(
+            "- {} (`{}`): `{}`",
+            integration.name,
+            integration.command,
+            if integration.available { "ok" } else { "warn" }
+        ));
+        if let Some(hash) = &integration.version_hash {
+            out.push_str(&format!(" ({hash})"));
+        }
+        out.push('\n');
+    }
+
+    out.push_str("\n## Direct Runner Readiness\n\n");
+    out.push_str("| Runner | Command | Available | Event contract | Capture stream | Raw output suppressed | Isolated clones |\n");
+    out.push_str("| --- | --- | --- | --- | --- | --- | --- |\n");
+    for runner in &report.direct_runners {
+        out.push_str(&format!(
+            "| `{}` | `{}` | {} | {} | {} | {} | {} |\n",
+            runner.name,
+            runner.command,
+            yes_no(runner.available),
+            yes_no(runner.injects_source_free_event_contract),
+            yes_no(runner.capture_stream_supported),
+            yes_no(runner.suppresses_raw_output_by_default),
+            yes_no(runner.isolated_clones)
+        ));
+    }
+
+    out.push_str("\n## Observation Modes\n\n");
+    for mode in &report.observation_modes {
+        out.push_str(&format!(
+            "- `{}`: {}; source-free `{}`, persists raw stream `{}`\n",
+            mode.name,
+            mode.description,
+            yes_no(mode.source_free),
+            yes_no(mode.persists_raw_stream)
+        ));
+    }
+
+    out.push_str("\n## Supported Variants\n\n");
+    for variant in &report.supported_variants {
+        out.push_str(&format!("- `{:?}`\n", variant));
+    }
+
+    out.push_str("\n## Privacy\n\n");
+    out.push_str("- Source-free: `true`\n");
+    out.push_str("- Raw source logged: `false`\n");
+    out.push_str("- Raw prompts logged: `false`\n");
+    out.push_str("- Raw transcripts logged: `false`\n");
+    out.push_str("- Raw terminal logs logged: `false`\n");
+    out
+}
+
+fn repo_name(root: &Path) -> String {
+    root.file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("repo")
+        .to_string()
 }
 
 fn command_available(command: &str) -> bool {
@@ -1310,6 +1529,22 @@ fn command_available(command: &str) -> bool {
         .output()
         .map(|output| output.status.success())
         .unwrap_or(false)
+}
+
+fn command_version_hash(command: &str) -> Option<String> {
+    let output = ProcessCommand::new(command)
+        .arg("--version")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let mut version = String::from_utf8(output.stdout).ok()?;
+    if version.trim().is_empty() {
+        version = String::from_utf8(output.stderr).ok()?;
+    }
+    let version = version.trim();
+    (!version.is_empty()).then(|| source_free_hash("version", version))
 }
 
 fn git_repo_ok(root: &Path) -> bool {
@@ -6667,6 +6902,35 @@ mod tests {
     #[test]
     fn doctor_accepts_current_checkout() {
         run_doctor(Path::new(env!("CARGO_MANIFEST_DIR"))).expect("doctor");
+    }
+
+    #[test]
+    fn doctor_report_describes_direct_runner_readiness_source_free() {
+        let report = build_doctor_report(Path::new(env!("CARGO_MANIFEST_DIR")));
+
+        assert!(report.ok);
+        assert_eq!(report.schema_version, 1);
+        assert!(report.privacy.source_free);
+        assert!(report.direct_runners.iter().any(|runner| {
+            runner.name == "claude-run"
+                && runner.injects_source_free_event_contract
+                && runner.capture_stream_supported
+                && runner.suppresses_raw_output_by_default
+        }));
+        assert!(report
+            .direct_runners
+            .iter()
+            .any(|runner| runner.name == "codex-run" && runner.isolated_clones));
+        assert!(report
+            .observation_modes
+            .iter()
+            .any(|mode| mode.name == "capture-stream"
+                && mode.source_free
+                && !mode.persists_raw_stream));
+
+        let json = serde_json::to_string(&report).expect("json");
+        assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));
+        assert!(!json.contains("rawTranscriptLogged\":true"));
     }
 
     #[test]

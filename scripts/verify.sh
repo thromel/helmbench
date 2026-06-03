@@ -32,6 +32,10 @@ cargo run -- autopsy --help >/dev/null
 cargo run -- diff-autopsy --help >/dev/null
 cargo run -- dashboard --help >/dev/null
 cargo run -- doctor --repo . >/dev/null
+cargo run -- doctor --repo . --format json --out "$TMP_DIR/doctor.json"
+grep -q '"ok": true' "$TMP_DIR/doctor.json"
+grep -q '"sourceFree": true' "$TMP_DIR/doctor.json"
+grep -q '"directRunners"' "$TMP_DIR/doctor.json"
 
 cargo run -- init-demo-repo \
   --repo-out "$TMP_DIR/demo-repo" \

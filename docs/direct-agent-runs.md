@@ -17,6 +17,21 @@ The presets are intentionally thin:
 
 They do not parse or persist raw transcripts.
 
+## Preflight
+
+Before running direct agent presets, generate a source-free readiness report:
+
+```bash
+helmbench doctor \
+  --repo . \
+  --format json \
+  --out /tmp/helmbench-doctor.json
+```
+
+The report includes required HelmBench checks, optional `ctxhelm`/Claude/Codex
+availability, direct-runner readiness, observation modes, and privacy flags. It
+stores version hashes, not raw version strings.
+
 ## Claude Code
 
 ```bash
