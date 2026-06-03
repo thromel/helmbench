@@ -2142,6 +2142,7 @@ struct RunMatrixManifestArtifacts {
     quality_gate_markdown: String,
     dashboard_html: String,
     baseline_autopsy_markdown: String,
+    reproduction_markdown: String,
     evidence_manifest: String,
 }
 
@@ -2575,6 +2576,7 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
     )?;
     verify_evidence_bundle(&evidence_dir)?;
 
+    let reproduction_markdown_path = docs_dir.join("reproduction.md");
     let manifest = build_run_matrix_manifest(
         request,
         &baseline_result,
@@ -2586,9 +2588,14 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         &quality_gate_markdown_path,
         &dashboard_path,
         &baseline_autopsy_path,
+        &reproduction_markdown_path,
         &evidence_dir.join("manifest.json"),
         gate.passed,
         true,
+    )?;
+    write_text(
+        &render_markdown_matrix_reproduction(&manifest),
+        &reproduction_markdown_path,
     )?;
     write_json(&manifest, &out_dir.join("matrix-manifest.json"))?;
 
@@ -2611,6 +2618,7 @@ fn build_run_matrix_manifest(
     quality_gate_markdown: &Path,
     dashboard_html: &Path,
     baseline_autopsy_markdown: &Path,
+    reproduction_markdown: &Path,
     evidence_manifest: &Path,
     quality_gate_passed: bool,
     evidence_bundle_verified: bool,
@@ -2635,6 +2643,7 @@ fn build_run_matrix_manifest(
             quality_gate_markdown: manifest_path(&request.out_dir, quality_gate_markdown),
             dashboard_html: manifest_path(&request.out_dir, dashboard_html),
             baseline_autopsy_markdown: manifest_path(&request.out_dir, baseline_autopsy_markdown),
+            reproduction_markdown: manifest_path(&request.out_dir, reproduction_markdown),
             evidence_manifest: manifest_path(&request.out_dir, evidence_manifest),
         },
         quality_gate_passed,
@@ -2695,6 +2704,121 @@ fn manifest_path(out_dir: &Path, path: &Path) -> String {
         .to_string()
 }
 
+fn render_markdown_matrix_reproduction(manifest: &RunMatrixManifest) -> String {
+    let mut out = String::new();
+    out.push_str("# HelmBench Reproduction\n\n");
+    out.push_str("This source-free guide describes how to verify and rerun the matrix evidence without storing raw source, prompts, transcripts, terminal logs, adapter commands, setup commands, or ctxhelm pack sections.\n\n");
+
+    out.push_str("## Verify Published Artifacts\n\n");
+    out.push_str("```bash\n");
+    out.push_str("helmbench verify-matrix --matrix <matrix-dir>\n");
+    out.push_str("helmbench verify-bundle --bundle <matrix-dir>/evidence\n");
+    out.push_str("```\n\n");
+
+    out.push_str("## Run Identity\n\n");
+    out.push_str("| Field | Value |\n| --- | --- |\n");
+    out.push_str(&format!(
+        "| HelmBench version | `{}` |\n",
+        manifest.provenance.helmbench_version
+    ));
+    out.push_str(&format!(
+        "| Suite hash | `{}` |\n",
+        manifest.provenance.suite_hash
+    ));
+    out.push_str(&format!(
+        "| Repo HEAD | `{}` |\n",
+        manifest
+            .provenance
+            .repo_head
+            .as_deref()
+            .unwrap_or("unknown")
+    ));
+    out.push_str(&format!(
+        "| Dirty checkout | {} |\n",
+        yes_no(manifest.provenance.repo_dirty)
+    ));
+    out.push_str(&format!(
+        "| Setup commands | {} hashed command(s) |\n\n",
+        manifest.provenance.setup_command_count
+    ));
+
+    if !manifest.provenance.setup_command_hashes.is_empty() {
+        out.push_str("## Setup Command Hashes\n\n");
+        for hash in &manifest.provenance.setup_command_hashes {
+            out.push_str(&format!("- `{hash}`\n"));
+        }
+        out.push('\n');
+    }
+
+    out.push_str("## Runs\n\n");
+    out.push_str("| Run | Agent | Variant | ctxhelm | Pack | Stream | Report | Trace Dir | Adapter Hash | ctxhelm Hash |\n");
+    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+    for run in std::iter::once(&manifest.baseline).chain(manifest.heads.iter()) {
+        out.push_str(&format!(
+            "| `{}` | `{}` | `{:?}` | {} | {} | {} | `{}` | `{}` | `{}` | `{}` |\n",
+            run.name,
+            run.agent,
+            run.variant,
+            yes_no(run.ctxhelm_enabled),
+            yes_no(run.pack_enabled),
+            yes_no(run.stream_capture_enabled),
+            run.report_path,
+            run.trace_dir,
+            run.adapter_command_hash.as_deref().unwrap_or("none"),
+            run.ctxhelm_config_hash.as_deref().unwrap_or("none")
+        ));
+    }
+
+    out.push_str("\n## Key Artifacts\n\n");
+    out.push_str("| Artifact | Path |\n| --- | --- |\n");
+    out.push_str(&format!(
+        "| Suite health | `{}` |\n",
+        manifest.artifacts.suite_health_json
+    ));
+    out.push_str(&format!(
+        "| Benchmark summary JSON | `{}` |\n",
+        manifest.artifacts.benchmark_summary_json
+    ));
+    out.push_str(&format!(
+        "| Benchmark summary Markdown | `{}` |\n",
+        manifest.artifacts.benchmark_summary_markdown
+    ));
+    out.push_str(&format!(
+        "| Quality gate JSON | `{}` |\n",
+        manifest.artifacts.quality_gate_json
+    ));
+    out.push_str(&format!(
+        "| Quality gate Markdown | `{}` |\n",
+        manifest.artifacts.quality_gate_markdown
+    ));
+    out.push_str(&format!(
+        "| Dashboard | `{}` |\n",
+        manifest.artifacts.dashboard_html
+    ));
+    out.push_str(&format!(
+        "| Baseline autopsy | `{}` |\n",
+        manifest.artifacts.baseline_autopsy_markdown
+    ));
+    out.push_str(&format!(
+        "| Evidence manifest | `{}` |\n\n",
+        manifest.artifacts.evidence_manifest
+    ));
+
+    out.push_str("## Rerun Notes\n\n");
+    out.push_str("- Check out the target repository at the recorded repo HEAD before rerunning.\n");
+    out.push_str("- Use a suite with the recorded suite hash.\n");
+    out.push_str("- Recreate adapter/setup commands from local configuration; HelmBench stores only hashes for privacy.\n");
+    out.push_str("- Compare a new run with the published matrix using `helmbench matrix-history --matrix <old-matrix-dir> --matrix <new-matrix-dir> --out <history.md>`.\n\n");
+
+    out.push_str("## Privacy\n\n");
+    out.push_str("- Source-free: `true`\n");
+    out.push_str("- Raw source logged: `false`\n");
+    out.push_str("- Raw prompts logged: `false`\n");
+    out.push_str("- Raw transcripts logged: `false`\n");
+    out.push_str("- Raw terminal logs logged: `false`\n");
+    out
+}
+
 fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     let manifest_path = matrix_dir.join("matrix-manifest.json");
     let raw = std::fs::read_to_string(&manifest_path)
@@ -2752,6 +2876,7 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
         &manifest.artifacts.quality_gate_markdown,
         &manifest.artifacts.dashboard_html,
         &manifest.artifacts.baseline_autopsy_markdown,
+        &manifest.artifacts.reproduction_markdown,
         &manifest.artifacts.evidence_manifest,
     ];
     for path in artifact_paths {
@@ -4957,6 +5082,7 @@ mod tests {
         assert!(out.join("docs/compare-guided.md").exists());
         assert!(out.join("docs/benchmark-summary.md").exists());
         assert!(out.join("docs/native-autopsy.md").exists());
+        assert!(out.join("docs/reproduction.md").exists());
         assert!(out.join("docs/dashboard.html").exists());
         assert!(out.join("evidence/health.json").exists());
         assert!(out.join("evidence/manifest.json").exists());
@@ -5043,9 +5169,19 @@ mod tests {
             "reports/benchmark-summary.json"
         );
         assert_eq!(
+            manifest["artifacts"]["reproductionMarkdown"],
+            "docs/reproduction.md"
+        );
+        assert_eq!(
             manifest["artifacts"]["evidenceManifest"],
             "evidence/manifest.json"
         );
+        let reproduction =
+            std::fs::read_to_string(out.join("docs/reproduction.md")).expect("reproduction");
+        assert!(reproduction.contains("helmbench verify-matrix --matrix <matrix-dir>"));
+        assert!(reproduction.contains("Suite hash"));
+        assert!(reproduction.contains(&command_hash(&adapter_command)));
+        assert!(!reproduction.contains(adapter.to_string_lossy().as_ref()));
 
         let verified = verify_run_matrix(&out).expect("verify matrix");
         assert_eq!(verified.heads.len(), 1);

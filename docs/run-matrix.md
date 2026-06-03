@@ -117,6 +117,7 @@ source-free baseline trace.
 │   ├── benchmark-summary.md
 │   ├── quality-gate.md
 │   ├── native-autopsy.md
+│   ├── reproduction.md
 │   └── dashboard.html
 └── evidence/
     ├── health.json
@@ -135,6 +136,11 @@ run row also records adapter command and ctxhelm configuration hashes when
 present. The manifest does not store raw adapter commands, setup commands,
 prompts, transcripts, terminal logs, ctxhelm pack sections, or source content.
 
+`docs/reproduction.md` is generated from the source-free matrix manifest. It
+lists verification commands, run identity, artifact paths, command/config
+hashes, and rerun notes using placeholders such as `<matrix-dir>` instead of
+raw local commands.
+
 `reports/benchmark-summary.json` includes confidence metadata. HelmBench writes
 95% Wilson score intervals for success and validation coverage and warns when a
 suite has fewer than 10 tasks, so small demo runs are clearly marked as
@@ -151,8 +157,9 @@ helmbench verify-bundle \
 ```
 
 `verify-matrix` validates `matrix-manifest.json`, checks that every referenced
-report, trace directory, suite-health artifact, Markdown/HTML artifact, and
-evidence manifest exists, and then verifies the nested evidence bundle hashes.
+report, trace directory, suite-health artifact, reproduction guide,
+Markdown/HTML artifact, and evidence manifest exists, and then verifies the
+nested evidence bundle hashes.
 
 Use `--fail-on-regression` when this command runs in CI and should exit
 non-zero if the default quality gate fails.

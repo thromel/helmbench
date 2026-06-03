@@ -29,8 +29,8 @@ tested without external agents or network access.
 `run-matrix` is the main orchestration command for real eval runs. It executes
 one baseline plus one or more local adapter variants over the same suite, then
 writes per-run reports, pairwise comparisons, a benchmark summary, quality
-gate, suite-health report, baseline autopsy, dashboard, and verifiable evidence
-bundle.
+gate, suite-health report, baseline autopsy, reproduction guide, dashboard, and
+verifiable evidence bundle.
 
 `suite-health` is the preflight check for custom benchmark suites. It verifies
 that expected files and tests exist in the target repo, every task has a
@@ -48,6 +48,10 @@ suite hash, repo HEAD, dirty-checkout flag, setup-command hashes, and per-row
 adapter/ctxhelm configuration hashes. This lets reviewers compare or rerun a
 benchmark without storing raw commands, prompts, terminal logs, transcripts,
 ctxhelm pack sections, or source content.
+
+`docs/reproduction.md` renders that provenance into reviewer-facing verification
+and rerun instructions. It uses placeholders and hashes rather than raw local
+adapter/setup commands.
 
 ## Source-Free Trace Model
 
