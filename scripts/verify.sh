@@ -36,6 +36,7 @@ test -f docs/refactoringminer-ctxhelm-plan.md
 test -f docs/claude-real-smoke.md
 test -f reports/claude-real-smoke.json
 test -f reports/refactoringminer-suite-health.json
+test -f reports/refactoringminer-outcome-health.json
 test -f reports/refactoringminer-ctxhelm-plan.json
 test -f suites/refactoring-miner-public.json
 grep -q '"preset": "claude-code"' suites/demo-matrix.json
@@ -51,6 +52,9 @@ grep -q '"successRate": 1.0' reports/claude-real-smoke.json
 grep -q '"sourceFree": true' reports/claude-real-smoke.json
 grep -q 'Success rate: `100.0%`' docs/claude-real-smoke.md
 grep -q '"ok": true' reports/refactoringminer-suite-health.json
+grep -q '"ok": false' reports/refactoringminer-outcome-health.json
+grep -q '"validationBaselineReady": false' reports/refactoringminer-outcome-health.json
+grep -q '"successCommandCheckFailFast": true' reports/refactoringminer-outcome-health.json
 grep -q '"taskCount": 10' reports/refactoringminer-ctxhelm-plan.json
 grep -q '"sourceFree": true' reports/refactoringminer-ctxhelm-plan.json
 grep -q 'Recommendation recall: `61.3%`' docs/refactoringminer-ctxhelm-plan.md
@@ -150,8 +154,10 @@ cargo run -- suite-health \
   --suite "$TMP_DIR/demo-suite.json" \
   --repo "$TMP_DIR/demo-repo" \
   --out "$TMP_DIR/suite-health-baseline.json" \
-  --check-success-commands
+  --check-success-commands \
+  --fail-fast-success-commands
 grep -q '"successCommandCheckRequested": true' "$TMP_DIR/suite-health-baseline.json"
+grep -q '"successCommandCheckFailFast": true' "$TMP_DIR/suite-health-baseline.json"
 grep -q '"validationBaselineReady": true' "$TMP_DIR/suite-health-baseline.json"
 
 cargo run -- local-run \

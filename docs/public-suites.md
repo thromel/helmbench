@@ -217,9 +217,11 @@ keeps the same privacy and reproducibility contract as the recommendation
 trace flow.
 
 Before using a public-suite matrix for task-success claims, run
-`suite-health --check-success-commands`. Public suite tasks are only outcome
-ready when validation fails before the agent runs; otherwise, the matrix should
-be described as navigation and validation-behavior evidence.
+`suite-health --preset <preset> --check-success-commands`. Public suite tasks
+are only outcome ready when validation fails before the agent runs; otherwise,
+the matrix should be described as navigation and validation-behavior evidence.
+For large suites, add `--fail-fast-success-commands` to stop after the first
+pre-agent validation pass.
 
 ## Health Failures
 

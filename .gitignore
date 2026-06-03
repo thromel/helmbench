@@ -9,4 +9,5 @@
 !/reports/example-claude-code.json
 !/reports/claude-real-smoke.json
 !/reports/refactoringminer-suite-health.json
+!/reports/refactoringminer-outcome-health.json
 !/reports/refactoringminer-ctxhelm-plan.json

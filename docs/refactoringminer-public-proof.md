@@ -27,6 +27,25 @@ The checked fixture health report proves:
 Health artifact:
 [`reports/refactoringminer-suite-health.json`](../reports/refactoringminer-suite-health.json)
 
+## Outcome Readiness
+
+The current RefactoringMiner suite is **not** ready for task-success claims.
+The source-free validation-baseline gate was run with
+`--check-success-commands --fail-fast-success-commands` and stopped after the
+first clean-checkout validation command passed before any agent changes.
+
+Outcome-health artifact:
+[`reports/refactoringminer-outcome-health.json`](../reports/refactoringminer-outcome-health.json)
+
+| Metric | Value |
+| --- | ---: |
+| Validation baseline ready | false |
+| Baseline success-command passes | 1 |
+| Baseline success-command skipped by fail-fast | 9 |
+
+This means the checked RefactoringMiner proof should be treated as a
+navigation/recommendation proof until seeded task setup is added.
+
 ## Result
 
 Report artifact:
@@ -124,11 +143,13 @@ cargo run -- validate-matrix \
   --config /tmp/refactoring-miner-matrix.json
 
 cargo run -- suite-health \
+  --preset refactoring-miner \
   --suite suites/refactoring-miner-public.json \
   --repo <refactoringminer-repo> \
   --out /tmp/refactoring-miner-outcome-health.json \
   --min-commits 1000 \
-  --check-success-commands
+  --check-success-commands \
+  --fail-fast-success-commands
 
 cargo run -- run-matrix \
   --config /tmp/refactoring-miner-matrix.json \

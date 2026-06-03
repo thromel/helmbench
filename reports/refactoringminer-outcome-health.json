@@ -66,16 +66,25 @@
   "missingExpectedFiles": [],
   "missingExpectedTests": [],
   "tasksMissingSuccessCommand": [],
-  "successCommandCheckRequested": false,
-  "successCommandCheckFailFast": false,
+  "successCommandCheckRequested": true,
+  "successCommandCheckFailFast": true,
   "successCommandCheckReady": false,
   "validationBaselineReady": false,
-  "baselineSuccessCommandPassCount": 0,
+  "baselineSuccessCommandPassCount": 1,
   "baselineSuccessCommandFailCount": 0,
   "baselineSuccessCommandTimeoutCount": 0,
-  "baselineSuccessCommandSkippedCount": 0,
-  "baselineSuccessCommands": [],
-  "ok": true,
+  "baselineSuccessCommandSkippedCount": 9,
+  "baselineSuccessCommands": [
+    {
+      "taskId": "rm-mcp-intent-validation-001",
+      "commandClass": "test",
+      "commandHash": "cmd:e9cca3c479fa7d5f",
+      "exitStatus": 0,
+      "elapsedMillis": 72691,
+      "timedOut": false
+    }
+  ],
+  "ok": false,
   "privacy": {
     "sourceFree": true,
     "rawSourceLogged": false,

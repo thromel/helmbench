@@ -27,6 +27,8 @@ Express presets.
 The checked-in [RefactoringMiner public recommendation proof](docs/refactoringminer-public-proof.md)
 runs `ctxhelm prepare-task` over a healthy 10-task public suite and records
 `61.3%` average recommendation recall with source-free artifacts.
+Its checked outcome-readiness report shows the suite is not yet valid for
+task-success claims because validation can pass before any agent change.
 
 The checked-in [real Claude Code smoke report](docs/claude-real-smoke.md)
 launches Claude Code through `claude-run` on the local smoke suite and records
@@ -335,6 +337,9 @@ source-free and can be included in evidence bundles.
 For outcome claims, add `--check-success-commands`. HelmBench will run each
 validation command in an isolated clone and fail the health check if validation
 already passes before an agent changes the repo.
+For large suites, add `--fail-fast-success-commands` to stop after the first
+pre-agent validation pass. For public suites, pass `--preset <preset>` so the
+health report includes the public-suite label and anchor checks.
 
 Build reports from source-free traces:
 

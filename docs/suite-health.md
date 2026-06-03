@@ -31,10 +31,12 @@ before any agent runs:
 
 ```bash
 helmbench suite-health \
+  --preset refactoring-miner \
   --suite suites/my-suite.json \
   --repo ~/work/example-repo \
   --out /tmp/example-health.json \
-  --check-success-commands
+  --check-success-commands \
+  --fail-fast-success-commands
 ```
 
 With this flag, HelmBench runs each `successCommand` inside an isolated clone
@@ -42,6 +44,10 @@ and stores only source-free command metadata: task id, command class, command
 hash, exit status, timeout status, and elapsed milliseconds. If validation
 already passes before the agent edits the repo, `validationBaselineReady` is
 `false` and the health command exits non-zero after writing the report.
+`--fail-fast-success-commands` stops after the first pre-agent pass and records
+the remaining tasks as skipped, which is useful for large public suites.
+Use `--preset` for generated public suites so the report includes the preset
+label and preset-specific anchor-file checks.
 
 By default, HelmBench requires a clean checkout and at least one commit. For
 local exploratory runs, a dirty checkout can be allowed explicitly:
@@ -66,7 +72,8 @@ The report records only source-free metadata:
 - expected file/test counts;
 - missing expected files and tests;
 - tasks missing `successCommand`;
-- optional validation-baseline status for `successCommand`s;
+- optional validation-baseline status for `successCommand`s, including whether
+  the check ran in fail-fast mode;
 - source-free privacy flags.
 
 It does not store raw source, prompts beyond suite task prompts, transcripts,
