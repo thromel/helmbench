@@ -152,6 +152,15 @@ HELMBENCH_BIN="$ROOT/target/debug/helmbench" cargo run -- run-matrix \
   --config "$TMP_DIR/matrix-config.json" \
   --force
 
+HELMBENCH_BIN="$ROOT/target/debug/helmbench" cargo run -- validate-matrix \
+  --config suites/demo-matrix.json
+
+HELMBENCH_BIN="$ROOT/target/debug/helmbench" cargo run -- run-matrix \
+  --config suites/demo-matrix.json \
+  --out-dir "$TMP_DIR/checked-in-matrix" \
+  --force \
+  --allow-dirty-health
+
 cargo run -- run \
   --suite "$TMP_DIR/demo-suite.json" \
   --trace-dir "$TMP_DIR/traces" \
@@ -220,6 +229,12 @@ cargo run -- verify-bundle \
 
 cargo run -- verify-matrix \
   --matrix "$TMP_DIR/matrix-config"
+
+cargo run -- verify-bundle \
+  --bundle "$TMP_DIR/checked-in-matrix/evidence"
+
+cargo run -- verify-matrix \
+  --matrix "$TMP_DIR/checked-in-matrix"
 
 cargo run -- matrix-history \
   --matrix "$TMP_DIR/matrix" \
@@ -308,13 +323,22 @@ test -f "$TMP_DIR/matrix-config/docs/reproduction.md"
 test -f "$TMP_DIR/matrix-config/evidence/health.json"
 test -f "$TMP_DIR/matrix-config/evidence/manifest.json"
 test -f "$TMP_DIR/matrix-config/matrix-manifest.json"
+test -f "$TMP_DIR/checked-in-matrix/reports/native-search.json"
+test -f "$TMP_DIR/checked-in-matrix/reports/guided.json"
+test -f "$TMP_DIR/checked-in-matrix/reports/privacy-report.json"
+test -f "$TMP_DIR/checked-in-matrix/docs/reproduction.md"
+test -f "$TMP_DIR/checked-in-matrix/evidence/manifest.json"
+test -f "$TMP_DIR/checked-in-matrix/matrix-manifest.json"
 
 grep -q '"ctxhelmEnabled": true' "$TMP_DIR/matrix/matrix-manifest.json"
 grep -q '"packEnabled": true' "$TMP_DIR/matrix/matrix-manifest.json"
 grep -q '"ctxhelmEnabled": true' "$TMP_DIR/matrix-config/matrix-manifest.json"
 grep -q '"packEnabled": true' "$TMP_DIR/matrix-config/matrix-manifest.json"
+grep -q '"ctxhelmEnabled": true' "$TMP_DIR/checked-in-matrix/matrix-manifest.json"
+grep -q '"packEnabled": true' "$TMP_DIR/checked-in-matrix/matrix-manifest.json"
 grep -q '"totalTokenEstimate": 642' "$TMP_DIR/matrix/reports/guided.json"
 grep -q '"totalTokenEstimate": 642' "$TMP_DIR/matrix-config/reports/guided.json"
+grep -q '"totalTokenEstimate": 64' "$TMP_DIR/checked-in-matrix/reports/guided.json"
 
 git diff --check
 

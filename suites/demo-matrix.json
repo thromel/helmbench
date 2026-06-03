@@ -1,6 +1,6 @@
 {
-  "suite": "suites/demo-tiny-repo.json",
-  "repo": ".helmbench/demo-repo",
+  "suite": "suites/local-run-smoke.json",
+  "repo": ".",
   "outDir": ".helmbench/matrix-demo",
   "failOnRegression": true,
   "baseline": {
@@ -13,13 +13,17 @@
       "name": "native-search",
       "agent": "demo-search",
       "variant": "native_search",
-      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
+      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-local-agent.sh"
     },
     {
       "name": "guided",
       "agent": "demo-guided",
       "variant": "ctxhelm_mcp",
-      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
+      "ctxhelm": true,
+      "ctxhelmBin": "scripts/demo-ctxhelm.sh",
+      "pack": true,
+      "packBudget": "brief",
+      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-local-agent.sh"
     }
   ]
 }

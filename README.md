@@ -183,6 +183,11 @@ HELMBENCH_BIN=$(pwd)/target/debug/helmbench \
     --force
 ```
 
+The checked-in `suites/demo-matrix.json` is self-contained for a fresh
+HelmBench checkout. It runs the tracked `local-run-smoke` suite against this
+repo, compares native, native-search, and ctxhelm-guided rows, and uses
+`scripts/demo-ctxhelm.sh` as a deterministic source-free ctxhelm shim.
+
 Every successful matrix run writes `matrix-manifest.json`, a source-free
 top-level index of run labels, suite-health, report paths,
 dashboard/evidence artifacts, quality-gate status, and evidence verification

@@ -34,8 +34,8 @@ Config format:
 
 ```json
 {
-  "suite": "suites/demo-tiny-repo.json",
-  "repo": ".helmbench/demo-repo",
+  "suite": "suites/local-run-smoke.json",
+  "repo": ".",
   "outDir": ".helmbench/matrix-demo",
   "setupCommands": [],
   "failOnRegression": true,
@@ -59,18 +59,17 @@ Config format:
       "name": "native-search",
       "agent": "demo-search",
       "variant": "native_search",
-      "captureStream": true,
-      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
+      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-local-agent.sh"
     },
     {
       "name": "guided",
       "agent": "demo-guided",
       "variant": "ctxhelm_mcp",
       "ctxhelm": true,
+      "ctxhelmBin": "scripts/demo-ctxhelm.sh",
       "pack": true,
       "packBudget": "brief",
-      "captureStream": true,
-      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
+      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-local-agent.sh"
     }
   ]
 }
@@ -86,7 +85,9 @@ provided. `qualityGate` configures the source-free quality gate written to
 thresholds for one run. `healthMinCommits` and `allowDirtyHealth` control the
 matrix suite-health gate. `setupCommands` from the config run before
 additional `--setup-command` values. Config paths are resolved from the current
-working directory.
+working directory. The checked-in `suites/demo-matrix.json` uses the tracked
+`local-run-smoke` suite plus `scripts/demo-ctxhelm.sh`, so it can be validated
+and run from a fresh HelmBench checkout without a real ctxhelm install.
 
 Before any agent row executes, `run-matrix` writes `reports/suite-health.json`
 and fails if the suite/repo preflight is unhealthy. This keeps publishable
