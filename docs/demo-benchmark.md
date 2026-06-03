@@ -6,6 +6,11 @@ reports, autopsy, dashboard, benchmark summary, privacy report, quality gate,
 and evidence bundle artifacts. It is meant for smoke testing HelmBench itself
 and for demos where a real agent call would be too slow or expensive.
 
+The checked-in `suites/local-run-smoke.json` follows the same outcome shape in
+this repository: the tracked fixture is healthy at rest, while task-level
+`setupCommands` seed a failing state inside each isolated clone before the
+adapter or direct agent runs.
+
 ## One-Command Demo
 
 ```bash

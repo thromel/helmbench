@@ -1,5 +1,9 @@
 # HelmBench Report: claude-code / Native
 
+This smoke suite keeps the tracked fixture healthy at rest and uses task-level
+`setupCommands` to seed the failing state inside the isolated task clone before
+the agent runs.
+
 ## Summary
 
 - Suite: `local-run-smoke`

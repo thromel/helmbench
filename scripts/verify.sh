@@ -162,6 +162,17 @@ grep -q '"successCommandCheckRequested": true' "$TMP_DIR/suite-health-baseline.j
 grep -q '"successCommandCheckFailFast": true' "$TMP_DIR/suite-health-baseline.json"
 grep -q '"validationBaselineReady": true' "$TMP_DIR/suite-health-baseline.json"
 
+cargo run -- suite-health \
+  --suite suites/local-run-smoke.json \
+  --repo . \
+  --out "$TMP_DIR/local-run-smoke-health-baseline.json" \
+  --allow-dirty \
+  --check-success-commands
+grep -q '"successCommandCheckRequested": true' "$TMP_DIR/local-run-smoke-health-baseline.json"
+grep -q '"validationBaselineReady": true' "$TMP_DIR/local-run-smoke-health-baseline.json"
+grep -q '"baselineSuccessCommandFailCount": 1' "$TMP_DIR/local-run-smoke-health-baseline.json"
+grep -q '"tasksFailedSetupCommand": \[\]' "$TMP_DIR/local-run-smoke-health-baseline.json"
+
 cargo run -- local-run \
   --suite "$TMP_DIR/demo-suite.json" \
   --repo "$TMP_DIR/demo-repo" \

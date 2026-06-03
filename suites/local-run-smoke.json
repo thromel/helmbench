@@ -13,6 +13,9 @@
         "examples/demo-app/auth.test"
       ],
       "successCommand": "grep -q fixed examples/demo-app/auth.txt",
+      "setupCommands": [
+        "printf 'expired sessions redirect to /expired\\n' > examples/demo-app/auth.txt"
+      ],
       "tags": [
         "demo",
         "local-run"

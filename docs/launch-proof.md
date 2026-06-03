@@ -27,7 +27,10 @@ HelmBench also includes a real direct-agent smoke run over
 `suites/local-run-smoke.json`. That proof launches Claude Code through
 `claude-run`, suppresses raw stdout/stderr, records only source-free telemetry,
 infers edits from git status, and validates the isolated clone after the agent
-exits.
+exits. The tracked fixture is healthy at rest; the suite's task-level
+`setupCommands` seed the failing state inside each isolated clone before the
+agent runs, so `suite-health --check-success-commands` can prove the validation
+command fails pre-agent and passes only after repair.
 
 ## Current Source-Free Result
 

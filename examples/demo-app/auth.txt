@@ -1,1 +1,1 @@
-expired sessions redirect to /expired
+fixed sessions redirect to /login

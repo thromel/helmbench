@@ -232,7 +232,9 @@ The checked-in `suites/demo-matrix.json` is self-contained for a fresh
 HelmBench checkout. It runs the tracked `local-run-smoke` suite against this
 repo, compares native, native-search, and ctxhelm-guided rows, and uses
 `scripts/demo-local-agent.sh` through the `claude-code` matrix preset plus
-`scripts/demo-ctxhelm.sh` as deterministic source-free shims.
+`scripts/demo-ctxhelm.sh` as deterministic source-free shims. The smoke suite
+keeps the fixture healthy at rest and uses task-level `setupCommands` to seed
+the failing state inside isolated clones before each agent row runs.
 
 Generate a real-agent public matrix config after creating or checking out a
 public suite fixture:
