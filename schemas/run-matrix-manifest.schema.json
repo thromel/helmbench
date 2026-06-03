@@ -1,0 +1,326 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/run-matrix-manifest.schema.json",
+  "title": "HelmBench Run Matrix Manifest",
+  "description": "Source-free top-level manifest for a run-matrix output directory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suitePath",
+    "repoPath",
+    "outDir",
+    "provenance",
+    "baseline",
+    "heads",
+    "artifacts",
+    "artifactDigests",
+    "qualityGatePassed",
+    "evidenceBundleVerified",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 6
+    },
+    "suitePath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repoPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outDir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provenance": {
+      "$ref": "#/$defs/provenance"
+    },
+    "baseline": {
+      "$ref": "#/$defs/run"
+    },
+    "heads": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/run"
+      }
+    },
+    "artifacts": {
+      "$ref": "#/$defs/artifacts"
+    },
+    "artifactDigests": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/artifactDigest"
+      }
+    },
+    "qualityGatePassed": {
+      "type": "boolean"
+    },
+    "evidenceBundleVerified": {
+      "const": true
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "safeRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^/"
+          },
+          {
+            "pattern": "^[A-Za-z]:"
+          },
+          {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        ]
+      }
+    },
+    "sourceFreeHash": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+:[0-9a-f]{16}$"
+    },
+    "agentVariant": {
+      "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "helmbenchVersion",
+        "suiteHash",
+        "repoHead",
+        "repoDirty",
+        "setupCommandCount",
+        "setupCommandHashes"
+      ],
+      "properties": {
+        "helmbenchVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "suiteHash": {
+          "type": "string",
+          "pattern": "^suite:[0-9a-f]{16}$"
+        },
+        "repoHead": {
+          "type": ["string", "null"]
+        },
+        "repoDirty": {
+          "type": "boolean"
+        },
+        "setupCommandCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "setupCommandHashes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^cmd:[0-9a-f]{16}$"
+          }
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "agent",
+        "variant",
+        "reportPath",
+        "traceDir",
+        "autopsyMarkdown",
+        "comparisonJson",
+        "comparisonMarkdown",
+        "ctxhelmEnabled",
+        "packEnabled",
+        "streamCaptureEnabled",
+        "adapterCommandHash",
+        "ctxhelmConfigHash"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "variant": {
+          "$ref": "#/$defs/agentVariant"
+        },
+        "reportPath": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "traceDir": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "autopsyMarkdown": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "comparisonJson": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/safeRelativePath"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "comparisonMarkdown": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/safeRelativePath"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ctxhelmEnabled": {
+          "type": "boolean"
+        },
+        "packEnabled": {
+          "type": "boolean"
+        },
+        "streamCaptureEnabled": {
+          "type": "boolean"
+        },
+        "adapterCommandHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^cmd:[0-9a-f]{16}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ctxhelmConfigHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^ctxhelm:[0-9a-f]{16}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "suiteHealthJson",
+        "benchmarkSummaryJson",
+        "benchmarkSummaryMarkdown",
+        "qualityGateJson",
+        "qualityGateMarkdown",
+        "privacyReportJson",
+        "privacyReportMarkdown",
+        "dashboardHtml",
+        "baselineAutopsyMarkdown",
+        "reproductionMarkdown",
+        "evidenceManifest"
+      ],
+      "properties": {
+        "suiteHealthJson": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "benchmarkSummaryJson": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "benchmarkSummaryMarkdown": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "qualityGateJson": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "qualityGateMarkdown": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "privacyReportJson": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "privacyReportMarkdown": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "dashboardHtml": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "baselineAutopsyMarkdown": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "reproductionMarkdown": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "evidenceManifest": {
+          "$ref": "#/$defs/safeRelativePath"
+        }
+      }
+    },
+    "artifactDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "byteCount", "contentHash"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/safeRelativePath"
+        },
+        "byteCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "contentHash": {
+          "type": "string",
+          "pattern": "^fnv64:[0-9a-f]{16}$"
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}

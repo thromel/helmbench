@@ -18,7 +18,7 @@ This repository currently implements the core HelmBench workflow:
 - task suite schema
 - source-free trace schema
 - published JSON Schema contracts for task suites, agent events, traces, run
-  reports, and matrix privacy reports
+  reports, matrix manifests, and matrix privacy reports
 - suite and trace validation
 - run report generation from trace JSON
 - report comparison
