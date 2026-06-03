@@ -106,7 +106,7 @@
       "name": "launch-grade public matrix",
       "status": "warn",
       "evidence": "run_matrix",
-      "detail": "0 verified real-agent matrix output(s) at 10+ task(s); launch target is 1 real-agent row(s)"
+      "detail": "0 verified outcome-ready real-agent matrix output(s) at 10+ task(s); launch target is 1 real-agent row(s)"
     },
     {
       "name": "privacy boundary",

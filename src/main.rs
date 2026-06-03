@@ -2148,7 +2148,8 @@ fn build_launch_readiness_report(
                 } else {
                     matrix_suite_mismatches += 1;
                 }
-                if matrix_summary.confidence.task_count >= inputs.min_task_count
+                if manifest.suite_evidence_use == SuiteEvidenceUse::OutcomeReady
+                    && matrix_summary.confidence.task_count >= inputs.min_task_count
                     && matrix_real_agent_rows >= inputs.min_real_agent_rows
                 {
                     launch_grade_public_matrices += 1;
@@ -2195,7 +2196,7 @@ fn build_launch_readiness_report(
         },
         "run_matrix".to_string(),
         format!(
-            "{launch_grade_public_matrices} verified real-agent matrix output(s) at {}+ task(s); launch target is {} real-agent row(s)",
+            "{launch_grade_public_matrices} verified outcome-ready real-agent matrix output(s) at {}+ task(s); launch target is {} real-agent row(s)",
             inputs.min_task_count, inputs.min_real_agent_rows
         ),
     ));

@@ -30,7 +30,7 @@ Status: **smoke_proof**
 | real-agent evidence | `pass` | 0 matching real-agent matrix row(s), 1 matching real-agent report(s), 0 suite mismatch(es), 0 non-real-agent report(s); launch target is 1 |
 | outcome-health evidence | `pass` | matching suite-health evidenceUse: outcome_ready |
 | verified run matrix | `pass` | 1 matching verified matrix output(s), 0 suite mismatch(es), 0 failure(s) |
-| launch-grade public matrix | `warn` | 0 verified real-agent matrix output(s) at 10+ task(s); launch target is 1 real-agent row(s) |
+| launch-grade public matrix | `warn` | 0 verified outcome-ready real-agent matrix output(s) at 10+ task(s); launch target is 1 real-agent row(s) |
 | privacy boundary | `pass` | artifacts store paths, counts, statuses, hashes, and source-free flags only |
 
 ## Artifacts

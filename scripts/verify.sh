@@ -59,6 +59,7 @@ grep -q 'real-agent evidence | `pass`' docs/launch-readiness.md
 grep -q 'outcome-health evidence | `pass`' docs/launch-readiness.md
 grep -q 'verified run matrix | `pass`' docs/launch-readiness.md
 grep -q 'launch-grade public matrix | `warn`' docs/launch-readiness.md
+grep -q 'verified outcome-ready real-agent matrix output' docs/launch-readiness.md
 grep -q '"suiteEvidenceUse": "outcome_ready"' docs/local-smoke-matrix/matrix-manifest.json
 grep -q '"evidenceUse": "outcome_ready"' docs/local-smoke-matrix/evidence/manifest.json
 grep -q 'claude-real-smoke' docs/launch-proof.md
@@ -380,6 +381,7 @@ grep -q 'real-agent evidence | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'outcome-health evidence | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'verified run matrix | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'launch-grade public matrix | `warn`' "$TMP_DIR/launch-readiness.md"
+grep -q 'verified outcome-ready real-agent matrix output' "$TMP_DIR/launch-readiness.md"
 grep -q '"status": "smoke_proof"' "$TMP_DIR/launch-readiness.json"
 grep -q '"realAgentReportCount": 1' "$TMP_DIR/launch-readiness.json"
 grep -q '"publicReportCount": 1' "$TMP_DIR/launch-readiness.json"
