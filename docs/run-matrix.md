@@ -144,7 +144,9 @@ raw local commands.
 `reports/benchmark-summary.json` includes confidence metadata. HelmBench writes
 95% Wilson score intervals for success and validation coverage and warns when a
 suite has fewer than 10 tasks, so small demo runs are clearly marked as
-directional evidence.
+directional evidence. Each run summary also includes a source-free failure
+taxonomy for failed/skipped tasks, validation gaps, missing relevant reads,
+missing expected edits, recommendation misses, and irrelevant-read tasks.
 
 Verify the bundle before publishing:
 

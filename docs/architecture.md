@@ -171,6 +171,9 @@ The summary artifact includes:
   and validation coverage;
 - a low-sample warning when the suite has fewer than 10 tasks, so directional
   early results are not presented as high-confidence proof;
+- source-free failure taxonomy counts for failed/skipped tasks, validation
+  gaps, missing relevant reads, missing expected edits, recommendation misses,
+  and tasks with irrelevant reads;
 - deltas from baseline for success, validation, recommendation recall, context
   precision, edited-file recall, irrelevant reads, tool calls, and token
   estimate;

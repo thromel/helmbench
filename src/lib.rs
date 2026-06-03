@@ -9,7 +9,7 @@ pub const TRACE_SCHEMA_VERSION: u32 = 1;
 pub const REPORT_SCHEMA_VERSION: u32 = 1;
 pub const AUTOPSY_SCHEMA_VERSION: u32 = 1;
 pub const DIFF_AUTOPSY_SCHEMA_VERSION: u32 = 1;
-pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 2;
+pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 3;
 pub const QUALITY_GATE_SCHEMA_VERSION: u32 = 1;
 pub const CONFIDENCE_LEVEL_95: f32 = 0.95;
 pub const MIN_RECOMMENDED_BENCHMARK_TASKS: usize = 10;
@@ -278,6 +278,19 @@ pub struct BenchmarkRunSummary {
     pub edited_file_recall: f32,
     pub total_tool_calls: u32,
     pub total_token_estimate: u64,
+    pub failure_taxonomy: BenchmarkFailureTaxonomy,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct BenchmarkFailureTaxonomy {
+    pub failed_task_count: usize,
+    pub skipped_task_count: usize,
+    pub validation_gap_count: usize,
+    pub no_relevant_file_read_count: usize,
+    pub no_expected_edit_count: usize,
+    pub recommendation_miss_count: usize,
+    pub irrelevant_read_task_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -837,6 +850,7 @@ fn benchmark_run_summary(report: &RunReport) -> BenchmarkRunSummary {
         .iter()
         .filter(|task| task.validation_covered)
         .count();
+    let failure_taxonomy = benchmark_failure_taxonomy(report);
     BenchmarkRunSummary {
         agent: report.agent.clone(),
         variant: report.variant.clone(),
@@ -862,6 +876,50 @@ fn benchmark_run_summary(report: &RunReport) -> BenchmarkRunSummary {
         edited_file_recall: report.summary.average_edited_file_recall,
         total_tool_calls: report.summary.total_tool_calls,
         total_token_estimate: report.summary.total_token_estimate,
+        failure_taxonomy,
+    }
+}
+
+fn benchmark_failure_taxonomy(report: &RunReport) -> BenchmarkFailureTaxonomy {
+    BenchmarkFailureTaxonomy {
+        failed_task_count: report
+            .tasks
+            .iter()
+            .filter(|task| task.status == TaskStatus::Failure)
+            .count(),
+        skipped_task_count: report
+            .tasks
+            .iter()
+            .filter(|task| task.status == TaskStatus::Skipped)
+            .count(),
+        validation_gap_count: report
+            .tasks
+            .iter()
+            .filter(|task| !task.validation_covered)
+            .count(),
+        no_relevant_file_read_count: report
+            .tasks
+            .iter()
+            .filter(|task| task.expected_file_count > 0 && task.relevant_files_read_count == 0)
+            .count(),
+        no_expected_edit_count: report
+            .tasks
+            .iter()
+            .filter(|task| task.expected_file_count > 0 && task.expected_files_edited_count == 0)
+            .count(),
+        recommendation_miss_count: report
+            .tasks
+            .iter()
+            .filter(|task| {
+                (task.expected_file_count + task.expected_test_count) > 0
+                    && task.relevant_recommended_file_count == 0
+            })
+            .count(),
+        irrelevant_read_task_count: report
+            .tasks
+            .iter()
+            .filter(|task| task.irrelevant_file_read_count > 0)
+            .count(),
     }
 }
 
@@ -1293,6 +1351,25 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
             pct(run.irrelevant_read_rate),
             run.total_tool_calls,
             run.total_token_estimate
+        ));
+    }
+
+    out.push_str("\n## Failure Taxonomy\n\n");
+    out.push_str("Counts are source-free and may overlap when one task has multiple issues.\n\n");
+    out.push_str("| Run | Failed | Skipped | Validation gaps | No relevant read | No expected edit | Recommendation miss | Irrelevant-read tasks |\n");
+    out.push_str("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    for run in &report.runs {
+        out.push_str(&format!(
+            "| {} / {:?} | {} | {} | {} | {} | {} | {} | {} |\n",
+            run.agent,
+            run.variant,
+            run.failure_taxonomy.failed_task_count,
+            run.failure_taxonomy.skipped_task_count,
+            run.failure_taxonomy.validation_gap_count,
+            run.failure_taxonomy.no_relevant_file_read_count,
+            run.failure_taxonomy.no_expected_edit_count,
+            run.failure_taxonomy.recommendation_miss_count,
+            run.failure_taxonomy.irrelevant_read_task_count
         ));
     }
 
@@ -2921,6 +2998,15 @@ mod tests {
         assert_eq!(summary.runs[0].success_count, 0);
         assert_eq!(summary.runs[1].success_count, 1);
         assert_eq!(summary.runs[1].validation_covered_count, 1);
+        assert_eq!(summary.runs[0].failure_taxonomy.failed_task_count, 1);
+        assert_eq!(summary.runs[0].failure_taxonomy.validation_gap_count, 1);
+        assert_eq!(
+            summary.runs[0].failure_taxonomy.irrelevant_read_task_count,
+            1
+        );
+        assert_eq!(summary.runs[0].failure_taxonomy.no_expected_edit_count, 1);
+        assert_eq!(summary.runs[1].failure_taxonomy.failed_task_count, 0);
+        assert_eq!(summary.runs[1].failure_taxonomy.validation_gap_count, 0);
         assert_eq!(
             summary.runs[1].success_rate_interval.confidence_level,
             CONFIDENCE_LEVEL_95
@@ -2937,6 +3023,8 @@ mod tests {
         assert!(markdown.contains("Confidence"));
         assert!(markdown.contains("Low sample warning"));
         assert!(markdown.contains("95% CI"));
+        assert!(markdown.contains("Failure Taxonomy"));
+        assert!(markdown.contains("Validation gaps"));
         assert!(markdown.contains("Deltas From Baseline"));
         assert!(markdown.contains("Improved"));
     }
