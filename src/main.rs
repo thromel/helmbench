@@ -20,6 +20,7 @@ use std::time::{Duration, Instant};
 
 const RUN_MATRIX_MANIFEST_SCHEMA_VERSION: u32 = 6;
 const RUN_MATRIX_PRIVACY_REPORT_SCHEMA_VERSION: u32 = 1;
+const MATRIX_HISTORY_SCHEMA_VERSION: u32 = 2;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -493,6 +494,7 @@ enum SchemaKind {
     RunReport,
     BenchmarkSummary,
     QualityGate,
+    MatrixHistory,
     RunMatrixManifest,
     RunMatrixPrivacyReport,
 }
@@ -1283,6 +1285,7 @@ fn schema_contract(kind: SchemaKind) -> &'static str {
         SchemaKind::RunReport => include_str!("../schemas/run-report.schema.json"),
         SchemaKind::BenchmarkSummary => include_str!("../schemas/benchmark-summary.schema.json"),
         SchemaKind::QualityGate => include_str!("../schemas/quality-gate.schema.json"),
+        SchemaKind::MatrixHistory => include_str!("../schemas/matrix-history.schema.json"),
         SchemaKind::RunMatrixManifest => {
             include_str!("../schemas/run-matrix-manifest.schema.json")
         }
@@ -4141,7 +4144,7 @@ fn build_matrix_history_report(matrix_dirs: &[PathBuf]) -> Result<MatrixHistoryR
 
     let trends = matrix_history_trends(&entries)?;
     Ok(MatrixHistoryReport {
-        schema_version: 2,
+        schema_version: MATRIX_HISTORY_SCHEMA_VERSION,
         suite_name: suite_name.unwrap_or_default(),
         matrices: entries,
         trends,
@@ -7044,6 +7047,7 @@ mod tests {
             (SchemaKind::RunReport, "HelmBench Run Report"),
             (SchemaKind::BenchmarkSummary, "HelmBench Benchmark Summary"),
             (SchemaKind::QualityGate, "HelmBench Quality Gate"),
+            (SchemaKind::MatrixHistory, "HelmBench Matrix History"),
             (
                 SchemaKind::RunMatrixManifest,
                 "HelmBench Run Matrix Manifest",
@@ -7076,6 +7080,12 @@ mod tests {
                 assert_eq!(
                     value["properties"]["schemaVersion"]["const"],
                     helmbench::QUALITY_GATE_SCHEMA_VERSION
+                );
+            }
+            if matches!(kind, SchemaKind::MatrixHistory) {
+                assert_eq!(
+                    value["properties"]["schemaVersion"]["const"],
+                    MATRIX_HISTORY_SCHEMA_VERSION
                 );
             }
             if matches!(kind, SchemaKind::RunMatrixManifest) {

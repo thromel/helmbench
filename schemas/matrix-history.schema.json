@@ -1,0 +1,335 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/matrix-history.schema.json",
+  "title": "HelmBench Matrix History",
+  "description": "Source-free longitudinal trend report for verified run-matrix outputs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteName",
+    "matrices",
+    "trends",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "suiteName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "matrices": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/matrixEntry"
+      }
+    },
+    "trends": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/runTrend"
+      }
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "agentVariant": {
+      "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "delta": {
+      "type": "number"
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "optionalNonNegativeNumber": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "optionalNumber": {
+      "type": ["number", "null"]
+    },
+    "matrixEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "matrixIndex",
+        "label",
+        "qualityGatePassed",
+        "evidenceBundleVerified",
+        "runs"
+      ],
+      "properties": {
+        "matrixIndex": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "qualityGatePassed": {
+          "type": "boolean"
+        },
+        "evidenceBundleVerified": {
+          "const": true
+        },
+        "runs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/historyRun"
+          }
+        }
+      }
+    },
+    "historyRun": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "agent",
+        "variant",
+        "taskCount",
+        "successRate",
+        "validationCoverageRate",
+        "irrelevantReadRate",
+        "recommendationRecall",
+        "contextPrecision",
+        "editedFileRecall",
+        "averageTimeToFirstRelevantFileMillis",
+        "totalToolCalls",
+        "totalTokenEstimate",
+        "toolCallsPerSuccess",
+        "tokenEstimatePerSuccess"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "variant": {
+          "$ref": "#/$defs/agentVariant"
+        },
+        "taskCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "successRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "validationCoverageRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "irrelevantReadRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "recommendationRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "contextPrecision": {
+          "$ref": "#/$defs/rate"
+        },
+        "editedFileRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "averageTimeToFirstRelevantFileMillis": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "totalToolCalls": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "totalTokenEstimate": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "toolCallsPerSuccess": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "tokenEstimatePerSuccess": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        }
+      }
+    },
+    "runTrend": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "agent",
+        "variant",
+        "firstSuccessRate",
+        "lastSuccessRate",
+        "successRateDelta",
+        "firstValidationCoverageRate",
+        "lastValidationCoverageRate",
+        "validationCoverageRateDelta",
+        "firstIrrelevantReadRate",
+        "lastIrrelevantReadRate",
+        "irrelevantReadRateDelta",
+        "firstRecommendationRecall",
+        "lastRecommendationRecall",
+        "recommendationRecallDelta",
+        "firstContextPrecision",
+        "lastContextPrecision",
+        "contextPrecisionDelta",
+        "firstEditedFileRecall",
+        "lastEditedFileRecall",
+        "editedFileRecallDelta",
+        "firstAverageTimeToFirstRelevantFileMillis",
+        "lastAverageTimeToFirstRelevantFileMillis",
+        "averageTimeToFirstRelevantFileMillisDelta",
+        "totalToolCallsDelta",
+        "totalTokenEstimateDelta",
+        "firstToolCallsPerSuccess",
+        "lastToolCallsPerSuccess",
+        "toolCallsPerSuccessDelta",
+        "firstTokenEstimatePerSuccess",
+        "lastTokenEstimatePerSuccess",
+        "tokenEstimatePerSuccessDelta"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "variant": {
+          "$ref": "#/$defs/agentVariant"
+        },
+        "firstSuccessRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "lastSuccessRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "successRateDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "firstValidationCoverageRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "lastValidationCoverageRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "validationCoverageRateDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "firstIrrelevantReadRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "lastIrrelevantReadRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "irrelevantReadRateDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "firstRecommendationRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "lastRecommendationRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "recommendationRecallDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "firstContextPrecision": {
+          "$ref": "#/$defs/rate"
+        },
+        "lastContextPrecision": {
+          "$ref": "#/$defs/rate"
+        },
+        "contextPrecisionDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "firstEditedFileRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "lastEditedFileRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "editedFileRecallDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "firstAverageTimeToFirstRelevantFileMillis": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "lastAverageTimeToFirstRelevantFileMillis": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "averageTimeToFirstRelevantFileMillisDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "totalToolCallsDelta": {
+          "type": "integer"
+        },
+        "totalTokenEstimateDelta": {
+          "type": "integer"
+        },
+        "firstToolCallsPerSuccess": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "lastToolCallsPerSuccess": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "toolCallsPerSuccessDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "firstTokenEstimatePerSuccess": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "lastTokenEstimatePerSuccess": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "tokenEstimatePerSuccessDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}
