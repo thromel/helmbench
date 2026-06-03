@@ -161,3 +161,6 @@ measurement contract first; `init-public-matrix` is the repeatable bridge from
 that target to real agent outcome evidence. If the success commands already
 pass before any agent changes, treat the matrix as navigation/validation
 behavior evidence, not task-success evidence, until seeded task setup is added.
+Once seeded task setup is present, add `--health-check-success-commands` and
+`--health-require-setup-commands` to `init-public-matrix` so the generated
+matrix config carries the outcome-health preflight forward.

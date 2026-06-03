@@ -185,6 +185,12 @@ enum Command {
         #[arg(long)]
         allow_dirty_health: bool,
         #[arg(long)]
+        health_check_success_commands: bool,
+        #[arg(long)]
+        health_fail_fast_success_commands: bool,
+        #[arg(long)]
+        health_require_setup_commands: bool,
+        #[arg(long)]
         force: bool,
     },
     /// Check that a source-free task suite is usable against a local git repo.
@@ -840,6 +846,9 @@ fn main() -> Result<()> {
             fail_on_regression,
             health_min_commits,
             allow_dirty_health,
+            health_check_success_commands,
+            health_fail_fast_success_commands,
+            health_require_setup_commands,
             force,
         } => {
             let out = out.unwrap_or_else(|| default_public_matrix_config_out(preset));
@@ -862,6 +871,9 @@ fn main() -> Result<()> {
                 fail_on_regression,
                 health_min_commits,
                 allow_dirty_health,
+                health_check_success_commands,
+                health_fail_fast_success_commands,
+                health_require_setup_commands,
                 force,
             })?;
         }
@@ -2262,6 +2274,9 @@ struct InitPublicMatrixOptions {
     fail_on_regression: bool,
     health_min_commits: u64,
     allow_dirty_health: bool,
+    health_check_success_commands: bool,
+    health_fail_fast_success_commands: bool,
+    health_require_setup_commands: bool,
     force: bool,
 }
 
@@ -2289,9 +2304,9 @@ fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
         &options.repo,
         options.health_min_commits,
         options.allow_dirty_health,
-        false,
-        false,
-        false,
+        options.health_check_success_commands,
+        options.health_fail_fast_success_commands,
+        options.health_require_setup_commands,
         &suite,
         public_suite_anchor_files(options.preset),
     )?;
@@ -2353,9 +2368,11 @@ fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
         }),
         health_min_commits: Some(options.health_min_commits),
         allow_dirty_health: Some(options.allow_dirty_health),
-        health_check_success_commands: None,
-        health_fail_fast_success_commands: None,
-        health_require_setup_commands: None,
+        health_check_success_commands: options.health_check_success_commands.then_some(true),
+        health_fail_fast_success_commands: options
+            .health_fail_fast_success_commands
+            .then_some(true),
+        health_require_setup_commands: options.health_require_setup_commands.then_some(true),
     };
 
     write_json(&config, &options.out)?;
@@ -8491,6 +8508,9 @@ mod tests {
             fail_on_regression: false,
             health_min_commits: 1,
             allow_dirty_health: false,
+            health_check_success_commands: false,
+            health_fail_fast_success_commands: false,
+            health_require_setup_commands: false,
             force: false,
         })
         .expect("matrix config");
@@ -8555,6 +8575,80 @@ mod tests {
             .as_ref()
             .expect("command")
             .contains("'fake-claude'"));
+    }
+
+    #[test]
+    fn init_public_matrix_config_can_require_outcome_health() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        create_public_suite_fixture_repo(PublicSuitePreset::RefactoringMiner, &repo)
+            .expect("fixture repo");
+        let mut suite = refactoring_miner_suite();
+        for task in &mut suite.tasks {
+            task.setup_commands = vec!["true".to_string()];
+            task.success_command = Some("test -f .helmbench/agent-created-sentinel".to_string());
+        }
+        let suite_path = temp.path().join("refactoring-miner-public.json");
+        write_json(&suite, &suite_path).expect("suite");
+        let config_path = temp.path().join("refactoring-miner-matrix.json");
+
+        init_public_matrix_config(InitPublicMatrixOptions {
+            preset: PublicSuitePreset::RefactoringMiner,
+            repo,
+            suite_path: Some(suite_path),
+            out: config_path.clone(),
+            out_dir: None,
+            agent_preset: AdapterPreset::ClaudeCode,
+            agent_bin: Some(PathBuf::from("fake-claude")),
+            model: None,
+            agent_args: Vec::new(),
+            dangerously_skip_permissions: true,
+            dangerously_bypass_approvals_and_sandbox: false,
+            ctxhelm_bin: PathBuf::from("fake-ctxhelm"),
+            mode: "bug-fix".to_string(),
+            target_agent: None,
+            pack: false,
+            fail_on_regression: true,
+            health_min_commits: 1,
+            allow_dirty_health: false,
+            health_check_success_commands: true,
+            health_fail_fast_success_commands: true,
+            health_require_setup_commands: true,
+            force: false,
+        })
+        .expect("matrix config");
+
+        let raw = std::fs::read_to_string(&config_path).expect("config raw");
+        assert!(raw.contains("\"healthCheckSuccessCommands\": true"));
+        assert!(raw.contains("\"healthFailFastSuccessCommands\": true"));
+        assert!(raw.contains("\"healthRequireSetupCommands\": true"));
+        let request = build_run_matrix_request(
+            Some(&config_path),
+            None,
+            None,
+            None,
+            None,
+            Vec::new(),
+            Vec::new(),
+            false,
+            false,
+            false,
+            1,
+            false,
+            false,
+            false,
+            false,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("request");
+        assert!(request.health_check_success_commands);
+        assert!(request.health_fail_fast_success_commands);
+        assert!(request.health_require_setup_commands);
     }
 
     #[test]

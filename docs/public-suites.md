@@ -223,6 +223,12 @@ the matrix should be described as navigation and validation-behavior evidence.
 For large suites, add `--fail-fast-success-commands` to stop after the first
 pre-agent validation pass.
 
+If the suite already includes task-level seeded setup, put that gate directly in
+the generated matrix config by adding `--health-check-success-commands` and
+`--health-require-setup-commands` to `init-public-matrix`. The generator will
+fail before writing when the fixture cannot prove the same outcome-health
+contract that `run-matrix` will later enforce.
+
 ## Health Failures
 
 If the repository is dirty, corrupt, too shallow, or missing expected anchor

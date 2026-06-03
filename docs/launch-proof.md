@@ -114,3 +114,6 @@ fixture passes suite health, run `suite-health --check-success-commands` to
 prove validation does not already pass before the agent runs, using
 `--fail-fast-success-commands` for large suites when needed, then run
 `verify-matrix` on the generated output.
+After the suite has seeded task setup, pass `--health-check-success-commands`
+and `--health-require-setup-commands` to `init-public-matrix` so the generated
+config enforces that outcome-health proof automatically.

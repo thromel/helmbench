@@ -267,6 +267,12 @@ cargo run -- run-matrix \
   --force
 ```
 
+When the public suite has task-level seeded setup, add
+`--health-check-success-commands` and `--health-require-setup-commands` to
+`init-public-matrix`. The generator proves those outcome-health gates before
+writing the config, and the generated `run-matrix` config enforces the same
+gates before any agent row runs.
+
 Every successful matrix run writes `matrix-manifest.json`, a source-free
 top-level index of run labels, suite-health, report paths,
 dashboard/evidence artifacts, quality-gate status, and evidence verification

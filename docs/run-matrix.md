@@ -112,6 +112,12 @@ the requested public preset or if the fixture repo fails the source-free
 suite-health gate. Defaults write machine-specific configs under `.helmbench/`
 so local repo paths are not accidentally committed.
 
+For seeded public suites, pass `--health-check-success-commands` and
+`--health-require-setup-commands` to `init-public-matrix`. The generator runs
+that stronger suite-health gate before writing, then stores
+`healthCheckSuccessCommands` and `healthRequireSetupCommands` in the matrix
+config so `run-matrix` repeats the same preflight.
+
 CLI values override `suite`, `repo`, `outDir`, `baseline`, and `heads` when
 provided. `qualityGate` configures the source-free quality gate written to
 `reports/quality-gate.json`; the `--min-task-count`,
