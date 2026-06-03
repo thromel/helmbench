@@ -49,8 +49,9 @@ This repository currently implements the core HelmBench workflow:
   artifacts, and source-free reproducibility provenance
 - `matrix-history` longitudinal comparison and static HTML trend dashboards for
   verified run-matrix outputs
-- `diff-autopsy` reviewer report that compares a git worktree or branch diff
-  against one source-free benchmark task without reading patch contents
+- `diff-autopsy` reviewer report that compares a git worktree, branch diff, or
+  GitHub PR changed-file list against one source-free benchmark task without
+  reading patch contents
 - GitHub release workflow with packaged binaries, SHA-256 checksums, and
   provenance attestations
 - `benchmark-summary` reports that compare one baseline against multiple
@@ -324,6 +325,17 @@ cargo run -- diff-autopsy \
   --base-ref origin/main \
   --head-ref HEAD \
   --out /tmp/helmbench-diff-autopsy.md
+```
+
+Analyze a GitHub PR by changed file names only:
+
+```bash
+cargo run -- diff-autopsy \
+  --suite suites/example-auth-bugs.json \
+  --repo . \
+  --task-id auth-redirect-001 \
+  --pr 42 \
+  --out /tmp/helmbench-pr-autopsy.md
 ```
 
 Run direct agent presets:

@@ -93,6 +93,22 @@ helmbench diff-autopsy \
   --format json
 ```
 
+Analyze a GitHub PR by changed file names only:
+
+```bash
+helmbench diff-autopsy \
+  --suite suites/example-auth-bugs.json \
+  --repo . \
+  --task-id auth-redirect-001 \
+  --pr 42 \
+  --out reports/example-pr-autopsy.md
+```
+
+If the current checkout is not connected to the target GitHub repository, pass
+`--github-repo OWNER/REPO`. HelmBench shells out to `gh pr diff --name-only`,
+never `--patch`; numeric PR identifiers are stored as `pr:<number>`, while URL
+or branch identifiers are stored as source-free hashes.
+
 ### Inputs
 
 Diff autopsy uses only:
@@ -100,6 +116,7 @@ Diff autopsy uses only:
 - suite expectations;
 - task id;
 - changed file paths from `git status --short` or `git diff --name-only`;
+- changed file paths from `gh pr diff --name-only` when `--pr` is used;
 - base/head ref labels;
 - source-free privacy flags.
 

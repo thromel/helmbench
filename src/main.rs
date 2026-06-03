@@ -433,10 +433,14 @@ enum Command {
         repo: PathBuf,
         #[arg(long)]
         task_id: String,
-        #[arg(long, default_value = "HEAD")]
-        base_ref: String,
+        #[arg(long)]
+        base_ref: Option<String>,
         #[arg(long)]
         head_ref: Option<String>,
+        #[arg(long)]
+        pr: Option<String>,
+        #[arg(long)]
+        github_repo: Option<String>,
         #[arg(long)]
         out: PathBuf,
         #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
@@ -1169,14 +1173,32 @@ fn main() -> Result<()> {
             task_id,
             base_ref,
             head_ref,
+            pr,
+            github_repo,
             out,
             format,
         } => {
             let suite = load_suite(&suite)?;
-            let changed_files = if let Some(head_ref) = &head_ref {
-                git_diff_paths(&repo, &base_ref, head_ref)?
+            let (changed_files, base_ref, head_ref) = if let Some(pr) = &pr {
+                if base_ref.is_some() || head_ref.is_some() {
+                    anyhow::bail!("--pr cannot be combined with --base-ref or --head-ref");
+                }
+                (
+                    gh_pr_diff_paths(&repo, pr, github_repo.as_deref())?,
+                    "github-pr".to_string(),
+                    Some(source_free_pr_label(pr)),
+                )
             } else {
-                git_changed_paths(&repo)?
+                if github_repo.is_some() {
+                    anyhow::bail!("--github-repo requires --pr");
+                }
+                let base_ref = base_ref.unwrap_or_else(|| "HEAD".to_string());
+                let changed_files = if let Some(head_ref) = &head_ref {
+                    git_diff_paths(&repo, &base_ref, head_ref)?
+                } else {
+                    git_changed_paths(&repo)?
+                };
+                (changed_files, base_ref, head_ref)
             };
             let autopsy = build_diff_autopsy(
                 &suite,
@@ -5319,6 +5341,37 @@ fn git_diff_paths(repo: &Path, base_ref: &str, head_ref: &str) -> Result<Vec<Str
         anyhow::bail!("git diff failed with status {:?}", output.status.code());
     }
     let stdout = String::from_utf8(output.stdout).context("git diff utf8")?;
+    parse_name_only_paths(&stdout)
+}
+
+fn gh_pr_diff_paths(repo: &Path, pr: &str, github_repo: Option<&str>) -> Result<Vec<String>> {
+    if pr.trim().is_empty() {
+        anyhow::bail!("PR identifier must not be empty");
+    }
+    let mut command = ProcessCommand::new("gh");
+    command
+        .current_dir(repo)
+        .arg("pr")
+        .arg("diff")
+        .arg(pr)
+        .arg("--name-only");
+    if let Some(github_repo) = github_repo {
+        if github_repo.trim().is_empty() {
+            anyhow::bail!("--github-repo must not be empty");
+        }
+        command.arg("--repo").arg(github_repo);
+    }
+    let output = command
+        .output()
+        .with_context(|| format!("gh pr diff --name-only in {}", repo.display()))?;
+    if !output.status.success() {
+        anyhow::bail!("gh pr diff failed with status {:?}", output.status.code());
+    }
+    let stdout = String::from_utf8(output.stdout).context("gh pr diff utf8")?;
+    parse_name_only_paths(&stdout)
+}
+
+fn parse_name_only_paths(stdout: &str) -> Result<Vec<String>> {
     let mut paths = Vec::new();
     for line in stdout.lines() {
         let path = line.trim();
@@ -5331,6 +5384,15 @@ fn git_diff_paths(repo: &Path, base_ref: &str, head_ref: &str) -> Result<Vec<Str
     paths.sort();
     paths.dedup();
     Ok(paths)
+}
+
+fn source_free_pr_label(pr: &str) -> String {
+    let pr = pr.trim();
+    if !pr.is_empty() && pr.chars().all(|ch| ch.is_ascii_digit()) {
+        format!("pr:{pr}")
+    } else {
+        source_free_hash("pr-ref", pr)
+    }
 }
 
 fn path_event(
@@ -6519,6 +6581,34 @@ mod tests {
         let error =
             collect_ctxhelm_paths(&value, "targetFiles", &mut paths).expect_err("unsafe path");
         assert!(error.to_string().contains("parent traversal"));
+    }
+
+    #[test]
+    fn name_only_paths_are_source_free_and_deduped() {
+        let paths = parse_name_only_paths(
+            "src/auth/session.txt\n.helmbench/events.jsonl\nsrc/auth/session.txt\n tests/auth/session.test.sh \n",
+        )
+        .expect("paths");
+
+        assert_eq!(
+            paths,
+            vec![
+                "src/auth/session.txt".to_string(),
+                "tests/auth/session.test.sh".to_string()
+            ]
+        );
+
+        let err = parse_name_only_paths("../secret.txt\n").expect_err("unsafe path");
+        assert!(err.to_string().contains("parent traversal"));
+    }
+
+    #[test]
+    fn pr_labels_are_source_free() {
+        assert_eq!(source_free_pr_label("42"), "pr:42");
+        let branch_label = source_free_pr_label("feature/read-auth-source");
+        assert!(branch_label.starts_with("pr-ref:"));
+        assert!(!branch_label.contains("feature"));
+        assert!(!branch_label.contains('/'));
     }
 
     #[test]
