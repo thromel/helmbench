@@ -79,6 +79,36 @@ Config format:
 }
 ```
 
+For public repository suites, generate a real-agent matrix config with fixture
+health checked up front:
+
+```bash
+helmbench init-public-matrix \
+  --preset refactoring-miner \
+  --repo /tmp/RefactoringMiner \
+  --suite suites/refactoring-miner-public.json \
+  --out /tmp/refactoring-miner-matrix.json \
+  --out-dir /tmp/refactoring-miner-matrix \
+  --agent-preset claude-code \
+  --dangerously-skip-permissions \
+  --ctxhelm-bin ctxhelm \
+  --pack \
+  --force
+
+helmbench validate-matrix \
+  --config /tmp/refactoring-miner-matrix.json
+
+helmbench run-matrix \
+  --config /tmp/refactoring-miner-matrix.json \
+  --force
+```
+
+The generator writes a normal `run-matrix` config with a `native` baseline row
+and a `ctxhelm` guided row. It fails before writing if the suite does not match
+the requested public preset or if the fixture repo fails the source-free
+suite-health gate. Defaults write machine-specific configs under `.helmbench/`
+so local repo paths are not accidentally committed.
+
 CLI values override `suite`, `repo`, `outDir`, `baseline`, and `heads` when
 provided. `qualityGate` configures the source-free quality gate written to
 `reports/quality-gate.json`; the `--min-task-count`,

@@ -61,6 +61,8 @@ This repository currently implements the core HelmBench workflow:
 - `init-public-suite` generator for verified public-repo benchmark suites,
   currently including a 10-task RefactoringMiner suite plus Flask, ripgrep,
   and Express presets
+- `init-public-matrix` generator for repeatable real-agent public-suite matrix
+  configs, with source-free fixture health checked before the config is written
 - `suite-health` checks any source-free suite against a local git repo before
   benchmark results are trusted
 - `demo-run` one-command deterministic demo pipeline with reports, dashboard,
@@ -216,6 +218,30 @@ HelmBench checkout. It runs the tracked `local-run-smoke` suite against this
 repo, compares native, native-search, and ctxhelm-guided rows, and uses
 `scripts/demo-local-agent.sh` through the `claude-code` matrix preset plus
 `scripts/demo-ctxhelm.sh` as deterministic source-free shims.
+
+Generate a real-agent public matrix config after creating or checking out a
+public suite fixture:
+
+```bash
+cargo run -- init-public-matrix \
+  --preset refactoring-miner \
+  --repo /tmp/RefactoringMiner \
+  --suite suites/refactoring-miner-public.json \
+  --out /tmp/refactoring-miner-matrix.json \
+  --out-dir /tmp/refactoring-miner-matrix \
+  --agent-preset claude-code \
+  --dangerously-skip-permissions \
+  --ctxhelm-bin ctxhelm \
+  --pack \
+  --force
+
+cargo run -- validate-matrix \
+  --config /tmp/refactoring-miner-matrix.json
+
+cargo run -- run-matrix \
+  --config /tmp/refactoring-miner-matrix.json \
+  --force
+```
 
 Every successful matrix run writes `matrix-manifest.json`, a source-free
 top-level index of run labels, suite-health, report paths,
@@ -632,6 +658,7 @@ helmbench-cli
   demo-run
   run-matrix
   init-public-suite
+  init-public-matrix
   suite-health
   validate-suite
   run

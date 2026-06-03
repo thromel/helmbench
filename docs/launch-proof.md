@@ -90,4 +90,6 @@ that measures ctxhelm recommendation quality on a real public repository suite.
 The next proof step is a full `run-matrix` over that same suite with at least
 one real agent baseline and one ctxhelm-guided agent row, then publishing the
 verified matrix directory and evidence bundle. That is the path from
-recommendation proof to launch-grade agent outcome evidence.
+recommendation proof to launch-grade agent outcome evidence. Use
+`init-public-matrix` to generate that matrix config after the RefactoringMiner
+fixture passes suite health, then run `verify-matrix` on the generated output.

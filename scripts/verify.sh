@@ -38,6 +38,8 @@ test -f reports/refactoringminer-ctxhelm-plan.json
 test -f suites/refactoring-miner-public.json
 grep -q '"preset": "claude-code"' suites/demo-matrix.json
 grep -q 'preset=claude-code' docs/run-matrix.md
+grep -q 'init-public-matrix' README.md
+grep -q 'init-public-matrix' docs/refactoringminer-public-proof.md
 grep -q 'HelmBench Launch Proof' docs/launch-proof.md
 grep -q 'Low sample size: 1 task' docs/example-benchmark-summary.md
 grep -q 'raw source' docs/launch-proof.md
@@ -56,6 +58,7 @@ cargo run -- schema --help >/dev/null
 cargo run -- demo-run --help >/dev/null
 cargo run -- validate-matrix --help >/dev/null
 cargo run -- run-matrix --help >/dev/null
+cargo run -- init-public-matrix --help >/dev/null
 cargo run -- matrix-history --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
 cargo run -- suite-health --help >/dev/null

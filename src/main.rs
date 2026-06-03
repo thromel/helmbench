@@ -140,6 +140,47 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Generate a repeatable public-repo run-matrix config for a real agent proof.
+    InitPublicMatrix {
+        #[arg(long, value_enum)]
+        preset: PublicSuitePreset,
+        #[arg(long)]
+        repo: PathBuf,
+        #[arg(long)]
+        suite: Option<PathBuf>,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long)]
+        out_dir: Option<PathBuf>,
+        #[arg(long, value_enum, default_value_t = AdapterPreset::ClaudeCode)]
+        agent_preset: AdapterPreset,
+        #[arg(long)]
+        agent_bin: Option<PathBuf>,
+        #[arg(long)]
+        model: Option<String>,
+        #[arg(long)]
+        agent_arg: Vec<String>,
+        #[arg(long)]
+        dangerously_skip_permissions: bool,
+        #[arg(long)]
+        dangerously_bypass_approvals_and_sandbox: bool,
+        #[arg(long, default_value = "ctxhelm")]
+        ctxhelm_bin: PathBuf,
+        #[arg(long, default_value = "bug-fix")]
+        mode: String,
+        #[arg(long)]
+        target_agent: Option<String>,
+        #[arg(long)]
+        pack: bool,
+        #[arg(long)]
+        fail_on_regression: bool,
+        #[arg(long, default_value_t = 1000)]
+        health_min_commits: u64,
+        #[arg(long)]
+        allow_dirty_health: bool,
+        #[arg(long)]
+        force: bool,
+    },
     /// Check that a source-free task suite is usable against a local git repo.
     SuiteHealth {
         #[arg(long)]
@@ -756,6 +797,50 @@ fn main() -> Result<()> {
             init_public_suite(preset, &repo, &suite_out, &health_out, min_commits, force)?;
             println!("wrote {}", suite_out.display());
             println!("wrote {}", health_out.display());
+        }
+        Command::InitPublicMatrix {
+            preset,
+            repo,
+            suite,
+            out,
+            out_dir,
+            agent_preset,
+            agent_bin,
+            model,
+            agent_arg,
+            dangerously_skip_permissions,
+            dangerously_bypass_approvals_and_sandbox,
+            ctxhelm_bin,
+            mode,
+            target_agent,
+            pack,
+            fail_on_regression,
+            health_min_commits,
+            allow_dirty_health,
+            force,
+        } => {
+            let out = out.unwrap_or_else(|| default_public_matrix_config_out(preset));
+            init_public_matrix_config(InitPublicMatrixOptions {
+                preset,
+                repo,
+                suite_path: suite,
+                out,
+                out_dir,
+                agent_preset,
+                agent_bin,
+                model,
+                agent_args: agent_arg,
+                dangerously_skip_permissions,
+                dangerously_bypass_approvals_and_sandbox,
+                ctxhelm_bin,
+                mode,
+                target_agent,
+                pack,
+                fail_on_regression,
+                health_min_commits,
+                allow_dirty_health,
+                force,
+            })?;
         }
         Command::SuiteHealth {
             suite,
@@ -2069,6 +2154,158 @@ fn init_public_suite(
     Ok(())
 }
 
+#[derive(Debug, Clone)]
+struct InitPublicMatrixOptions {
+    preset: PublicSuitePreset,
+    repo: PathBuf,
+    suite_path: Option<PathBuf>,
+    out: PathBuf,
+    out_dir: Option<PathBuf>,
+    agent_preset: AdapterPreset,
+    agent_bin: Option<PathBuf>,
+    model: Option<String>,
+    agent_args: Vec<String>,
+    dangerously_skip_permissions: bool,
+    dangerously_bypass_approvals_and_sandbox: bool,
+    ctxhelm_bin: PathBuf,
+    mode: String,
+    target_agent: Option<String>,
+    pack: bool,
+    fail_on_regression: bool,
+    health_min_commits: u64,
+    allow_dirty_health: bool,
+    force: bool,
+}
+
+fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
+    ensure_output_path_available(&options.out, options.force)?;
+    let suite_path = options
+        .suite_path
+        .unwrap_or_else(|| default_public_suite_out(options.preset));
+    let suite = load_suite(&suite_path)
+        .with_context(|| format!("load public suite {}", suite_path.display()))?;
+    validate_suite(&suite)?;
+
+    let expected_suite = public_suite_for_preset(options.preset);
+    if suite.name != expected_suite.name {
+        anyhow::bail!(
+            "suite `{}` does not match preset `{}` expected suite `{}`",
+            suite.name,
+            public_suite_preset_name(options.preset),
+            expected_suite.name
+        );
+    }
+
+    let health = suite_health_report(
+        Some(public_suite_preset_name(options.preset)),
+        &options.repo,
+        options.health_min_commits,
+        options.allow_dirty_health,
+        &suite,
+        public_suite_anchor_files(options.preset),
+    )?;
+    if !health.ok {
+        anyhow::bail!(
+            "public matrix fixture is not healthy; run suite-health for details before writing {}",
+            options.out.display()
+        );
+    }
+
+    let agent = adapter_preset_label(Some(options.agent_preset))
+        .expect("adapter preset label")
+        .to_string();
+    let out_dir = options
+        .out_dir
+        .unwrap_or_else(|| default_public_matrix_out_dir(options.preset));
+    let target_agent = options.target_agent.unwrap_or_else(|| agent.clone());
+    let base = public_matrix_agent_spec(
+        "native",
+        &agent,
+        AgentVariant::Native,
+        options.agent_preset,
+        options.agent_bin.clone(),
+        options.model.clone(),
+        options.agent_args.clone(),
+        options.dangerously_skip_permissions,
+        options.dangerously_bypass_approvals_and_sandbox,
+    );
+    let mut head = public_matrix_agent_spec(
+        "ctxhelm",
+        &agent,
+        AgentVariant::CtxhelmMcp,
+        options.agent_preset,
+        options.agent_bin,
+        options.model,
+        options.agent_args,
+        options.dangerously_skip_permissions,
+        options.dangerously_bypass_approvals_and_sandbox,
+    );
+    head.ctxhelm = true;
+    head.ctxhelm_bin = Some(options.ctxhelm_bin);
+    head.mode = Some(options.mode);
+    head.target_agent = Some(target_agent);
+    head.pack = options.pack;
+    head.pack_budget = options.pack.then(|| "brief".to_string());
+
+    let config = RunMatrixConfig {
+        suite: Some(suite_path),
+        repo: Some(options.repo),
+        out_dir: Some(out_dir),
+        setup_commands: Vec::new(),
+        baseline: base,
+        heads: vec![head],
+        keep_workdirs: None,
+        fail_on_regression: Some(options.fail_on_regression),
+        quality_gate: Some(RunMatrixQualityGateConfig {
+            min_task_count: Some(suite.tasks.len()),
+            ..RunMatrixQualityGateConfig::default()
+        }),
+        health_min_commits: Some(options.health_min_commits),
+        allow_dirty_health: Some(options.allow_dirty_health),
+    };
+
+    write_json(&config, &options.out)?;
+    println!("wrote {}", options.out.display());
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn public_matrix_agent_spec(
+    name: &str,
+    agent: &str,
+    variant: AgentVariant,
+    preset: AdapterPreset,
+    bin: Option<PathBuf>,
+    model: Option<String>,
+    args: Vec<String>,
+    dangerously_skip_permissions: bool,
+    dangerously_bypass_approvals_and_sandbox: bool,
+) -> RunMatrixConfigSpec {
+    RunMatrixConfigSpec {
+        name: name.to_string(),
+        agent: agent.to_string(),
+        variant,
+        ctxhelm: false,
+        ctxhelm_bin: None,
+        mode: None,
+        target_agent: None,
+        semantic: false,
+        semantic_provider: None,
+        semantic_model: None,
+        semantic_dimensions: None,
+        pack: false,
+        pack_budget: None,
+        command: None,
+        preset: Some(preset),
+        bin,
+        model,
+        args,
+        dangerously_skip_permissions,
+        dangerously_bypass_approvals_and_sandbox,
+        capture_stream: false,
+    }
+}
+
 fn ensure_output_path_available(path: &Path, force: bool) -> Result<()> {
     if path.exists() && !force {
         anyhow::bail!(
@@ -2225,6 +2462,20 @@ fn default_public_suite_out(preset: PublicSuitePreset) -> PathBuf {
 fn default_public_health_out(preset: PublicSuitePreset) -> PathBuf {
     PathBuf::from(format!(
         ".helmbench/{}-public-suite-health.json",
+        public_suite_preset_name(preset)
+    ))
+}
+
+fn default_public_matrix_config_out(preset: PublicSuitePreset) -> PathBuf {
+    PathBuf::from(format!(
+        ".helmbench/{}-matrix.json",
+        public_suite_preset_name(preset)
+    ))
+}
+
+fn default_public_matrix_out_dir(preset: PublicSuitePreset) -> PathBuf {
+    PathBuf::from(format!(
+        ".helmbench/{}-matrix",
         public_suite_preset_name(preset)
     ))
 }
@@ -2841,7 +3092,7 @@ struct RunMatrixSpec {
     capture_stream: bool,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, ValueEnum)]
 #[serde(rename_all = "kebab-case")]
 enum AdapterPreset {
     ClaudeCode,
@@ -3061,100 +3312,111 @@ struct RunMatrixRequest {
     allow_dirty_health: bool,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RunMatrixConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
     suite: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     repo: Option<PathBuf>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     out_dir: Option<PathBuf>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     setup_commands: Vec<String>,
     baseline: RunMatrixConfigSpec,
     #[serde(default)]
     heads: Vec<RunMatrixConfigSpec>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     keep_workdirs: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     fail_on_regression: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     quality_gate: Option<RunMatrixQualityGateConfig>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     health_min_commits: Option<u64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     allow_dirty_health: Option<bool>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RunMatrixConfigSpec {
     name: String,
     agent: String,
     variant: AgentVariant,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     ctxhelm: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     ctxhelm_bin: Option<PathBuf>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     mode: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     target_agent: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     semantic: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     semantic_provider: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     semantic_model: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     semantic_dimensions: Option<u16>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     pack: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pack_budget: Option<String>,
-    #[serde(default, alias = "adapterCommand")]
+    #[serde(
+        default,
+        alias = "adapterCommand",
+        skip_serializing_if = "Option::is_none"
+    )]
     command: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     preset: Option<AdapterPreset>,
-    #[serde(default, alias = "adapterBin")]
+    #[serde(default, alias = "adapterBin", skip_serializing_if = "Option::is_none")]
     bin: Option<PathBuf>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     model: Option<String>,
-    #[serde(default, alias = "adapterArgs")]
+    #[serde(default, alias = "adapterArgs", skip_serializing_if = "Vec::is_empty")]
     args: Vec<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     dangerously_skip_permissions: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     dangerously_bypass_approvals_and_sandbox: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "is_false")]
     capture_stream: bool,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RunMatrixQualityGateConfig {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     min_task_count: Option<usize>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     min_success_rate_delta: Option<f32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     min_validation_coverage_rate_delta: Option<f32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     max_irrelevant_read_rate_delta: Option<f32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     min_recommendation_recall_delta: Option<f32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     min_context_precision_delta: Option<f32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     min_edited_file_recall_delta: Option<f32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     max_total_tool_calls_delta: Option<i64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     max_total_token_estimate_delta: Option<i64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     max_tool_calls_per_success_delta: Option<f32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     max_token_estimate_per_success_delta: Option<f32>,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -7643,6 +7905,99 @@ mod tests {
     }
 
     #[test]
+    fn init_public_matrix_config_writes_valid_agent_matrix_request() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        create_public_suite_fixture_repo(PublicSuitePreset::RefactoringMiner, &repo)
+            .expect("fixture repo");
+        let suite_path = temp.path().join("refactoring-miner-public.json");
+        write_json(&refactoring_miner_suite(), &suite_path).expect("suite");
+        let config_path = temp.path().join("refactoring-miner-matrix.json");
+        let matrix_out = temp.path().join("matrix-out");
+
+        init_public_matrix_config(InitPublicMatrixOptions {
+            preset: PublicSuitePreset::RefactoringMiner,
+            repo: repo.clone(),
+            suite_path: Some(suite_path.clone()),
+            out: config_path.clone(),
+            out_dir: Some(matrix_out.clone()),
+            agent_preset: AdapterPreset::ClaudeCode,
+            agent_bin: Some(PathBuf::from("fake-claude")),
+            model: Some("sonnet".to_string()),
+            agent_args: vec!["--debug".to_string()],
+            dangerously_skip_permissions: true,
+            dangerously_bypass_approvals_and_sandbox: false,
+            ctxhelm_bin: PathBuf::from("fake-ctxhelm"),
+            mode: "bug-fix".to_string(),
+            target_agent: None,
+            pack: true,
+            fail_on_regression: false,
+            health_min_commits: 1,
+            allow_dirty_health: false,
+            force: false,
+        })
+        .expect("matrix config");
+
+        let raw = std::fs::read_to_string(&config_path).expect("config raw");
+        assert!(!raw.contains("null"));
+        assert!(raw.contains("\"preset\": \"claude-code\""));
+        let request = build_run_matrix_request(
+            Some(&config_path),
+            None,
+            None,
+            None,
+            None,
+            Vec::new(),
+            Vec::new(),
+            false,
+            false,
+            false,
+            1,
+            false,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("request");
+        let suite = validate_run_matrix_request(&request).expect("valid matrix");
+        assert_eq!(suite.name, "refactoringminer-public");
+        assert_eq!(suite.tasks.len(), 10);
+        assert_eq!(request.repo, repo);
+        assert_eq!(request.out_dir, matrix_out);
+        assert_eq!(request.quality_gate_config.min_task_count, Some(10));
+        assert_eq!(request.health_min_commits, 1);
+        assert_eq!(request.baseline.safe_name, "native");
+        assert_eq!(request.baseline.variant, AgentVariant::Native);
+        assert_eq!(
+            request
+                .baseline
+                .adapter_preset
+                .as_ref()
+                .expect("preset")
+                .preset,
+            AdapterPreset::ClaudeCode
+        );
+        assert_eq!(request.heads[0].safe_name, "ctxhelm");
+        assert_eq!(request.heads[0].variant, AgentVariant::CtxhelmMcp);
+        assert!(request.heads[0].ctxhelm.is_some());
+        assert!(
+            request.heads[0]
+                .ctxhelm
+                .as_ref()
+                .expect("ctxhelm")
+                .include_pack
+        );
+        assert!(request.heads[0]
+            .adapter_command
+            .as_ref()
+            .expect("command")
+            .contains("'fake-claude'"));
+    }
+
+    #[test]
     fn refactoring_miner_public_suite_is_source_free_and_valid() {
         let suite = refactoring_miner_suite();
         validate_suite(&suite).expect("suite");
@@ -7883,6 +8238,14 @@ mod tests {
         assert_eq!(
             default_public_health_out(PublicSuitePreset::RefactoringMiner),
             PathBuf::from(".helmbench/refactoring-miner-public-suite-health.json")
+        );
+        assert_eq!(
+            default_public_matrix_config_out(PublicSuitePreset::RefactoringMiner),
+            PathBuf::from(".helmbench/refactoring-miner-matrix.json")
+        );
+        assert_eq!(
+            default_public_matrix_out_dir(PublicSuitePreset::RefactoringMiner),
+            PathBuf::from(".helmbench/refactoring-miner-matrix")
         );
         assert_eq!(
             default_public_suite_out(PublicSuitePreset::Flask),

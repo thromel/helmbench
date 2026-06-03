@@ -188,6 +188,34 @@ For full agent runs, use `claude-run`, `codex-run`, `local-run`, or
 `ctxhelm-run` with the same suite. HelmBench clones the repository per task, so
 the source repository must be a healthy Git checkout.
 
+For baseline-vs-ctxhelm agent comparisons, generate a `run-matrix` config:
+
+```bash
+helmbench init-public-matrix \
+  --preset refactoring-miner \
+  --repo ../ctxhelm-proof-fixtures/RefactoringMiner \
+  --suite /tmp/refactoringminer-suite.json \
+  --out /tmp/refactoringminer-matrix.json \
+  --out-dir /tmp/refactoringminer-matrix \
+  --agent-preset claude-code \
+  --dangerously-skip-permissions \
+  --ctxhelm-bin ctxhelm \
+  --pack \
+  --force
+
+helmbench run-matrix \
+  --config /tmp/refactoringminer-matrix.json \
+  --force
+
+helmbench verify-matrix \
+  --matrix /tmp/refactoringminer-matrix
+```
+
+`init-public-matrix` writes the normal matrix config only after the fixture
+passes the source-free suite-health gate, so the generated real-agent proof path
+keeps the same privacy and reproducibility contract as the recommendation
+trace flow.
+
 ## Health Failures
 
 If the repository is dirty, corrupt, too shallow, or missing expected anchor
