@@ -29,7 +29,7 @@ tested without external agents or network access.
 `run-matrix` is the main orchestration command for real eval runs. It executes
 one baseline plus one or more local adapter variants over the same suite, then
 writes per-run reports, pairwise comparisons, a benchmark summary, quality
-gate, suite-health report, baseline autopsy, reproduction guide, dashboard, and
+gate, suite-health report, per-run autopsies, reproduction guide, dashboard, and
 verifiable evidence bundle.
 
 `suite-health` is the preflight check for custom benchmark suites. It verifies

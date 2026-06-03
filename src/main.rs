@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command as ProcessCommand, Stdio};
 use std::time::{Duration, Instant};
 
-const RUN_MATRIX_MANIFEST_SCHEMA_VERSION: u32 = 2;
+const RUN_MATRIX_MANIFEST_SCHEMA_VERSION: u32 = 3;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -2144,6 +2144,7 @@ struct RunMatrixManifestRun {
     variant: AgentVariant,
     report_path: String,
     trace_dir: String,
+    autopsy_markdown: String,
     ctxhelm_enabled: bool,
     pack_enabled: bool,
     stream_capture_enabled: bool,
@@ -2659,11 +2660,18 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         &quality_gate_markdown_path,
     )?;
 
-    let baseline_traces = load_traces(&baseline_result.trace_dir)?;
-    let autopsy = build_autopsy(&suite, &baseline_traces)?;
-    let baseline_autopsy_path =
-        docs_dir.join(format!("{}-autopsy.md", baseline_result.spec.safe_name));
-    write_text(&render_markdown_autopsy(&autopsy), &baseline_autopsy_path)?;
+    let mut autopsy_paths = BTreeMap::new();
+    let baseline_autopsy_path = write_matrix_autopsy(&suite, &docs_dir, &baseline_result)?;
+    autopsy_paths.insert(
+        baseline_result.spec.safe_name.clone(),
+        baseline_autopsy_path.clone(),
+    );
+    for head in &head_results {
+        autopsy_paths.insert(
+            head.spec.safe_name.clone(),
+            write_matrix_autopsy(&suite, &docs_dir, head)?,
+        );
+    }
 
     let all_reports = std::iter::once(baseline_result.report.clone())
         .chain(head_results.iter().map(|result| result.report.clone()))
@@ -2697,6 +2705,7 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         &quality_gate_json_path,
         &quality_gate_markdown_path,
         &dashboard_path,
+        &autopsy_paths,
         &baseline_autopsy_path,
         &reproduction_markdown_path,
         &evidence_dir.join("manifest.json"),
@@ -2716,6 +2725,18 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
     Ok(())
 }
 
+fn write_matrix_autopsy(
+    suite: &helmbench::TaskSuite,
+    docs_dir: &Path,
+    result: &RunMatrixResult,
+) -> Result<PathBuf> {
+    let traces = load_traces(&result.trace_dir)?;
+    let autopsy = build_autopsy(suite, &traces)?;
+    let path = docs_dir.join(format!("{}-autopsy.md", result.spec.safe_name));
+    write_text(&render_markdown_autopsy(&autopsy), &path)?;
+    Ok(path)
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_run_matrix_manifest(
     request: &RunMatrixRequest,
@@ -2727,6 +2748,7 @@ fn build_run_matrix_manifest(
     quality_gate_json: &Path,
     quality_gate_markdown: &Path,
     dashboard_html: &Path,
+    autopsy_paths: &BTreeMap<String, PathBuf>,
     baseline_autopsy_markdown: &Path,
     reproduction_markdown: &Path,
     evidence_manifest: &Path,
@@ -2740,11 +2762,11 @@ fn build_run_matrix_manifest(
         repo_path: request.repo.display().to_string(),
         out_dir: request.out_dir.display().to_string(),
         provenance,
-        baseline: run_matrix_manifest_run(&request.out_dir, baseline),
+        baseline: run_matrix_manifest_run(&request.out_dir, baseline, autopsy_paths)?,
         heads: heads
             .iter()
-            .map(|head| run_matrix_manifest_run(&request.out_dir, head))
-            .collect(),
+            .map(|head| run_matrix_manifest_run(&request.out_dir, head, autopsy_paths))
+            .collect::<Result<Vec<_>>>()?,
         artifacts: RunMatrixManifestArtifacts {
             suite_health_json: manifest_path(&request.out_dir, suite_health_json),
             benchmark_summary_json: manifest_path(&request.out_dir, benchmark_summary_json),
@@ -2784,13 +2806,21 @@ fn run_matrix_provenance(request: &RunMatrixRequest) -> Result<RunMatrixProvenan
     })
 }
 
-fn run_matrix_manifest_run(out_dir: &Path, result: &RunMatrixResult) -> RunMatrixManifestRun {
-    RunMatrixManifestRun {
+fn run_matrix_manifest_run(
+    out_dir: &Path,
+    result: &RunMatrixResult,
+    autopsy_paths: &BTreeMap<String, PathBuf>,
+) -> Result<RunMatrixManifestRun> {
+    let autopsy_path = autopsy_paths
+        .get(&result.spec.safe_name)
+        .with_context(|| format!("missing autopsy path for matrix run `{}`", result.spec.name))?;
+    Ok(RunMatrixManifestRun {
         name: result.spec.name.clone(),
         agent: result.spec.agent.clone(),
         variant: result.spec.variant.clone(),
         report_path: manifest_path(out_dir, &result.report_path),
         trace_dir: manifest_path(out_dir, &result.trace_dir),
+        autopsy_markdown: manifest_path(out_dir, autopsy_path),
         ctxhelm_enabled: result.spec.ctxhelm.is_some(),
         pack_enabled: result
             .spec
@@ -2804,7 +2834,7 @@ fn run_matrix_manifest_run(out_dir: &Path, result: &RunMatrixResult) -> RunMatri
             .as_ref()
             .map(|command| command_hash(command)),
         ctxhelm_config_hash: result.spec.ctxhelm.as_ref().map(ctxhelm_config_hash),
-    }
+    })
 }
 
 fn manifest_path(out_dir: &Path, path: &Path) -> String {
@@ -2861,11 +2891,11 @@ fn render_markdown_matrix_reproduction(manifest: &RunMatrixManifest) -> String {
     }
 
     out.push_str("## Runs\n\n");
-    out.push_str("| Run | Agent | Variant | ctxhelm | Pack | Stream | Report | Trace Dir | Adapter Hash | ctxhelm Hash |\n");
-    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+    out.push_str("| Run | Agent | Variant | ctxhelm | Pack | Stream | Report | Trace Dir | Autopsy | Adapter Hash | ctxhelm Hash |\n");
+    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
     for run in std::iter::once(&manifest.baseline).chain(manifest.heads.iter()) {
         out.push_str(&format!(
-            "| `{}` | `{}` | `{:?}` | {} | {} | {} | `{}` | `{}` | `{}` | `{}` |\n",
+            "| `{}` | `{}` | `{:?}` | {} | {} | {} | `{}` | `{}` | `{}` | `{}` | `{}` |\n",
             run.name,
             run.agent,
             run.variant,
@@ -2874,6 +2904,7 @@ fn render_markdown_matrix_reproduction(manifest: &RunMatrixManifest) -> String {
             yes_no(run.stream_capture_enabled),
             run.report_path,
             run.trace_dir,
+            run.autopsy_markdown,
             run.adapter_command_hash.as_deref().unwrap_or("none"),
             run.ctxhelm_config_hash.as_deref().unwrap_or("none")
         ));
@@ -3674,6 +3705,8 @@ fn verify_matrix_run(matrix_dir: &Path, run: &RunMatrixManifestRun) -> Result<()
         .with_context(|| format!("verify report for run `{}`", run.name))?;
     require_matrix_dir(matrix_dir, &run.trace_dir)
         .with_context(|| format!("verify trace dir for run `{}`", run.name))?;
+    require_matrix_file(matrix_dir, &run.autopsy_markdown)
+        .with_context(|| format!("verify autopsy for run `{}`", run.name))?;
     Ok(())
 }
 
@@ -5260,6 +5293,7 @@ mod tests {
         assert!(out.join("docs/compare-guided.md").exists());
         assert!(out.join("docs/benchmark-summary.md").exists());
         assert!(out.join("docs/native-autopsy.md").exists());
+        assert!(out.join("docs/guided-autopsy.md").exists());
         assert!(out.join("docs/reproduction.md").exists());
         assert!(out.join("docs/dashboard.html").exists());
         assert!(out.join("evidence/health.json").exists());
@@ -5321,10 +5355,18 @@ mod tests {
         );
         assert_eq!(manifest["baseline"]["name"], "native");
         assert_eq!(
+            manifest["baseline"]["autopsyMarkdown"],
+            "docs/native-autopsy.md"
+        );
+        assert_eq!(
             manifest["baseline"]["adapterCommandHash"],
             serde_json::Value::Null
         );
         assert_eq!(manifest["heads"][0]["name"], "guided");
+        assert_eq!(
+            manifest["heads"][0]["autopsyMarkdown"],
+            "docs/guided-autopsy.md"
+        );
         assert_eq!(manifest["heads"][0]["ctxhelmEnabled"], true);
         assert_eq!(manifest["heads"][0]["packEnabled"], true);
         assert_eq!(
@@ -5347,6 +5389,10 @@ mod tests {
             "reports/benchmark-summary.json"
         );
         assert_eq!(
+            manifest["artifacts"]["baselineAutopsyMarkdown"],
+            "docs/native-autopsy.md"
+        );
+        assert_eq!(
             manifest["artifacts"]["reproductionMarkdown"],
             "docs/reproduction.md"
         );
@@ -5358,6 +5404,7 @@ mod tests {
             std::fs::read_to_string(out.join("docs/reproduction.md")).expect("reproduction");
         assert!(reproduction.contains("helmbench verify-matrix --matrix <matrix-dir>"));
         assert!(reproduction.contains("Suite hash"));
+        assert!(reproduction.contains("docs/guided-autopsy.md"));
         assert!(reproduction.contains(&command_hash(&adapter_command)));
         assert!(!reproduction.contains(adapter.to_string_lossy().as_ref()));
 

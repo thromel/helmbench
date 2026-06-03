@@ -125,6 +125,7 @@ source-free baseline trace.
 │   ├── benchmark-summary.md
 │   ├── quality-gate.md
 │   ├── native-autopsy.md
+│   ├── guided-autopsy.md
 │   ├── reproduction.md
 │   └── dashboard.html
 └── evidence/
@@ -133,8 +134,8 @@ source-free baseline trace.
 ```
 
 `matrix-manifest.json` is the top-level source-free run identity. It records the
-suite path, repo path, baseline/head run labels, relative report and trace
-paths, suite-health artifact, key artifact paths, quality-gate status,
+suite path, repo path, baseline/head run labels, relative report, trace, and
+autopsy paths, suite-health artifact, key artifact paths, quality-gate status,
 evidence-bundle verification status, source-free privacy flags, and
 reproducibility provenance.
 

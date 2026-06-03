@@ -45,8 +45,8 @@ This repository currently implements the core HelmBench workflow:
   quality gate, and evidence bundle
 - `run-matrix` benchmark coordinator that runs one baseline plus one or more
   local adapter variants and emits reports, comparisons, dashboard, quality
-  gate, suite-health, autopsy, reproduction guide, evidence bundle artifacts,
-  and source-free reproducibility provenance
+  gate, suite-health, per-run autopsies, reproduction guide, evidence bundle
+  artifacts, and source-free reproducibility provenance
 - `matrix-history` longitudinal comparison and static HTML trend dashboards for
   verified run-matrix outputs
 - `diff-autopsy` reviewer report that compares a git worktree or branch diff
