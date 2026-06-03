@@ -44,6 +44,7 @@ pub struct BenchTask {
 #[serde(rename_all = "snake_case")]
 pub enum AgentVariant {
     Native,
+    NativeSearch,
     CtxhelmPlan,
     CtxhelmMcp,
     CtxhelmPack,

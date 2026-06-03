@@ -36,6 +36,8 @@ Useful options:
 - `--pack`: call `ctxhelm get-pack`.
 - `--pack-budget`: `brief`, `standard`, or `deep`.
 - `--variant`: choose `ctxhelm-mcp` or `ctxhelm-pack`.
+  Non-ctxhelm baselines are modeled separately as `native` and `native-search`
+  traces.
 
 ## Privacy Boundary
 

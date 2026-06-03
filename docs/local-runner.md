@@ -49,6 +49,10 @@ helmbench local-run \
   --out-dir traces/local-run-smoke
 ```
 
+Use `--variant native` for an agent-alone baseline and `--variant
+native-search` when the adapter exercises the agent's own repository search or
+built-in context discovery without ctxhelm.
+
 Use `--keep-workdirs` to preserve isolated clones for debugging.
 
 ## Privacy Boundary

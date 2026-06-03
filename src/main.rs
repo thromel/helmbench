@@ -69,7 +69,7 @@ enum Command {
         repo: Option<PathBuf>,
         #[arg(long)]
         out_dir: Option<PathBuf>,
-        /// Run spec: name=<id>,agent=<agent>,variant=<native|ctxhelm_plan|ctxhelm_mcp|ctxhelm_pack|other>[,command=<adapter command>]
+        /// Run spec: name=<id>,agent=<agent>,variant=<native|native_search|ctxhelm_plan|ctxhelm_mcp|ctxhelm_pack|other>[,command=<adapter command>]
         #[arg(long)]
         baseline: Option<String>,
         /// Repeated run spec with the same format as --baseline.
@@ -480,6 +480,7 @@ enum MatrixHistoryFormat {
 #[derive(Debug, Clone, Copy, ValueEnum)]
 enum TraceVariant {
     Native,
+    NativeSearch,
     CtxhelmMcp,
     CtxhelmPack,
 }
@@ -556,6 +557,7 @@ impl From<TraceVariant> for AgentVariant {
     fn from(value: TraceVariant) -> Self {
         match value {
             TraceVariant::Native => AgentVariant::Native,
+            TraceVariant::NativeSearch => AgentVariant::NativeSearch,
             TraceVariant::CtxhelmMcp => AgentVariant::CtxhelmMcp,
             TraceVariant::CtxhelmPack => AgentVariant::CtxhelmPack,
         }
@@ -1393,6 +1395,7 @@ fn build_doctor_report(root: &Path) -> DoctorReport {
     ];
     let supported_variants = vec![
         AgentVariant::Native,
+        AgentVariant::NativeSearch,
         AgentVariant::CtxhelmPlan,
         AgentVariant::CtxhelmMcp,
         AgentVariant::CtxhelmPack,
@@ -4643,6 +4646,7 @@ fn validate_run_matrix_specs(baseline: &RunMatrixSpec, heads: &[RunMatrixSpec]) 
 fn parse_agent_variant(value: &str) -> Result<AgentVariant> {
     match value {
         "native" => Ok(AgentVariant::Native),
+        "native_search" | "native-search" => Ok(AgentVariant::NativeSearch),
         "ctxhelm_plan" => Ok(AgentVariant::CtxhelmPlan),
         "ctxhelm_mcp" => Ok(AgentVariant::CtxhelmMcp),
         "ctxhelm_pack" => Ok(AgentVariant::CtxhelmPack),
@@ -6030,13 +6034,17 @@ mod tests {
             ctxhelm.to_string_lossy(),
             adapter_command,
         );
+        let native_search_head = format!(
+            "name=native-search,agent=demo-native-search,variant=native_search,command={}",
+            adapter_command,
+        );
         let request = build_run_matrix_request(
             None,
             Some(suite_path.clone()),
             Some(repo.clone()),
             Some(out.clone()),
             Some("name=native,agent=demo-baseline,variant=native".to_string()),
-            vec![head],
+            vec![native_search_head, head],
             Vec::new(),
             false,
             false,
@@ -6059,15 +6067,22 @@ mod tests {
         assert!(out
             .join("traces/guided/demo-auth-redirect-001.json")
             .exists());
+        assert!(out
+            .join("traces/native-search/demo-auth-redirect-001.json")
+            .exists());
         assert!(out.join("reports/native.json").exists());
+        assert!(out.join("reports/native-search.json").exists());
         assert!(out.join("reports/guided.json").exists());
+        assert!(out.join("reports/compare-native-search.json").exists());
         assert!(out.join("reports/compare-guided.json").exists());
         assert!(out.join("reports/suite-health.json").exists());
         assert!(out.join("reports/benchmark-summary.json").exists());
         assert!(out.join("reports/quality-gate.json").exists());
+        assert!(out.join("docs/compare-native-search.md").exists());
         assert!(out.join("docs/compare-guided.md").exists());
         assert!(out.join("docs/benchmark-summary.md").exists());
         assert!(out.join("docs/native-autopsy.md").exists());
+        assert!(out.join("docs/native-search-autopsy.md").exists());
         assert!(out.join("docs/guided-autopsy.md").exists());
         assert!(out.join("docs/reproduction.md").exists());
         assert!(out.join("docs/dashboard.html").exists());
@@ -6079,7 +6094,9 @@ mod tests {
         let summary =
             std::fs::read_to_string(out.join("reports/benchmark-summary.json")).expect("summary");
         let summary = serde_json::from_str::<serde_json::Value>(&summary).expect("json");
-        assert_eq!(summary["comparisons"][0]["successRateDelta"], 1.0);
+        assert_eq!(summary["runs"][1]["variant"], "native_search");
+        assert_eq!(summary["comparisons"][0]["headVariant"], "native_search");
+        assert_eq!(summary["comparisons"][1]["successRateDelta"], 1.0);
         let gate = std::fs::read_to_string(out.join("reports/quality-gate.json")).expect("gate");
         let gate = serde_json::from_str::<serde_json::Value>(&gate).expect("json");
         assert_eq!(gate["passed"], true);
@@ -6145,26 +6162,46 @@ mod tests {
             manifest["baseline"]["adapterCommandHash"],
             serde_json::Value::Null
         );
-        assert_eq!(manifest["heads"][0]["name"], "guided");
+        assert_eq!(manifest["heads"][0]["name"], "native-search");
+        assert_eq!(manifest["heads"][0]["variant"], "native_search");
         assert_eq!(
             manifest["heads"][0]["autopsyMarkdown"],
-            "docs/guided-autopsy.md"
+            "docs/native-search-autopsy.md"
         );
         assert_eq!(
             manifest["heads"][0]["comparisonJson"],
-            "reports/compare-guided.json"
+            "reports/compare-native-search.json"
         );
         assert_eq!(
             manifest["heads"][0]["comparisonMarkdown"],
-            "docs/compare-guided.md"
+            "docs/compare-native-search.md"
         );
-        assert_eq!(manifest["heads"][0]["ctxhelmEnabled"], true);
-        assert_eq!(manifest["heads"][0]["packEnabled"], true);
+        assert_eq!(manifest["heads"][0]["ctxhelmEnabled"], false);
+        assert_eq!(manifest["heads"][0]["packEnabled"], false);
         assert_eq!(
             manifest["heads"][0]["adapterCommandHash"],
             serde_json::json!(command_hash(&adapter_command))
         );
-        assert!(manifest["heads"][0]["ctxhelmConfigHash"]
+        assert_eq!(manifest["heads"][1]["name"], "guided");
+        assert_eq!(
+            manifest["heads"][1]["autopsyMarkdown"],
+            "docs/guided-autopsy.md"
+        );
+        assert_eq!(
+            manifest["heads"][1]["comparisonJson"],
+            "reports/compare-guided.json"
+        );
+        assert_eq!(
+            manifest["heads"][1]["comparisonMarkdown"],
+            "docs/compare-guided.md"
+        );
+        assert_eq!(manifest["heads"][1]["ctxhelmEnabled"], true);
+        assert_eq!(manifest["heads"][1]["packEnabled"], true);
+        assert_eq!(
+            manifest["heads"][1]["adapterCommandHash"],
+            serde_json::json!(command_hash(&adapter_command))
+        );
+        assert!(manifest["heads"][1]["ctxhelmConfigHash"]
             .as_str()
             .expect("ctxhelm hash")
             .starts_with("ctxhelm:"));
@@ -6202,6 +6239,12 @@ mod tests {
         }));
         assert!(artifact_digests
             .iter()
+            .any(|digest| digest["path"] == "reports/native-search.json"));
+        assert!(artifact_digests
+            .iter()
+            .any(|digest| digest["path"] == "reports/compare-native-search.json"));
+        assert!(artifact_digests
+            .iter()
             .any(|digest| digest["path"] == "reports/compare-guided.json"));
         assert!(artifact_digests
             .iter()
@@ -6219,6 +6262,8 @@ mod tests {
             std::fs::read_to_string(out.join("docs/reproduction.md")).expect("reproduction");
         assert!(reproduction.contains("helmbench verify-matrix --matrix <matrix-dir>"));
         assert!(reproduction.contains("Suite hash"));
+        assert!(reproduction.contains("docs/native-search-autopsy.md"));
+        assert!(reproduction.contains("reports/compare-native-search.json"));
         assert!(reproduction.contains("docs/guided-autopsy.md"));
         assert!(reproduction.contains("reports/compare-guided.json"));
         assert!(reproduction.contains("docs/compare-guided.md"));
@@ -6226,7 +6271,7 @@ mod tests {
         assert!(!reproduction.contains(adapter.to_string_lossy().as_ref()));
 
         let verified = verify_run_matrix(&out).expect("verify matrix");
-        assert_eq!(verified.heads.len(), 1);
+        assert_eq!(verified.heads.len(), 2);
         assert!(verified.evidence_bundle_verified);
         let first_summary_path = out.join("reports/benchmark-summary.json");
         let mut first_summary =
@@ -6261,8 +6306,8 @@ mod tests {
         let history =
             build_matrix_history_report(&[out.clone(), out2.clone()]).expect("matrix history");
         assert_eq!(history.matrices.len(), 2);
-        assert_eq!(history.trends.len(), 2);
-        assert_eq!(history.trends[1].name, "guided");
+        assert_eq!(history.trends.len(), 3);
+        assert_eq!(history.trends[1].name, "native-search");
         assert!(history.trends[1].success_rate_delta < 0.0);
         assert!(history.trends[1].irrelevant_read_rate_delta > 0.0);
         assert_eq!(
@@ -6494,6 +6539,18 @@ mod tests {
         );
         assert_eq!(override_request.health_min_commits, 3);
         assert!(override_request.allow_dirty_health);
+    }
+
+    #[test]
+    fn run_matrix_variant_parser_accepts_native_search_aliases() {
+        assert_eq!(
+            parse_agent_variant("native_search").expect("underscore"),
+            AgentVariant::NativeSearch
+        );
+        assert_eq!(
+            parse_agent_variant("native-search").expect("hyphen"),
+            AgentVariant::NativeSearch
+        );
     }
 
     #[test]
@@ -6927,6 +6984,9 @@ mod tests {
             .any(|mode| mode.name == "capture-stream"
                 && mode.source_free
                 && !mode.persists_raw_stream));
+        assert!(report
+            .supported_variants
+            .contains(&AgentVariant::NativeSearch));
 
         let json = serde_json::to_string(&report).expect("json");
         assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));

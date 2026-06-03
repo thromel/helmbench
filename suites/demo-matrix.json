@@ -10,6 +10,12 @@
   },
   "heads": [
     {
+      "name": "native-search",
+      "agent": "demo-search",
+      "variant": "native_search",
+      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
+    },
+    {
       "name": "guided",
       "agent": "demo-guided",
       "variant": "ctxhelm_mcp",

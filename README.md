@@ -143,6 +143,7 @@ cargo run -- run-matrix \
   --repo /tmp/helmbench-demo-repo \
   --out-dir /tmp/helmbench-matrix \
   --baseline "name=native,agent=demo-baseline,variant=native" \
+  --head "name=native-search,agent=demo-search,variant=native_search,command=HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-agent.sh" \
   --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,command=HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-agent.sh" \
   --force
 
@@ -399,10 +400,14 @@ cargo run -- stream-trace \
   --stream examples/streams/claude-code/auth-redirect-001.jsonl \
   --task-id auth-redirect-001 \
   --agent claude-code \
-  --variant native \
+  --variant native-search \
   --status success \
   --out-dir examples/traces/stream-claude
 ```
+
+Use `native` for an agent-alone baseline and `native-search` when the trace
+captures the agent's own repository search or built-in context discovery
+without ctxhelm.
 
 Generate a ctxhelm recommendation trace over the HelmBench repo:
 

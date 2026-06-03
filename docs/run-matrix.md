@@ -12,6 +12,7 @@ helmbench run-matrix \
   --repo /tmp/helmbench-demo-repo \
   --out-dir /tmp/helmbench-matrix \
   --baseline "name=native,agent=demo-baseline,variant=native" \
+  --head "name=native-search,agent=demo-search,variant=native_search,command=HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-agent.sh" \
   --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,command=HELMBENCH_BIN=$(pwd)/target/debug/helmbench sh scripts/demo-agent.sh" \
   --force
 ```
@@ -55,6 +56,13 @@ Config format:
   },
   "heads": [
     {
+      "name": "native-search",
+      "agent": "demo-search",
+      "variant": "native_search",
+      "captureStream": true,
+      "command": "HELMBENCH_BIN=${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
+    },
+    {
       "name": "guided",
       "agent": "demo-guided",
       "variant": "ctxhelm_mcp",
@@ -89,8 +97,10 @@ Run specs use comma-separated `key=value` fields:
 
 - `name`: stable run identifier used in output paths;
 - `agent`: source-free agent label for reports;
-- `variant`: one of `native`, `ctxhelm_plan`, `ctxhelm_mcp`, `ctxhelm_pack`,
-  or `other`;
+- `variant`: one of `native`, `native_search`, `ctxhelm_plan`, `ctxhelm_mcp`,
+  `ctxhelm_pack`, or `other`;
+- `native_search` is for agent-native repository search or built-in context
+  discovery without ctxhelm; keep `native` for the agent-alone baseline;
 - `ctxhelm`: optional `true`/`false`; when true, HelmBench calls ctxhelm before
   the adapter command and records source-free recommendation events;
 - `ctxhelm_bin`: optional ctxhelm binary path, default `ctxhelm`;

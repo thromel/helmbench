@@ -19,10 +19,14 @@ helmbench stream-trace \
   --stream examples/streams/claude-code/auth-redirect-001.jsonl \
   --task-id auth-redirect-001 \
   --agent claude-code \
-  --variant native \
+  --variant native-search \
   --status success \
   --out-dir traces/stream-claude
 ```
+
+Use `--variant native` for an agent-alone trace and `--variant native-search`
+when the stream represents the agent's own repository search or built-in
+context discovery without ctxhelm.
 
 Then build reports normally:
 

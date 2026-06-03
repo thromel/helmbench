@@ -87,10 +87,15 @@ rank HelmBench's own benchmark artifacts as task evidence.
 Initial variants:
 
 - `native`
+- `native_search`
 - `ctxhelm_plan`
 - `ctxhelm_mcp`
 - `ctxhelm_pack`
 - `other`
+
+Use `native` for an agent-alone baseline and `native_search` for an agent run
+that uses the agent's own repository search or built-in context discovery
+without ctxhelm.
 
 The first MVP ingests manually produced or synthetic traces. Later adapters will
 run agents and produce traces automatically. The current ctxhelm adapter already
