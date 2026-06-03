@@ -135,9 +135,9 @@ source-free baseline trace.
 
 `matrix-manifest.json` is the top-level source-free run identity. It records the
 suite path, repo path, baseline/head run labels, relative report, trace, and
-autopsy paths, suite-health artifact, key artifact paths, quality-gate status,
-evidence-bundle verification status, source-free privacy flags, and
-reproducibility provenance.
+autopsy paths, suite-health artifact, key artifact paths, artifact byte
+counts/content hashes, quality-gate status, evidence-bundle verification
+status, source-free privacy flags, and reproducibility provenance.
 
 The provenance block includes the HelmBench version, suite content hash, repo
 HEAD, dirty-checkout flag, setup-command count, and setup-command hashes. Each
@@ -172,7 +172,8 @@ helmbench verify-bundle \
 
 `verify-matrix` validates `matrix-manifest.json`, checks that every referenced
 report, trace directory, suite-health artifact, reproduction guide,
-Markdown/HTML artifact, and evidence manifest exists, and then verifies the
+Markdown/HTML artifact, and evidence manifest exists, recomputes source-free
+artifact hashes for matrix-owned files and trace JSON, and then verifies the
 nested evidence bundle hashes.
 
 Use `--fail-on-regression` when this command runs in CI and should exit

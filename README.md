@@ -168,7 +168,7 @@ status.
 Matrix configs can include a `qualityGate` block, including an optional cap for
 average time-to-first-relevant-file delta.
 Use `verify-matrix --matrix <out-dir>` to validate the manifest, referenced
-artifacts, and nested evidence bundle before publishing results.
+artifact hashes, and nested evidence bundle before publishing results.
 
 Add `ctxhelm=true` to a `--head` spec when the row should call
 `ctxhelm prepare-task` before the adapter. Add `pack=true` to also call

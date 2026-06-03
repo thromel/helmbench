@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command as ProcessCommand, Stdio};
 use std::time::{Duration, Instant};
 
-const RUN_MATRIX_MANIFEST_SCHEMA_VERSION: u32 = 3;
+const RUN_MATRIX_MANIFEST_SCHEMA_VERSION: u32 = 4;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -2120,6 +2120,7 @@ struct RunMatrixManifest {
     baseline: RunMatrixManifestRun,
     heads: Vec<RunMatrixManifestRun>,
     artifacts: RunMatrixManifestArtifacts,
+    artifact_digests: Vec<MatrixArtifactDigest>,
     quality_gate_passed: bool,
     evidence_bundle_verified: bool,
     privacy: PrivacyStatus,
@@ -2164,6 +2165,14 @@ struct RunMatrixManifestArtifacts {
     baseline_autopsy_markdown: String,
     reproduction_markdown: String,
     evidence_manifest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct MatrixArtifactDigest {
+    path: String,
+    byte_count: u64,
+    content_hash: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2716,6 +2725,8 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         &render_markdown_matrix_reproduction(&manifest),
         &reproduction_markdown_path,
     )?;
+    let mut manifest = manifest;
+    manifest.artifact_digests = collect_matrix_artifact_digests(&request.out_dir, &manifest)?;
     write_json(&manifest, &out_dir.join("matrix-manifest.json"))?;
 
     if request.fail_on_regression && !gate.passed {
@@ -2778,6 +2789,7 @@ fn build_run_matrix_manifest(
             reproduction_markdown: manifest_path(&request.out_dir, reproduction_markdown),
             evidence_manifest: manifest_path(&request.out_dir, evidence_manifest),
         },
+        artifact_digests: Vec::new(),
         quality_gate_passed,
         evidence_bundle_verified,
         privacy: PrivacyStatus::source_free(),
@@ -2842,6 +2854,79 @@ fn manifest_path(out_dir: &Path, path: &Path) -> String {
         .unwrap_or(path)
         .display()
         .to_string()
+}
+
+fn collect_matrix_artifact_digests(
+    matrix_dir: &Path,
+    manifest: &RunMatrixManifest,
+) -> Result<Vec<MatrixArtifactDigest>> {
+    let mut paths = BTreeSet::new();
+    insert_matrix_artifact_paths(manifest, &mut paths);
+    for run in std::iter::once(&manifest.baseline).chain(manifest.heads.iter()) {
+        collect_matrix_trace_file_paths(matrix_dir, &run.trace_dir, &mut paths)?;
+    }
+
+    paths
+        .into_iter()
+        .map(|path| matrix_artifact_digest(matrix_dir, &path))
+        .collect()
+}
+
+fn insert_matrix_artifact_paths(manifest: &RunMatrixManifest, paths: &mut BTreeSet<String>) {
+    for run in std::iter::once(&manifest.baseline).chain(manifest.heads.iter()) {
+        paths.insert(run.report_path.clone());
+        paths.insert(run.autopsy_markdown.clone());
+    }
+    paths.insert(manifest.artifacts.suite_health_json.clone());
+    paths.insert(manifest.artifacts.benchmark_summary_json.clone());
+    paths.insert(manifest.artifacts.benchmark_summary_markdown.clone());
+    paths.insert(manifest.artifacts.quality_gate_json.clone());
+    paths.insert(manifest.artifacts.quality_gate_markdown.clone());
+    paths.insert(manifest.artifacts.dashboard_html.clone());
+    paths.insert(manifest.artifacts.baseline_autopsy_markdown.clone());
+    paths.insert(manifest.artifacts.reproduction_markdown.clone());
+    paths.insert(manifest.artifacts.evidence_manifest.clone());
+}
+
+fn collect_matrix_trace_file_paths(
+    matrix_dir: &Path,
+    trace_dir: &str,
+    paths: &mut BTreeSet<String>,
+) -> Result<()> {
+    let trace_dir = require_matrix_dir(matrix_dir, trace_dir)?;
+    let mut stack = vec![trace_dir];
+    while let Some(dir) = stack.pop() {
+        for entry in std::fs::read_dir(&dir).with_context(|| format!("read {}", dir.display()))? {
+            let entry = entry.with_context(|| format!("read entry in {}", dir.display()))?;
+            let path = entry.path();
+            let file_type = entry
+                .file_type()
+                .with_context(|| format!("inspect {}", path.display()))?;
+            if file_type.is_dir() {
+                stack.push(path);
+            } else if file_type.is_file() {
+                let relative = path
+                    .strip_prefix(matrix_dir)
+                    .with_context(|| format!("resolve matrix artifact {}", path.display()))?
+                    .display()
+                    .to_string();
+                helmbench::validate_safe_relative_path_for_cli(&relative)
+                    .with_context(|| format!("validate matrix trace path `{relative}`"))?;
+                paths.insert(relative);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn matrix_artifact_digest(matrix_dir: &Path, relative_path: &str) -> Result<MatrixArtifactDigest> {
+    let path = require_matrix_file(matrix_dir, relative_path)?;
+    let bytes = std::fs::read(&path).with_context(|| format!("read {}", path.display()))?;
+    Ok(MatrixArtifactDigest {
+        path: relative_path.to_string(),
+        byte_count: bytes.len() as u64,
+        content_hash: content_hash(&bytes),
+    })
 }
 
 fn render_markdown_matrix_reproduction(manifest: &RunMatrixManifest) -> String {
@@ -3032,8 +3117,36 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
         .parent()
         .with_context(|| format!("resolve evidence dir {}", evidence_manifest.display()))?;
     verify_evidence_bundle(evidence_dir)?;
+    verify_matrix_artifact_digests(matrix_dir, &manifest)?;
 
     Ok(manifest)
+}
+
+fn verify_matrix_artifact_digests(matrix_dir: &Path, manifest: &RunMatrixManifest) -> Result<()> {
+    if manifest.artifact_digests.is_empty() {
+        anyhow::bail!("matrix manifest must contain artifactDigests");
+    }
+    let mut seen_paths = BTreeSet::new();
+    for digest in &manifest.artifact_digests {
+        helmbench::validate_safe_relative_path_for_cli(&digest.path)
+            .with_context(|| format!("validate matrix artifact digest path `{}`", digest.path))?;
+        if !seen_paths.insert(digest.path.clone()) {
+            anyhow::bail!("duplicate matrix artifact digest path `{}`", digest.path);
+        }
+        if !digest.content_hash.starts_with("fnv64:") {
+            anyhow::bail!(
+                "matrix artifact `{}` has unsupported contentHash `{}`",
+                digest.path,
+                digest.content_hash
+            );
+        }
+    }
+
+    let actual = collect_matrix_artifact_digests(matrix_dir, manifest)?;
+    if actual != manifest.artifact_digests {
+        anyhow::bail!("matrix artifact digest mismatch");
+    }
+    Ok(())
 }
 
 fn verify_matrix_provenance(provenance: &RunMatrixProvenance) -> Result<()> {
@@ -5074,6 +5187,16 @@ fn shell_escape(value: &str) -> String {
 mod tests {
     use super::*;
 
+    fn refresh_matrix_manifest_digests(matrix_dir: &Path) {
+        let manifest_path = matrix_dir.join("matrix-manifest.json");
+        let raw = std::fs::read_to_string(&manifest_path).expect("matrix manifest");
+        let mut manifest =
+            serde_json::from_str::<RunMatrixManifest>(&raw).expect("parse matrix manifest");
+        manifest.artifact_digests =
+            collect_matrix_artifact_digests(matrix_dir, &manifest).expect("matrix digests");
+        write_json(&manifest, &manifest_path).expect("write matrix manifest");
+    }
+
     #[test]
     fn claude_command_includes_source_free_event_instructions() {
         let command = claude_adapter_command(
@@ -5400,6 +5523,24 @@ mod tests {
             manifest["artifacts"]["evidenceManifest"],
             "evidence/manifest.json"
         );
+        let artifact_digests = manifest["artifactDigests"]
+            .as_array()
+            .expect("artifact digests");
+        assert!(artifact_digests.iter().any(|digest| {
+            digest["path"] == "reports/guided.json"
+                && digest["contentHash"]
+                    .as_str()
+                    .is_some_and(|hash| hash.starts_with("fnv64:"))
+        }));
+        assert!(artifact_digests
+            .iter()
+            .any(|digest| { digest["path"] == "traces/guided/demo-auth-redirect-001.json" }));
+        assert!(artifact_digests
+            .iter()
+            .any(|digest| digest["path"] == "docs/guided-autopsy.md"));
+        assert!(artifact_digests
+            .iter()
+            .any(|digest| digest["path"] == "docs/reproduction.md"));
         let reproduction =
             std::fs::read_to_string(out.join("docs/reproduction.md")).expect("reproduction");
         assert!(reproduction.contains("helmbench verify-matrix --matrix <matrix-dir>"));
@@ -5416,6 +5557,7 @@ mod tests {
             read_benchmark_summary(&first_summary_path).expect("first benchmark summary");
         first_summary.runs[1].average_time_to_first_relevant_file_millis = Some(150.0);
         write_json(&first_summary, &first_summary_path).expect("mutated first summary");
+        refresh_matrix_manifest_digests(&out);
 
         let out2 = temp.path().join("matrix-second");
         let mut request2 = request.clone();
@@ -5434,6 +5576,7 @@ mod tests {
         second_summary.runs[1].total_tool_calls += 3;
         second_summary.runs[1].total_token_estimate += 100;
         write_json(&second_summary, &summary_path).expect("mutated second summary");
+        refresh_matrix_manifest_digests(&out2);
 
         let history =
             build_matrix_history_report(&[out.clone(), out2.clone()]).expect("matrix history");
@@ -5460,6 +5603,13 @@ mod tests {
         assert!(html.contains("guided"));
         assert!(html.contains("-75 ms"));
         assert!(!html.contains(temp.path().to_string_lossy().as_ref()));
+
+        std::fs::write(out.join("docs/guided-autopsy.md"), "tampered").expect("tamper autopsy");
+        let err = verify_run_matrix(&out).expect_err("tampered matrix should fail");
+        assert!(
+            err.to_string().contains("matrix artifact digest mismatch"),
+            "{err}"
+        );
 
         let mut tampered = verified;
         tampered.artifacts.dashboard_html = "../dashboard.html".to_string();
