@@ -40,6 +40,13 @@ The importer recognizes source-free metadata from common tool objects:
 - `Read`, `View`, `Open` -> file read path;
 - `Edit`, `MultiEdit`, `Write`, `Create`, `apply_patch` -> file edit path;
 - `Bash`, `Shell`, `exec`, `run_command` -> command class/hash;
+- tool inputs under `input`, `tool_input`, `parameters`, `args`, or
+  JSON-encoded `arguments`;
+- path fields such as `file_path`, `filePath`, `target_file`, `targetFile`,
+  `filename`, `file`, and `path`;
+- explicit `usage` events with total, input/output, or prompt/completion token
+  counts;
+- explicit `status` events with source-free task outcomes;
 - explicit `eventKind` values such as `recommended_file`, `file_read`, and
   `file_edit`.
 

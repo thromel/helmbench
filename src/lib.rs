@@ -2367,25 +2367,22 @@ fn collect_stream_events(
 ) -> Result<()> {
     if let Some(object) = value.as_object() {
         if let Some(tool_name) = stream_tool_name(object) {
-            let input = object
-                .get("input")
-                .or_else(|| object.get("parameters"))
-                .or_else(|| object.get("args"))
-                .or_else(|| object.get("arguments"))
-                .unwrap_or(value);
+            let input = stream_tool_input(object, value);
             collect_tool_event(
                 task_id,
                 tool_name,
-                input,
+                &input,
                 repo_root,
                 expected_tests,
                 observed_at_millis,
                 seen,
                 events,
             )?;
-        } else if let Some(kind) = object
+        }
+        if let Some(kind) = object
             .get("eventKind")
             .or_else(|| object.get("event_kind"))
+            .or_else(|| object.get("type"))
             .and_then(|value| value.as_str())
         {
             collect_explicit_stream_event(
@@ -2438,7 +2435,7 @@ fn collect_tool_event(
 ) -> Result<()> {
     let normalized_name = normalize_tool_name(tool_name);
     if is_read_tool(&normalized_name) {
-        if let Some(path) = stream_path(input, repo_root) {
+        for path in stream_paths(input, repo_root) {
             push_unique_path_event(
                 task_id,
                 AgentEventKind::FileRead,
@@ -2449,7 +2446,7 @@ fn collect_tool_event(
             )?;
         }
     } else if is_edit_tool(&normalized_name) {
-        if let Some(path) = stream_path(input, repo_root) {
+        for path in stream_paths(input, repo_root) {
             push_unique_path_event(
                 task_id,
                 AgentEventKind::FileEdit,
@@ -2503,6 +2500,7 @@ fn collect_explicit_stream_event(
     seen: &mut BTreeSet<String>,
     events: &mut Vec<AgentEvent>,
 ) -> Result<()> {
+    let normalized_kind = normalize_tool_name(kind);
     let event_kind = match kind {
         "recommended_file" | "recommended-file" | "recommendedFile" => {
             Some(AgentEventKind::RecommendedFile)
@@ -2514,6 +2512,14 @@ fn collect_explicit_stream_event(
     if let Some(event_kind) = event_kind {
         if let Some(path) = stream_path(value, repo_root) {
             push_unique_path_event(task_id, event_kind, path, observed_at_millis, seen, events)?;
+        }
+    } else if normalized_kind == "usage" {
+        if let Some(token_estimate) = stream_token_estimate(value) {
+            push_unique_usage_event(task_id, token_estimate, observed_at_millis, seen, events)?;
+        }
+    } else if normalized_kind == "status" {
+        if let Some(status) = stream_task_status(value) {
+            push_unique_status_event(task_id, status, observed_at_millis, seen, events)?;
         }
     }
     Ok(())
@@ -2528,14 +2534,62 @@ fn stream_tool_name(object: &serde_json::Map<String, serde_json::Value>) -> Opti
         .and_then(|value| value.as_str())
 }
 
+fn stream_tool_input(
+    object: &serde_json::Map<String, serde_json::Value>,
+    fallback: &serde_json::Value,
+) -> serde_json::Value {
+    let value = object
+        .get("input")
+        .or_else(|| object.get("tool_input"))
+        .or_else(|| object.get("toolInput"))
+        .or_else(|| object.get("parameters"))
+        .or_else(|| object.get("args"))
+        .or_else(|| object.get("arguments"))
+        .unwrap_or(fallback);
+    if let Some(raw) = value.as_str() {
+        serde_json::from_str::<serde_json::Value>(raw).unwrap_or_else(|_| value.clone())
+    } else {
+        value.clone()
+    }
+}
+
 fn stream_path(value: &serde_json::Value, repo_root: Option<&Path>) -> Option<String> {
     let path = value
         .get("file_path")
         .or_else(|| value.get("filePath"))
         .or_else(|| value.get("filepath"))
+        .or_else(|| value.get("file"))
+        .or_else(|| value.get("filename"))
+        .or_else(|| value.get("target_file"))
+        .or_else(|| value.get("targetFile"))
         .or_else(|| value.get("path"))
         .and_then(|value| value.as_str())?;
     normalize_stream_path(path, repo_root)
+}
+
+fn stream_paths(value: &serde_json::Value, repo_root: Option<&Path>) -> Vec<String> {
+    let mut paths = BTreeSet::new();
+    collect_stream_paths(value, repo_root, &mut paths);
+    paths.into_iter().collect()
+}
+
+fn collect_stream_paths(
+    value: &serde_json::Value,
+    repo_root: Option<&Path>,
+    paths: &mut BTreeSet<String>,
+) {
+    if let Some(path) = stream_path(value, repo_root) {
+        paths.insert(path);
+    }
+    if let Some(object) = value.as_object() {
+        for child in object.values() {
+            collect_stream_paths(child, repo_root, paths);
+        }
+    } else if let Some(items) = value.as_array() {
+        for child in items {
+            collect_stream_paths(child, repo_root, paths);
+        }
+    }
 }
 
 fn normalize_stream_path(path: &str, repo_root: Option<&Path>) -> Option<String> {
@@ -2567,6 +2621,54 @@ fn stream_exit_status(value: &serde_json::Value) -> Option<i32> {
         .and_then(|value| i32::try_from(value).ok())
 }
 
+fn stream_token_estimate(value: &serde_json::Value) -> Option<u64> {
+    let object = value.as_object()?;
+    for key in [
+        "tokenEstimate",
+        "token_estimate",
+        "totalTokens",
+        "total_tokens",
+    ] {
+        if let Some(tokens) = object.get(key).and_then(|value| value.as_u64()) {
+            return Some(tokens);
+        }
+    }
+
+    let prompt = object
+        .get("input_tokens")
+        .or_else(|| object.get("inputTokens"))
+        .or_else(|| object.get("prompt_tokens"))
+        .or_else(|| object.get("promptTokens"))
+        .and_then(|value| value.as_u64())
+        .unwrap_or(0);
+    let completion = object
+        .get("output_tokens")
+        .or_else(|| object.get("outputTokens"))
+        .or_else(|| object.get("completion_tokens"))
+        .or_else(|| object.get("completionTokens"))
+        .and_then(|value| value.as_u64())
+        .unwrap_or(0);
+    (prompt.saturating_add(completion) > 0).then_some(prompt.saturating_add(completion))
+}
+
+fn stream_task_status(value: &serde_json::Value) -> Option<TaskStatus> {
+    let raw = value
+        .get("taskStatus")
+        .or_else(|| value.get("task_status"))
+        .or_else(|| value.get("outcome"))
+        .or_else(|| value.get("result"))
+        .or_else(|| value.get("status"))
+        .and_then(|value| value.as_str())?;
+    match normalize_tool_name(raw).as_str() {
+        "success" | "succeeded" | "complete" | "completed" | "pass" | "passed" => {
+            Some(TaskStatus::Success)
+        }
+        "failure" | "failed" | "fail" | "error" | "errored" => Some(TaskStatus::Failure),
+        "skipped" | "skip" => Some(TaskStatus::Skipped),
+        _ => None,
+    }
+}
+
 fn push_unique_path_event(
     task_id: &str,
     event_kind: AgentEventKind,
@@ -2589,6 +2691,68 @@ fn push_unique_path_event(
         touched_tests: Vec::new(),
         exit_status: None,
         status: None,
+        token_estimate: None,
+        elapsed_millis: None,
+        observed_at_millis: Some(observed_at_millis),
+        privacy: PrivacyStatus::source_free(),
+    };
+    validate_agent_event(&event)?;
+    events.push(event);
+    Ok(())
+}
+
+fn push_unique_usage_event(
+    task_id: &str,
+    token_estimate: u64,
+    observed_at_millis: u64,
+    seen: &mut BTreeSet<String>,
+    events: &mut Vec<AgentEvent>,
+) -> Result<()> {
+    let key = format!("Usage:{token_estimate}:{observed_at_millis}");
+    if !seen.insert(key) {
+        return Ok(());
+    }
+    let event = AgentEvent {
+        schema_version: TRACE_SCHEMA_VERSION,
+        task_id: task_id.to_string(),
+        event_kind: AgentEventKind::Usage,
+        path: None,
+        command_class: None,
+        command_hash: None,
+        touched_tests: Vec::new(),
+        exit_status: None,
+        status: None,
+        token_estimate: Some(token_estimate),
+        elapsed_millis: None,
+        observed_at_millis: Some(observed_at_millis),
+        privacy: PrivacyStatus::source_free(),
+    };
+    validate_agent_event(&event)?;
+    events.push(event);
+    Ok(())
+}
+
+fn push_unique_status_event(
+    task_id: &str,
+    status: TaskStatus,
+    observed_at_millis: u64,
+    seen: &mut BTreeSet<String>,
+    events: &mut Vec<AgentEvent>,
+) -> Result<()> {
+    let key = format!("Status:{status:?}:{observed_at_millis}");
+    if !seen.insert(key) {
+        return Ok(());
+    }
+    let event = AgentEvent {
+        schema_version: TRACE_SCHEMA_VERSION,
+        task_id: task_id.to_string(),
+        event_kind: AgentEventKind::Status,
+        path: None,
+        command_class: None,
+        command_hash: None,
+        touched_tests: Vec::new(),
+        exit_status: None,
+        status: Some(status),
         token_estimate: None,
         elapsed_millis: None,
         observed_at_millis: Some(observed_at_millis),
@@ -3850,6 +4014,79 @@ mod tests {
         assert!(!serde_json::to_string(&events)
             .expect("json")
             .contains("pnpm vitest run"));
+    }
+
+    #[test]
+    fn stream_jsonl_extracts_wrapped_tool_usage_and_status_metadata() {
+        let jsonl = format!(
+            "{}\n{}\n{}\n{}\n",
+            serde_json::json!({
+                "type": "function_call",
+                "name": "run_command",
+                "arguments": serde_json::json!({
+                    "cmd": "cargo test tests/auth/session.test.ts",
+                    "exitStatus": 0
+                })
+                .to_string()
+            }),
+            serde_json::json!({
+                "type": "tool_use",
+                "name": "MultiEdit",
+                "tool_input": {
+                    "edits": [
+                        {"filePath": "src/auth/session.ts"},
+                        {"target_file": "src/auth/middleware.ts"}
+                    ]
+                }
+            }),
+            serde_json::json!({
+                "type": "usage",
+                "input_tokens": 120,
+                "output_tokens": 30
+            }),
+            serde_json::json!({
+                "eventKind": "status",
+                "status": "completed"
+            })
+        );
+
+        let events = events_from_agent_stream_jsonl(
+            "auth-redirect-001",
+            &jsonl,
+            None,
+            &["tests/auth/session.test.ts".to_string()],
+        )
+        .expect("wrapped stream events");
+
+        assert!(events.iter().any(|event| {
+            event.event_kind == AgentEventKind::FileEdit
+                && event.path.as_deref() == Some("src/auth/session.ts")
+        }));
+        assert!(events.iter().any(|event| {
+            event.event_kind == AgentEventKind::FileEdit
+                && event.path.as_deref() == Some("src/auth/middleware.ts")
+        }));
+        let command = events
+            .iter()
+            .find(|event| event.event_kind == AgentEventKind::Command)
+            .expect("command event");
+        assert_eq!(command.command_class, Some(CommandClass::Test));
+        assert_eq!(command.exit_status, Some(0));
+        assert_eq!(
+            command.touched_tests,
+            vec!["tests/auth/session.test.ts".to_string()]
+        );
+        assert!(events.iter().any(|event| {
+            event.event_kind == AgentEventKind::Usage && event.token_estimate == Some(150)
+        }));
+        assert!(events.iter().any(|event| {
+            event.event_kind == AgentEventKind::Status
+                && event.status.as_ref() == Some(&TaskStatus::Success)
+        }));
+
+        let serialized = serde_json::to_string(&events).expect("json");
+        assert!(!serialized.contains("cargo test"));
+        assert!(!serialized.contains("completed"));
     }
 
     #[test]
