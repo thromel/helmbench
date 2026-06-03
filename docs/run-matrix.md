@@ -128,19 +128,26 @@ source-free baseline trace.
 ├── matrix-manifest.json
 ├── traces/
 │   ├── native/
+│   ├── native-search/
 │   └── guided/
 ├── reports/
 │   ├── suite-health.json
 │   ├── native.json
+│   ├── native-search.json
 │   ├── guided.json
+│   ├── compare-native-search.json
 │   ├── compare-guided.json
 │   ├── benchmark-summary.json
+│   ├── privacy-report.json
 │   └── quality-gate.json
 ├── docs/
+│   ├── compare-native-search.md
 │   ├── compare-guided.md
 │   ├── benchmark-summary.md
 │   ├── quality-gate.md
+│   ├── privacy-report.md
 │   ├── native-autopsy.md
+│   ├── native-search-autopsy.md
 │   ├── guided-autopsy.md
 │   ├── reproduction.md
 │   └── dashboard.html
@@ -153,7 +160,8 @@ source-free baseline trace.
 suite path, repo path, baseline/head run labels, relative report, trace,
 autopsy, and comparison paths, suite-health artifact, key artifact paths,
 artifact byte counts/content hashes, quality-gate status, evidence-bundle
-verification status, source-free privacy flags, and reproducibility provenance.
+verification status, source-free privacy-report paths, privacy flags, and
+reproducibility provenance.
 
 The provenance block includes the HelmBench version, suite content hash, repo
 HEAD, dirty-checkout flag, setup-command count, and setup-command hashes. Each
@@ -165,6 +173,12 @@ prompts, transcripts, terminal logs, ctxhelm pack sections, or source content.
 lists verification commands, run identity, artifact paths, command/config
 hashes, and rerun notes using placeholders such as `<matrix-dir>` instead of
 raw local commands.
+
+`reports/privacy-report.json` and `docs/privacy-report.md` summarize the
+source-free privacy contract for the matrix. They list recorded metadata classes,
+forbidden raw data classes, safeguards, and per-run source-free trace/report
+checks. `verify-matrix` parses the JSON privacy report and fails if it reports
+raw source, prompts, transcripts, terminal logs, or non-source-free traces.
 
 `reports/benchmark-summary.json` includes confidence metadata. HelmBench writes
 95% Wilson score intervals for success and validation coverage and warns when a

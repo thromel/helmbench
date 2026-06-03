@@ -2,9 +2,9 @@
 
 `demo-run` creates a tiny reproducible benchmark repository, runs a failing
 native baseline and a successful guided adapter variant, and writes source-free
-reports, autopsy, dashboard, benchmark summary, quality gate, and evidence
-bundle artifacts. It is meant for smoke testing HelmBench itself and for demos
-where a real agent call would be too slow or expensive.
+reports, autopsy, dashboard, benchmark summary, privacy report, quality gate,
+and evidence bundle artifacts. It is meant for smoke testing HelmBench itself
+and for demos where a real agent call would be too slow or expensive.
 
 ## One-Command Demo
 
@@ -19,7 +19,9 @@ Important outputs:
 - `/tmp/helmbench-demo-run/reports/native.json`
 - `/tmp/helmbench-demo-run/reports/guided.json`
 - `/tmp/helmbench-demo-run/reports/benchmark-summary.json`
+- `/tmp/helmbench-demo-run/reports/privacy-report.json`
 - `/tmp/helmbench-demo-run/reports/quality-gate.json`
+- `/tmp/helmbench-demo-run/docs/privacy-report.md`
 - `/tmp/helmbench-demo-run/docs/dashboard.html`
 - `/tmp/helmbench-demo-run/evidence/manifest.json`
 

@@ -29,8 +29,8 @@ tested without external agents or network access.
 `run-matrix` is the main orchestration command for real eval runs. It executes
 one baseline plus one or more local adapter variants over the same suite, then
 writes per-run reports, pairwise comparisons, a benchmark summary, quality
-gate, suite-health report, per-run autopsies, reproduction guide, dashboard, and
-verifiable evidence bundle.
+gate, suite-health report, per-run autopsies, privacy report, reproduction
+guide, dashboard, and verifiable evidence bundle.
 
 `suite-health` is the preflight check for custom benchmark suites. It verifies
 that expected files and tests exist in the target repo, every task has a
@@ -55,6 +55,13 @@ content.
 `docs/reproduction.md` renders that provenance into reviewer-facing verification
 and rerun instructions. It uses placeholders and hashes rather than raw local
 adapter/setup commands.
+
+`reports/privacy-report.json` and `docs/privacy-report.md` summarize the
+source-free privacy contract for each matrix. They list recorded metadata,
+forbidden raw data classes, safeguards, and per-run source-free trace/report
+checks. `verify-matrix` parses the JSON privacy report, so a published matrix
+cannot pass verification if the report claims raw source, prompts, transcripts,
+terminal logs, or non-source-free traces were recorded.
 
 ## Source-Free Trace Model
 

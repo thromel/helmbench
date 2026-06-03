@@ -43,11 +43,11 @@ This repository currently implements the core HelmBench workflow:
 - `suite-health` checks any source-free suite against a local git repo before
   benchmark results are trusted
 - `demo-run` one-command deterministic demo pipeline with reports, dashboard,
-  quality gate, and evidence bundle
+  privacy report, quality gate, and evidence bundle
 - `run-matrix` benchmark coordinator that runs one baseline plus one or more
   local adapter variants and emits reports, comparisons, dashboard, quality
-  gate, suite-health, per-run autopsies, reproduction guide, evidence bundle
-  artifacts, and source-free reproducibility provenance
+  gate, suite-health, per-run autopsies, privacy report, reproduction guide,
+  evidence bundle artifacts, and source-free reproducibility provenance
 - `matrix-history` longitudinal comparison and static HTML trend dashboards for
   verified run-matrix outputs
 - `diff-autopsy` reviewer report that compares a git worktree, branch diff, or

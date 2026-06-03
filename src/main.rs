@@ -18,7 +18,8 @@ use std::path::{Path, PathBuf};
 use std::process::{Command as ProcessCommand, Stdio};
 use std::time::{Duration, Instant};
 
-const RUN_MATRIX_MANIFEST_SCHEMA_VERSION: u32 = 5;
+const RUN_MATRIX_MANIFEST_SCHEMA_VERSION: u32 = 6;
+const RUN_MATRIX_PRIVACY_REPORT_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -2644,10 +2645,44 @@ struct RunMatrixManifestArtifacts {
     benchmark_summary_markdown: String,
     quality_gate_json: String,
     quality_gate_markdown: String,
+    privacy_report_json: String,
+    privacy_report_markdown: String,
     dashboard_html: String,
     baseline_autopsy_markdown: String,
     reproduction_markdown: String,
     evidence_manifest: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunMatrixPrivacyReport {
+    schema_version: u32,
+    suite_name: String,
+    task_count: usize,
+    run_count: usize,
+    trace_count: usize,
+    recorded_metadata: Vec<String>,
+    forbidden_raw_data: Vec<String>,
+    safeguards: Vec<String>,
+    runs: Vec<RunMatrixPrivacyRun>,
+    privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RunMatrixPrivacyRun {
+    name: String,
+    agent: String,
+    variant: AgentVariant,
+    report_path: String,
+    trace_dir: String,
+    trace_count: usize,
+    source_free_trace_count: usize,
+    report_source_free: bool,
+    raw_source_logged: bool,
+    raw_prompt_logged: bool,
+    raw_transcript_logged: bool,
+    raw_terminal_logged: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -3213,6 +3248,18 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
     let dashboard_path = docs_dir.join("dashboard.html");
     write_text(&render_html_dashboard(&all_reports)?, &dashboard_path)?;
 
+    let all_results = std::iter::once(&baseline_result)
+        .chain(head_results.iter())
+        .collect::<Vec<_>>();
+    let privacy_report = build_run_matrix_privacy_report(&suite, &request.out_dir, &all_results)?;
+    let privacy_report_json_path = reports_dir.join("privacy-report.json");
+    write_json(&privacy_report, &privacy_report_json_path)?;
+    let privacy_report_markdown_path = docs_dir.join("privacy-report.md");
+    write_text(
+        &render_markdown_run_matrix_privacy_report(&privacy_report),
+        &privacy_report_markdown_path,
+    )?;
+
     let head_report_paths = head_results
         .iter()
         .map(|result| result.report_path.clone())
@@ -3238,6 +3285,8 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         &docs_dir.join("benchmark-summary.md"),
         &quality_gate_json_path,
         &quality_gate_markdown_path,
+        &privacy_report_json_path,
+        &privacy_report_markdown_path,
         &dashboard_path,
         &autopsy_paths,
         &comparison_paths,
@@ -3274,6 +3323,159 @@ fn write_matrix_autopsy(
     Ok(path)
 }
 
+fn build_run_matrix_privacy_report(
+    suite: &helmbench::TaskSuite,
+    out_dir: &Path,
+    results: &[&RunMatrixResult],
+) -> Result<RunMatrixPrivacyReport> {
+    let mut runs = Vec::with_capacity(results.len());
+    let mut trace_count = 0usize;
+
+    for result in results {
+        let traces = load_traces(&result.trace_dir)?;
+        let source_free_trace_count = traces
+            .iter()
+            .filter(|trace| privacy_status_is_source_free(&trace.privacy))
+            .count();
+        trace_count += traces.len();
+        runs.push(RunMatrixPrivacyRun {
+            name: result.spec.name.clone(),
+            agent: result.spec.agent.clone(),
+            variant: result.spec.variant.clone(),
+            report_path: manifest_path(out_dir, &result.report_path),
+            trace_dir: manifest_path(out_dir, &result.trace_dir),
+            trace_count: traces.len(),
+            source_free_trace_count,
+            report_source_free: privacy_status_is_source_free(&result.report.privacy),
+            raw_source_logged: result.report.privacy.raw_source_logged
+                || traces.iter().any(|trace| trace.privacy.raw_source_logged),
+            raw_prompt_logged: result.report.privacy.raw_prompt_logged
+                || traces.iter().any(|trace| trace.privacy.raw_prompt_logged),
+            raw_transcript_logged: result.report.privacy.raw_transcript_logged
+                || traces
+                    .iter()
+                    .any(|trace| trace.privacy.raw_transcript_logged),
+            raw_terminal_logged: result.report.privacy.raw_terminal_logged
+                || traces.iter().any(|trace| trace.privacy.raw_terminal_logged),
+        });
+    }
+
+    Ok(RunMatrixPrivacyReport {
+        schema_version: RUN_MATRIX_PRIVACY_REPORT_SCHEMA_VERSION,
+        suite_name: suite.name.clone(),
+        task_count: suite.tasks.len(),
+        run_count: runs.len(),
+        trace_count,
+        recorded_metadata: vec![
+            "task ids".to_string(),
+            "agent labels".to_string(),
+            "variant labels".to_string(),
+            "relative file paths and path hashes".to_string(),
+            "command classes and command hashes".to_string(),
+            "touched expected-test paths".to_string(),
+            "exit statuses".to_string(),
+            "task status".to_string(),
+            "tool-call counts".to_string(),
+            "token estimates".to_string(),
+            "elapsed timing metadata".to_string(),
+            "ctxhelm recommendation paths".to_string(),
+            "ctxhelm pack token estimates".to_string(),
+            "artifact byte counts and hashes".to_string(),
+        ],
+        forbidden_raw_data: vec![
+            "raw source".to_string(),
+            "raw prompts".to_string(),
+            "raw model transcripts".to_string(),
+            "raw terminal logs".to_string(),
+            "raw adapter commands".to_string(),
+            "raw setup commands".to_string(),
+            "raw MCP payloads".to_string(),
+            "raw ctxhelm pack sections or snippets".to_string(),
+            "secrets".to_string(),
+        ],
+        safeguards: vec![
+            "trace and report readers reject privacy flags that indicate raw data logging"
+                .to_string(),
+            "structured streams are parsed in memory and not persisted by capture-stream"
+                .to_string(),
+            "adapter and setup commands are stored as source-free hashes".to_string(),
+            "matrix artifact paths are safe relative paths".to_string(),
+            "published matrix artifacts are byte-counted and content-hashed".to_string(),
+            "evidence bundles are verified before the matrix manifest is written".to_string(),
+        ],
+        runs,
+        privacy: PrivacyStatus::source_free(),
+    })
+}
+
+fn privacy_status_is_source_free(privacy: &PrivacyStatus) -> bool {
+    privacy.source_free
+        && !privacy.raw_source_logged
+        && !privacy.raw_prompt_logged
+        && !privacy.raw_transcript_logged
+        && !privacy.raw_terminal_logged
+}
+
+fn render_markdown_run_matrix_privacy_report(report: &RunMatrixPrivacyReport) -> String {
+    let mut out = String::new();
+    out.push_str(&format!(
+        "# HelmBench Privacy Report: `{}`\n\n",
+        report.suite_name
+    ));
+    out.push_str("This source-free report describes what HelmBench recorded for a run matrix and which raw data classes were intentionally excluded.\n\n");
+
+    out.push_str("## Summary\n\n");
+    out.push_str("| Field | Value |\n| --- | ---: |\n");
+    out.push_str(&format!("| Tasks | {} |\n", report.task_count));
+    out.push_str(&format!("| Runs | {} |\n", report.run_count));
+    out.push_str(&format!("| Traces | {} |\n", report.trace_count));
+    out.push_str(&format!(
+        "| Source-free | {} |\n\n",
+        yes_no(privacy_status_is_source_free(&report.privacy))
+    ));
+
+    out.push_str("## Run Checks\n\n");
+    out.push_str("| Run | Variant | Report source-free | Source-free traces | Raw source | Raw prompts | Raw transcripts | Raw terminal logs |\n");
+    out.push_str("| --- | --- | --- | ---: | --- | --- | --- | --- |\n");
+    for run in &report.runs {
+        out.push_str(&format!(
+            "| `{}` | `{:?}` | {} | {}/{} | {} | {} | {} | {} |\n",
+            run.name,
+            run.variant,
+            yes_no(run.report_source_free),
+            run.source_free_trace_count,
+            run.trace_count,
+            yes_no(run.raw_source_logged),
+            yes_no(run.raw_prompt_logged),
+            yes_no(run.raw_transcript_logged),
+            yes_no(run.raw_terminal_logged)
+        ));
+    }
+
+    out.push_str("\n## Recorded Metadata\n\n");
+    for item in &report.recorded_metadata {
+        out.push_str(&format!("- {item}\n"));
+    }
+
+    out.push_str("\n## Forbidden Raw Data\n\n");
+    for item in &report.forbidden_raw_data {
+        out.push_str(&format!("- {item}\n"));
+    }
+
+    out.push_str("\n## Safeguards\n\n");
+    for item in &report.safeguards {
+        out.push_str(&format!("- {item}\n"));
+    }
+
+    out.push_str("\n## Privacy Flags\n\n");
+    out.push_str("- Source-free: `true`\n");
+    out.push_str("- Raw source logged: `false`\n");
+    out.push_str("- Raw prompts logged: `false`\n");
+    out.push_str("- Raw transcripts logged: `false`\n");
+    out.push_str("- Raw terminal logs logged: `false`\n");
+    out
+}
+
 #[allow(clippy::too_many_arguments)]
 fn build_run_matrix_manifest(
     request: &RunMatrixRequest,
@@ -3284,6 +3486,8 @@ fn build_run_matrix_manifest(
     benchmark_summary_markdown: &Path,
     quality_gate_json: &Path,
     quality_gate_markdown: &Path,
+    privacy_report_json: &Path,
+    privacy_report_markdown: &Path,
     dashboard_html: &Path,
     autopsy_paths: &BTreeMap<String, PathBuf>,
     comparison_paths: &BTreeMap<String, (PathBuf, PathBuf)>,
@@ -3318,6 +3522,8 @@ fn build_run_matrix_manifest(
             benchmark_summary_markdown: manifest_path(&request.out_dir, benchmark_summary_markdown),
             quality_gate_json: manifest_path(&request.out_dir, quality_gate_json),
             quality_gate_markdown: manifest_path(&request.out_dir, quality_gate_markdown),
+            privacy_report_json: manifest_path(&request.out_dir, privacy_report_json),
+            privacy_report_markdown: manifest_path(&request.out_dir, privacy_report_markdown),
             dashboard_html: manifest_path(&request.out_dir, dashboard_html),
             baseline_autopsy_markdown: manifest_path(&request.out_dir, baseline_autopsy_markdown),
             reproduction_markdown: manifest_path(&request.out_dir, reproduction_markdown),
@@ -3426,6 +3632,8 @@ fn insert_matrix_artifact_paths(manifest: &RunMatrixManifest, paths: &mut BTreeS
     paths.insert(manifest.artifacts.benchmark_summary_markdown.clone());
     paths.insert(manifest.artifacts.quality_gate_json.clone());
     paths.insert(manifest.artifacts.quality_gate_markdown.clone());
+    paths.insert(manifest.artifacts.privacy_report_json.clone());
+    paths.insert(manifest.artifacts.privacy_report_markdown.clone());
     paths.insert(manifest.artifacts.dashboard_html.clone());
     paths.insert(manifest.artifacts.baseline_autopsy_markdown.clone());
     paths.insert(manifest.artifacts.reproduction_markdown.clone());
@@ -3566,6 +3774,14 @@ fn render_markdown_matrix_reproduction(manifest: &RunMatrixManifest) -> String {
         manifest.artifacts.quality_gate_markdown
     ));
     out.push_str(&format!(
+        "| Privacy report JSON | `{}` |\n",
+        manifest.artifacts.privacy_report_json
+    ));
+    out.push_str(&format!(
+        "| Privacy report Markdown | `{}` |\n",
+        manifest.artifacts.privacy_report_markdown
+    ));
+    out.push_str(&format!(
         "| Dashboard | `{}` |\n",
         manifest.artifacts.dashboard_html
     ));
@@ -3648,6 +3864,8 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
         &manifest.artifacts.benchmark_summary_markdown,
         &manifest.artifacts.quality_gate_json,
         &manifest.artifacts.quality_gate_markdown,
+        &manifest.artifacts.privacy_report_json,
+        &manifest.artifacts.privacy_report_markdown,
         &manifest.artifacts.dashboard_html,
         &manifest.artifacts.baseline_autopsy_markdown,
         &manifest.artifacts.reproduction_markdown,
@@ -3659,6 +3877,9 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     let suite_health_path = matrix_path(matrix_dir, &manifest.artifacts.suite_health_json)?;
     validate_public_suite_health(&suite_health_path)
         .with_context(|| format!("validate suite health {}", suite_health_path.display()))?;
+    let privacy_report_path = matrix_path(matrix_dir, &manifest.artifacts.privacy_report_json)?;
+    validate_run_matrix_privacy_report(&privacy_report_path)
+        .with_context(|| format!("validate privacy report {}", privacy_report_path.display()))?;
 
     let evidence_manifest = matrix_path(matrix_dir, &manifest.artifacts.evidence_manifest)?;
     let evidence_dir = evidence_manifest
@@ -3668,6 +3889,59 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     verify_matrix_artifact_digests(matrix_dir, &manifest)?;
 
     Ok(manifest)
+}
+
+fn validate_run_matrix_privacy_report(path: &Path) -> Result<()> {
+    let raw = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    let report = serde_json::from_str::<RunMatrixPrivacyReport>(&raw)
+        .with_context(|| format!("parse privacy report {}", path.display()))?;
+    if report.schema_version != RUN_MATRIX_PRIVACY_REPORT_SCHEMA_VERSION {
+        anyhow::bail!(
+            "unsupported privacy report schemaVersion {}; expected {}",
+            report.schema_version,
+            RUN_MATRIX_PRIVACY_REPORT_SCHEMA_VERSION
+        );
+    }
+    if report.suite_name.trim().is_empty() {
+        anyhow::bail!("privacy report suiteName must not be empty");
+    }
+    if report.run_count != report.runs.len() {
+        anyhow::bail!("privacy report runCount does not match runs");
+    }
+    if !privacy_status_is_source_free(&report.privacy) {
+        anyhow::bail!("privacy report is not source-free");
+    }
+    if report.recorded_metadata.is_empty()
+        || report.forbidden_raw_data.is_empty()
+        || report.safeguards.is_empty()
+    {
+        anyhow::bail!("privacy report must describe metadata, forbidden data, and safeguards");
+    }
+    let mut trace_count = 0usize;
+    for run in &report.runs {
+        if run.name.trim().is_empty() || run.agent.trim().is_empty() {
+            anyhow::bail!("privacy report run identity must not be empty");
+        }
+        helmbench::validate_safe_relative_path_for_cli(&run.report_path)
+            .with_context(|| format!("validate privacy report path `{}`", run.report_path))?;
+        helmbench::validate_safe_relative_path_for_cli(&run.trace_dir)
+            .with_context(|| format!("validate privacy trace dir `{}`", run.trace_dir))?;
+        if !run.report_source_free || run.source_free_trace_count != run.trace_count {
+            anyhow::bail!("privacy report run `{}` is not fully source-free", run.name);
+        }
+        if run.raw_source_logged
+            || run.raw_prompt_logged
+            || run.raw_transcript_logged
+            || run.raw_terminal_logged
+        {
+            anyhow::bail!("privacy report run `{}` logged raw data", run.name);
+        }
+        trace_count += run.trace_count;
+    }
+    if report.trace_count != trace_count {
+        anyhow::bail!("privacy report traceCount does not match runs");
+    }
+    Ok(())
 }
 
 fn verify_matrix_artifact_digests(matrix_dir: &Path, manifest: &RunMatrixManifest) -> Result<()> {
@@ -4758,6 +5032,42 @@ fn run_demo_pipeline_with_adapter(
     if !gate.passed {
         anyhow::bail!("demo quality gate failed");
     }
+
+    let native_result = RunMatrixResult {
+        spec: RunMatrixSpec {
+            name: "native".to_string(),
+            safe_name: "native".to_string(),
+            agent: "demo-baseline".to_string(),
+            variant: AgentVariant::Native,
+            ctxhelm: None,
+            adapter_command: None,
+            capture_stream: false,
+        },
+        report: native_report.clone(),
+        report_path: native_report_path.clone(),
+        trace_dir: native_traces.clone(),
+    };
+    let guided_result = RunMatrixResult {
+        spec: RunMatrixSpec {
+            name: "guided".to_string(),
+            safe_name: "guided".to_string(),
+            agent: "demo-guided".to_string(),
+            variant: AgentVariant::CtxhelmMcp,
+            ctxhelm: None,
+            adapter_command: Some(adapter_command.clone()),
+            capture_stream: false,
+        },
+        report: guided_report.clone(),
+        report_path: guided_report_path.clone(),
+        trace_dir: guided_traces.clone(),
+    };
+    let privacy_report =
+        build_run_matrix_privacy_report(&suite, out_dir, &[&native_result, &guided_result])?;
+    write_json(&privacy_report, &reports_dir.join("privacy-report.json"))?;
+    write_text(
+        &render_markdown_run_matrix_privacy_report(&privacy_report),
+        &docs_dir.join("privacy-report.md"),
+    )?;
 
     let autopsy = build_autopsy(&suite, &load_traces(&native_traces)?)?;
     write_text(
@@ -5996,9 +6306,11 @@ mod tests {
         assert!(out.join("reports/guided.json").exists());
         assert!(out.join("reports/benchmark-summary.json").exists());
         assert!(out.join("reports/quality-gate.json").exists());
+        assert!(out.join("reports/privacy-report.json").exists());
         assert!(out.join("docs/compare.md").exists());
         assert!(out.join("docs/benchmark-summary.md").exists());
         assert!(out.join("docs/quality-gate.md").exists());
+        assert!(out.join("docs/privacy-report.md").exists());
         assert!(out.join("docs/native-autopsy.md").exists());
         assert!(out.join("docs/dashboard.html").exists());
         assert!(out.join("evidence/manifest.json").exists());
@@ -6078,9 +6390,11 @@ mod tests {
         assert!(out.join("reports/suite-health.json").exists());
         assert!(out.join("reports/benchmark-summary.json").exists());
         assert!(out.join("reports/quality-gate.json").exists());
+        assert!(out.join("reports/privacy-report.json").exists());
         assert!(out.join("docs/compare-native-search.md").exists());
         assert!(out.join("docs/compare-guided.md").exists());
         assert!(out.join("docs/benchmark-summary.md").exists());
+        assert!(out.join("docs/privacy-report.md").exists());
         assert!(out.join("docs/native-autopsy.md").exists());
         assert!(out.join("docs/native-search-autopsy.md").exists());
         assert!(out.join("docs/guided-autopsy.md").exists());
@@ -6100,6 +6414,30 @@ mod tests {
         let gate = std::fs::read_to_string(out.join("reports/quality-gate.json")).expect("gate");
         let gate = serde_json::from_str::<serde_json::Value>(&gate).expect("json");
         assert_eq!(gate["passed"], true);
+        let privacy = std::fs::read_to_string(out.join("reports/privacy-report.json"))
+            .expect("privacy report");
+        let privacy = serde_json::from_str::<serde_json::Value>(&privacy).expect("json");
+        assert_eq!(privacy["schemaVersion"], 1);
+        assert_eq!(privacy["runCount"], 3);
+        assert_eq!(privacy["traceCount"], 6);
+        assert_eq!(privacy["privacy"]["sourceFree"], true);
+        assert!(privacy["forbiddenRawData"]
+            .as_array()
+            .expect("forbidden raw data")
+            .iter()
+            .any(|item| item == "raw source"));
+        assert!(privacy["runs"]
+            .as_array()
+            .expect("privacy runs")
+            .iter()
+            .all(|run| {
+                run["reportSourceFree"] == true
+                    && run["sourceFreeTraceCount"] == run["traceCount"]
+                    && run["rawSourceLogged"] == false
+                    && run["rawPromptLogged"] == false
+                    && run["rawTranscriptLogged"] == false
+                    && run["rawTerminalLogged"] == false
+            }));
         let health =
             std::fs::read_to_string(out.join("reports/suite-health.json")).expect("health");
         let health = serde_json::from_str::<serde_json::Value>(&health).expect("json");
@@ -6221,6 +6559,14 @@ mod tests {
             "docs/native-autopsy.md"
         );
         assert_eq!(
+            manifest["artifacts"]["privacyReportJson"],
+            "reports/privacy-report.json"
+        );
+        assert_eq!(
+            manifest["artifacts"]["privacyReportMarkdown"],
+            "docs/privacy-report.md"
+        );
+        assert_eq!(
             manifest["artifacts"]["reproductionMarkdown"],
             "docs/reproduction.md"
         );
@@ -6248,6 +6594,12 @@ mod tests {
             .any(|digest| digest["path"] == "reports/compare-guided.json"));
         assert!(artifact_digests
             .iter()
+            .any(|digest| digest["path"] == "reports/privacy-report.json"));
+        assert!(artifact_digests
+            .iter()
+            .any(|digest| digest["path"] == "docs/privacy-report.md"));
+        assert!(artifact_digests
+            .iter()
             .any(|digest| digest["path"] == "docs/compare-guided.md"));
         assert!(artifact_digests
             .iter()
@@ -6267,6 +6619,8 @@ mod tests {
         assert!(reproduction.contains("docs/guided-autopsy.md"));
         assert!(reproduction.contains("reports/compare-guided.json"));
         assert!(reproduction.contains("docs/compare-guided.md"));
+        assert!(reproduction.contains("reports/privacy-report.json"));
+        assert!(reproduction.contains("docs/privacy-report.md"));
         assert!(reproduction.contains(&command_hash(&adapter_command)));
         assert!(!reproduction.contains(adapter.to_string_lossy().as_ref()));
 
