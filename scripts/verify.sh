@@ -86,13 +86,31 @@ cargo run -- local-run \
   --adapter-command "sh $ROOT/scripts/demo-stream-agent.sh" \
   --capture-stream
 
+cat > "$TMP_DIR/fake-ctxhelm.sh" <<'EOF'
+#!/usr/bin/env sh
+set -eu
+
+case "${1:-}" in
+  prepare-task)
+    printf '{"targetFiles":[{"path":"src/auth/session.txt"}],"relatedTests":[{"path":"auth.test"}]}\n'
+    ;;
+  get-pack)
+    printf '{"tokenEstimate":321,"sections":[]}\n'
+    ;;
+  *)
+    exit 2
+    ;;
+esac
+EOF
+chmod +x "$TMP_DIR/fake-ctxhelm.sh"
+
 cargo run -- run-matrix \
   --suite "$TMP_DIR/demo-suite.json" \
   --repo "$TMP_DIR/demo-repo" \
   --out-dir "$TMP_DIR/matrix" \
   --baseline "name=native,agent=demo-baseline,variant=native" \
   --head "name=native-search,agent=demo-native-search,variant=native_search,command=HELMBENCH_BIN=$ROOT/target/debug/helmbench sh scripts/demo-agent.sh" \
-  --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,command=HELMBENCH_BIN=$ROOT/target/debug/helmbench sh scripts/demo-agent.sh" \
+  --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,ctxhelm=true,ctxhelm_bin=$TMP_DIR/fake-ctxhelm.sh,pack=true,pack_budget=brief,command=HELMBENCH_BIN=$ROOT/target/debug/helmbench sh scripts/demo-agent.sh" \
   --force
 
 cat > "$TMP_DIR/matrix-config.json" <<EOF
@@ -117,6 +135,10 @@ cat > "$TMP_DIR/matrix-config.json" <<EOF
       "name": "guided",
       "agent": "demo-guided",
       "variant": "ctxhelm_mcp",
+      "ctxhelm": true,
+      "ctxhelmBin": "$TMP_DIR/fake-ctxhelm.sh",
+      "pack": true,
+      "packBudget": "brief",
       "command": "HELMBENCH_BIN=\${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
     }
   ]
@@ -259,6 +281,7 @@ test -f "$TMP_DIR/matrix/reports/benchmark-summary.json"
 test -f "$TMP_DIR/matrix/reports/suite-health.json"
 test -f "$TMP_DIR/matrix/reports/native-search.json"
 test -f "$TMP_DIR/matrix/reports/compare-native-search.json"
+test -f "$TMP_DIR/matrix/reports/guided.json"
 test -f "$TMP_DIR/matrix/reports/quality-gate.json"
 test -f "$TMP_DIR/matrix/reports/privacy-report.json"
 test -f "$TMP_DIR/matrix/docs/dashboard.html"
@@ -274,6 +297,7 @@ test -f "$TMP_DIR/matrix-config/reports/benchmark-summary.json"
 test -f "$TMP_DIR/matrix-config/reports/suite-health.json"
 test -f "$TMP_DIR/matrix-config/reports/native-search.json"
 test -f "$TMP_DIR/matrix-config/reports/compare-native-search.json"
+test -f "$TMP_DIR/matrix-config/reports/guided.json"
 test -f "$TMP_DIR/matrix-config/reports/quality-gate.json"
 test -f "$TMP_DIR/matrix-config/reports/privacy-report.json"
 test -f "$TMP_DIR/matrix-config/docs/compare-native-search.md"
@@ -284,6 +308,13 @@ test -f "$TMP_DIR/matrix-config/docs/reproduction.md"
 test -f "$TMP_DIR/matrix-config/evidence/health.json"
 test -f "$TMP_DIR/matrix-config/evidence/manifest.json"
 test -f "$TMP_DIR/matrix-config/matrix-manifest.json"
+
+grep -q '"ctxhelmEnabled": true' "$TMP_DIR/matrix/matrix-manifest.json"
+grep -q '"packEnabled": true' "$TMP_DIR/matrix/matrix-manifest.json"
+grep -q '"ctxhelmEnabled": true' "$TMP_DIR/matrix-config/matrix-manifest.json"
+grep -q '"packEnabled": true' "$TMP_DIR/matrix-config/matrix-manifest.json"
+grep -q '"totalTokenEstimate": 642' "$TMP_DIR/matrix/reports/guided.json"
+grep -q '"totalTokenEstimate": 642' "$TMP_DIR/matrix-config/reports/guided.json"
 
 git diff --check
 
