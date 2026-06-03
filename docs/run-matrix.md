@@ -92,6 +92,7 @@ helmbench init-public-matrix \
   --suite suites/refactoring-miner-public.json \
   --out /tmp/refactoring-miner-matrix.json \
   --out-dir /tmp/refactoring-miner-matrix \
+  --health-out /tmp/refactoring-miner-matrix-health.json \
   --agent-preset claude-code \
   --dangerously-skip-permissions \
   --ctxhelm-bin ctxhelm \
@@ -111,6 +112,8 @@ and a `ctxhelm` guided row. It fails before writing if the suite does not match
 the requested public preset or if the fixture repo fails the source-free
 suite-health gate. Defaults write machine-specific configs under `.helmbench/`
 so local repo paths are not accidentally committed.
+Pass `--health-out` to persist the exact source-free fixture-health report that
+was checked before the matrix config was written.
 
 For seeded public suites, pass `--health-check-success-commands` and
 `--health-require-setup-commands` to `init-public-matrix`. The generator runs

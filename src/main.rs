@@ -158,6 +158,8 @@ enum Command {
         out: Option<PathBuf>,
         #[arg(long)]
         out_dir: Option<PathBuf>,
+        #[arg(long)]
+        health_out: Option<PathBuf>,
         #[arg(long, value_enum, default_value_t = AdapterPreset::ClaudeCode)]
         agent_preset: AdapterPreset,
         #[arg(long)]
@@ -833,6 +835,7 @@ fn main() -> Result<()> {
             suite,
             out,
             out_dir,
+            health_out,
             agent_preset,
             agent_bin,
             model,
@@ -858,6 +861,7 @@ fn main() -> Result<()> {
                 suite_path: suite,
                 out,
                 out_dir,
+                health_out,
                 agent_preset,
                 agent_bin,
                 model,
@@ -2261,6 +2265,7 @@ struct InitPublicMatrixOptions {
     suite_path: Option<PathBuf>,
     out: PathBuf,
     out_dir: Option<PathBuf>,
+    health_out: Option<PathBuf>,
     agent_preset: AdapterPreset,
     agent_bin: Option<PathBuf>,
     model: Option<String>,
@@ -2282,6 +2287,9 @@ struct InitPublicMatrixOptions {
 
 fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
     ensure_output_path_available(&options.out, options.force)?;
+    if let Some(health_out) = &options.health_out {
+        ensure_output_path_available(health_out, options.force)?;
+    }
     let suite_path = options
         .suite_path
         .unwrap_or_else(|| default_public_suite_out(options.preset));
@@ -2310,6 +2318,10 @@ fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
         &suite,
         public_suite_anchor_files(options.preset),
     )?;
+    if let Some(health_out) = &options.health_out {
+        write_json(&health, health_out)?;
+        println!("wrote {}", health_out.display());
+    }
     if !health.ok {
         anyhow::bail!(
             "public matrix fixture is not healthy; run suite-health for details before writing {}",
@@ -8487,6 +8499,7 @@ mod tests {
         let suite_path = temp.path().join("refactoring-miner-public.json");
         write_json(&refactoring_miner_suite(), &suite_path).expect("suite");
         let config_path = temp.path().join("refactoring-miner-matrix.json");
+        let health_path = temp.path().join("refactoring-miner-matrix-health.json");
         let matrix_out = temp.path().join("matrix-out");
 
         init_public_matrix_config(InitPublicMatrixOptions {
@@ -8495,6 +8508,7 @@ mod tests {
             suite_path: Some(suite_path.clone()),
             out: config_path.clone(),
             out_dir: Some(matrix_out.clone()),
+            health_out: Some(health_path.clone()),
             agent_preset: AdapterPreset::ClaudeCode,
             agent_bin: Some(PathBuf::from("fake-claude")),
             model: Some("sonnet".to_string()),
@@ -8516,8 +8530,11 @@ mod tests {
         .expect("matrix config");
 
         let raw = std::fs::read_to_string(&config_path).expect("config raw");
+        let health_raw = std::fs::read_to_string(&health_path).expect("health raw");
         assert!(!raw.contains("null"));
         assert!(raw.contains("\"preset\": \"claude-code\""));
+        assert!(health_raw.contains("\"suiteName\": \"refactoringminer-public\""));
+        assert!(health_raw.contains("\"ok\": true"));
         let request = build_run_matrix_request(
             Some(&config_path),
             None,
@@ -8598,6 +8615,7 @@ mod tests {
             suite_path: Some(suite_path),
             out: config_path.clone(),
             out_dir: None,
+            health_out: None,
             agent_preset: AdapterPreset::ClaudeCode,
             agent_bin: Some(PathBuf::from("fake-claude")),
             model: None,

@@ -197,6 +197,7 @@ helmbench init-public-matrix \
   --suite /tmp/refactoringminer-suite.json \
   --out /tmp/refactoringminer-matrix.json \
   --out-dir /tmp/refactoringminer-matrix \
+  --health-out /tmp/refactoringminer-matrix-health.json \
   --agent-preset claude-code \
   --dangerously-skip-permissions \
   --ctxhelm-bin ctxhelm \
@@ -215,6 +216,8 @@ helmbench verify-matrix \
 passes the source-free suite-health gate, so the generated real-agent proof path
 keeps the same privacy and reproducibility contract as the recommendation
 trace flow.
+Use `--health-out` to save that gate as a source-free JSON report beside the
+matrix config.
 
 Before using a public-suite matrix for task-success claims, run
 `suite-health --preset <preset> --check-success-commands`. Public suite tasks

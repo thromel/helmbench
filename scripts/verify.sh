@@ -69,6 +69,7 @@ cargo run -- schema --help >/dev/null
 cargo run -- demo-run --help >/dev/null
 cargo run -- validate-matrix --help >/dev/null
 cargo run -- run-matrix --help >/dev/null
+cargo run -- init-public-matrix --help | grep -q -- '--health-out'
 cargo run -- init-public-matrix --help | grep -q -- '--health-check-success-commands'
 cargo run -- matrix-history --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null

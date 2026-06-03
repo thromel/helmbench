@@ -133,6 +133,7 @@ cargo run -- init-public-matrix \
   --suite suites/refactoring-miner-public.json \
   --out /tmp/refactoring-miner-matrix.json \
   --out-dir /tmp/refactoring-miner-matrix \
+  --health-out /tmp/refactoring-miner-matrix-health.json \
   --agent-preset claude-code \
   --dangerously-skip-permissions \
   --ctxhelm-bin ctxhelm \
