@@ -1,0 +1,251 @@
+{
+  "schemaVersion": 1,
+  "name": "refactoringminer-git-regressions",
+  "description": "Source-free git regression suite generated from public commits; each task setup restores expected files from the parent commit in an isolated clone.",
+  "tasks": [
+    {
+      "id": "git-regression-949bddcd3509",
+      "prompt": "Recreate the behavior from public commit 949bddcd3509: Default MCP repository path to working directory. The task setup restores expected implementation files from the parent commit while keeping current tests; inspect the changed paths and restore the intended behavior without unrelated edits.",
+      "expectedFiles": [
+        "documentation/mcp.md",
+        "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java",
+        "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServiceRepositoryTest.java",
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpToolsTest.java"
+      ],
+      "successCommand": "JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo \"$JAVA_HOME\") ./gradlew --no-daemon test --tests 'org.refactoringminer.mcp.RefactoringMinerMcpServiceRepositoryTest' --tests 'org.refactoringminer.mcp.RefactoringMinerMcpToolsTest'",
+      "setupCommands": [
+        "git checkout 949bddcd3509a805f5e3bcc55fcdb71a691b0dac^ -- 'documentation/mcp.md' 'src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java' 'src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java'"
+      ],
+      "tags": [
+        "public_repo",
+        "git_regression",
+        "outcome_seed",
+        "commit:949bddcd3509"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "git-regression-4fa3c1a48ad4",
+      "prompt": "Recreate the behavior from public commit 4fa3c1a48ad4: Support Docker MCP WebDiff hosts. The task setup restores expected implementation files from the parent commit while keeping current tests; inspect the changed paths and restore the intended behavior without unrelated edits.",
+      "expectedFiles": [
+        "docker/Dockerfile",
+        "docker/README.md",
+        "docker/native/Dockerfile-native",
+        "documentation/mcp.md",
+        "src/main/java/gui/webdiff/WebDiff.java",
+        "src/main/java/org/refactoringminer/mcp/McpDiffBrowserResult.java",
+        "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/mcp/WebDiffBrowserLauncherTest.java"
+      ],
+      "successCommand": "JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo \"$JAVA_HOME\") ./gradlew --no-daemon test --tests 'org.refactoringminer.mcp.WebDiffBrowserLauncherTest'",
+      "setupCommands": [
+        "git checkout 4fa3c1a48ad40779dba7f214dd62e682a9bf173d^ -- 'docker/Dockerfile' 'docker/README.md' 'docker/native/Dockerfile-native' 'documentation/mcp.md' 'src/main/java/gui/webdiff/WebDiff.java' 'src/main/java/org/refactoringminer/mcp/McpDiffBrowserResult.java' 'src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java'"
+      ],
+      "tags": [
+        "public_repo",
+        "git_regression",
+        "outcome_seed",
+        "commit:4fa3c1a48ad4"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "git-regression-bd0b2277933f",
+      "prompt": "Recreate the behavior from public commit bd0b2277933f: docs: tighten MCP wording. The task setup restores expected implementation files from the parent commit while keeping current tests; inspect the changed paths and restore the intended behavior without unrelated edits.",
+      "expectedFiles": [
+        "build.gradle",
+        "documentation/mcp.md",
+        "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java",
+        "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java",
+        "src/main/resources/logback.xml"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpToolsTest.java"
+      ],
+      "successCommand": "JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo \"$JAVA_HOME\") ./gradlew --no-daemon test --tests 'org.refactoringminer.mcp.RefactoringMinerMcpToolsTest'",
+      "setupCommands": [
+        "git checkout bd0b2277933fda91585b7819fa9f5ed7cfd5edbc^ -- 'build.gradle' 'documentation/mcp.md' 'src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java' 'src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java' 'src/main/resources/logback.xml'"
+      ],
+      "tags": [
+        "public_repo",
+        "git_regression",
+        "outcome_seed",
+        "commit:bd0b2277933f"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "git-regression-1b9f2cf08b3c",
+      "prompt": "Recreate the behavior from public commit 1b9f2cf08b3c: Fix MCP WebDiff review issues. The task setup restores expected implementation files from the parent commit while keeping current tests; inspect the changed paths and restore the intended behavior without unrelated edits.",
+      "expectedFiles": [
+        "documentation/mcp.md",
+        "src/main/java/gui/webdiff/WebDiff.java",
+        "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java",
+        "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java",
+        "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpToolsTest.java",
+        "src/test/java/org/refactoringminer/mcp/WebDiffBrowserLauncherTest.java"
+      ],
+      "successCommand": "JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo \"$JAVA_HOME\") ./gradlew --no-daemon test --tests 'org.refactoringminer.mcp.RefactoringMinerMcpToolsTest' --tests 'org.refactoringminer.mcp.WebDiffBrowserLauncherTest'",
+      "setupCommands": [
+        "git checkout 1b9f2cf08b3c1296e0c6ca9cd5d1c1d0bc901cda^ -- 'documentation/mcp.md' 'src/main/java/gui/webdiff/WebDiff.java' 'src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java' 'src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java' 'src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java'"
+      ],
+      "tags": [
+        "public_repo",
+        "git_regression",
+        "outcome_seed",
+        "commit:1b9f2cf08b3c"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "git-regression-092c13f035f9",
+      "prompt": "Recreate the behavior from public commit 092c13f035f9: Enable matching of composite statements with 0 matched children and. The task setup restores expected implementation files from the parent commit while keeping current tests; inspect the changed paths and restore the intended behavior without unrelated edits.",
+      "expectedFiles": [
+        "documentation/accuracy.md",
+        "src/main/java/gr/uom/java/xmi/decomposition/UMLOperationBodyMapper.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/test/TestNewDatasetRefactorings.java",
+        "src/test/resources/oracle/tse-dataset/lucene-solr.json"
+      ],
+      "successCommand": "JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo \"$JAVA_HOME\") ./gradlew --no-daemon test --tests 'org.refactoringminer.test.TestNewDatasetRefactorings'",
+      "setupCommands": [
+        "git checkout 092c13f035f9e5c281409307675d622971bbcbb5^ -- 'documentation/accuracy.md' 'src/main/java/gr/uom/java/xmi/decomposition/UMLOperationBodyMapper.java'"
+      ],
+      "tags": [
+        "public_repo",
+        "git_regression",
+        "outcome_seed",
+        "commit:092c13f035f9"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "git-regression-fa8df046b0e0",
+      "prompt": "Recreate the behavior from public commit fa8df046b0e0: Improve advanced assertion migration matching. The task setup restores expected implementation files from the parent commit while keeping current tests; inspect the changed paths and restore the intended behavior without unrelated edits.",
+      "expectedFiles": [
+        "src/main/java/gr/uom/java/xmi/decomposition/ReplacementAlgorithm.java",
+        "src/main/java/gr/uom/java/xmi/decomposition/UMLOperationBodyMapper.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/test/AdvancedAssertionMigrationTest.java"
+      ],
+      "successCommand": "JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo \"$JAVA_HOME\") ./gradlew --no-daemon test --tests 'org.refactoringminer.test.AdvancedAssertionMigrationTest'",
+      "setupCommands": [
+        "git checkout fa8df046b0e05321321a5bbd191655d7a696035e^ -- 'src/main/java/gr/uom/java/xmi/decomposition/ReplacementAlgorithm.java' 'src/main/java/gr/uom/java/xmi/decomposition/UMLOperationBodyMapper.java'"
+      ],
+      "tags": [
+        "public_repo",
+        "git_regression",
+        "outcome_seed",
+        "commit:fa8df046b0e0"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "git-regression-1b04d6aae2e4",
+      "prompt": "Recreate the behavior from public commit 1b04d6aae2e4: Polish viewed file integration cleanup. The task setup restores expected implementation files from the parent commit while keeping current tests; inspect the changed paths and restore the intended behavior without unrelated edits.",
+      "expectedFiles": [
+        "src/main/java/gui/MarkAsViewed.java",
+        "src/main/java/gui/webdiff/viewers/spv/AbstractSinglePageView.java"
+      ],
+      "expectedTests": [
+        "src/test/java/gui/MarkAsViewedTest.java"
+      ],
+      "successCommand": "JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo \"$JAVA_HOME\") ./gradlew --no-daemon test --tests 'gui.MarkAsViewedTest'",
+      "setupCommands": [
+        "git checkout 1b04d6aae2e49c5c0a8b6f00014a54004b541f4e^ -- 'src/main/java/gui/MarkAsViewed.java' 'src/main/java/gui/webdiff/viewers/spv/AbstractSinglePageView.java'"
+      ],
+      "tags": [
+        "public_repo",
+        "git_regression",
+        "outcome_seed",
+        "commit:1b04d6aae2e4"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "git-regression-23e298ae221c",
+      "prompt": "Recreate the behavior from public commit 23e298ae221c: Improve merge parent switch feedback. The task setup restores expected implementation files from the parent commit while keeping current tests; inspect the changed paths and restore the intended behavior without unrelated edits.",
+      "expectedFiles": [
+        "src/main/java/gui/webdiff/WebDiff.java",
+        "src/main/java/gui/webdiff/dir/DirectoryDiffView.java",
+        "src/main/java/org/refactoringminer/RefactoringMiner.java",
+        "src/main/java/org/refactoringminer/astDiff/models/DiffMetaInfo.java",
+        "src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImplMergeCommitTest.java"
+      ],
+      "successCommand": "JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo \"$JAVA_HOME\") ./gradlew --no-daemon test --tests 'org.refactoringminer.rm1.GitHistoryRefactoringMinerImplMergeCommitTest'",
+      "setupCommands": [
+        "git checkout 23e298ae221c8d754a9cabf1211e4535c78a0a04^ -- 'src/main/java/gui/webdiff/WebDiff.java' 'src/main/java/gui/webdiff/dir/DirectoryDiffView.java' 'src/main/java/org/refactoringminer/RefactoringMiner.java' 'src/main/java/org/refactoringminer/astDiff/models/DiffMetaInfo.java' 'src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java'"
+      ],
+      "tags": [
+        "public_repo",
+        "git_regression",
+        "outcome_seed",
+        "commit:23e298ae221c"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "git-regression-97e31265fd95",
+      "prompt": "Recreate the behavior from public commit 97e31265fd95: Fix review thread regressions in merge diff support. The task setup restores expected implementation files from the parent commit while keeping current tests; inspect the changed paths and restore the intended behavior without unrelated edits.",
+      "expectedFiles": [
+        "src/main/java/gui/webdiff/RunMode.java",
+        "src/main/java/gui/webdiff/dir/DirComparator.java",
+        "src/main/java/org/refactoringminer/astDiff/models/DiffMetaInfo.java",
+        "src/main/java/org/refactoringminer/astDiff/utils/URLHelper.java",
+        "src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/astDiff/utils/URLHelperTest.java"
+      ],
+      "successCommand": "JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo \"$JAVA_HOME\") ./gradlew --no-daemon test --tests 'org.refactoringminer.astDiff.utils.URLHelperTest'",
+      "setupCommands": [
+        "git checkout 97e31265fd9522e744de800e5d501db65596a22f^ -- 'src/main/java/gui/webdiff/RunMode.java' 'src/main/java/gui/webdiff/dir/DirComparator.java' 'src/main/java/org/refactoringminer/astDiff/models/DiffMetaInfo.java' 'src/main/java/org/refactoringminer/astDiff/utils/URLHelper.java' 'src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java'"
+      ],
+      "tags": [
+        "public_repo",
+        "git_regression",
+        "outcome_seed",
+        "commit:97e31265fd95"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "git-regression-fa29ed0c80c8",
+      "prompt": "Recreate the behavior from public commit fa29ed0c80c8: Rename merge-specific commit APIs. The task setup restores expected implementation files from the parent commit while keeping current tests; inspect the changed paths and restore the intended behavior without unrelated edits.",
+      "expectedFiles": [
+        "src/main/java/gui/webdiff/RunMode.java",
+        "src/main/java/gui/webdiff/WebDiff.java",
+        "src/main/java/org/refactoringminer/RefactoringMiner.java",
+        "src/main/java/org/refactoringminer/api/GitHistoryRefactoringMiner.java",
+        "src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImplMergeCommitTest.java"
+      ],
+      "successCommand": "JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo \"$JAVA_HOME\") ./gradlew --no-daemon test --tests 'org.refactoringminer.rm1.GitHistoryRefactoringMinerImplMergeCommitTest'",
+      "setupCommands": [
+        "git checkout fa29ed0c80c82bd55f595209c5501fa53b2027e2^ -- 'src/main/java/gui/webdiff/RunMode.java' 'src/main/java/gui/webdiff/WebDiff.java' 'src/main/java/org/refactoringminer/RefactoringMiner.java' 'src/main/java/org/refactoringminer/api/GitHistoryRefactoringMiner.java' 'src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java'"
+      ],
+      "tags": [
+        "public_repo",
+        "git_regression",
+        "outcome_seed",
+        "commit:fa29ed0c80c8"
+      ],
+      "timeoutSeconds": 900
+    }
+  ]
+}

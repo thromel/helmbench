@@ -92,6 +92,8 @@ cargo run -- init-public-matrix --help | grep -q -- '--health-out'
 cargo run -- init-public-matrix --help | grep -q -- '--health-check-success-commands'
 cargo run -- init-git-regression-suite --help | grep -q -- '--check-success-commands'
 cargo run -- init-git-regression-suite --help | grep -q -- '--success-command-template'
+cargo run -- init-git-regression-suite --help | grep -q -- '--max-changed-tests'
+cargo run -- init-git-regression-suite --help | grep -q -- '--require-code-files'
 cargo run -- init-agent-matrix --help | grep -q -- '--health-check-success-commands'
 cargo run -- matrix-history --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
@@ -234,27 +236,25 @@ git -C "$REGRESSION_REPO" init --quiet
 git -C "$REGRESSION_REPO" add .
 git -C "$REGRESSION_REPO" -c user.name=HelmBench -c user.email=helmbench@example.test commit --quiet -m 'Create regression fixture'
 printf 'state=fixed\n' > "$REGRESSION_REPO/app.txt"
-git -C "$REGRESSION_REPO" add .
-git -C "$REGRESSION_REPO" -c user.name=HelmBench -c user.email=helmbench@example.test commit --quiet -m 'Fix seeded app behavior'
 mkdir -p "$REGRESSION_REPO/tests"
-printf '#!/usr/bin/env sh\nset -eu\ngrep -q fixed ../app.txt\n' > "$REGRESSION_REPO/tests/app.test.sh"
+printf '#!/usr/bin/env sh\nset -eu\ngrep -q fixed app.txt\n' > "$REGRESSION_REPO/tests/app.test.sh"
 git -C "$REGRESSION_REPO" add .
-git -C "$REGRESSION_REPO" -c user.name=HelmBench -c user.email=helmbench@example.test commit --quiet -m 'Add seeded app test'
+git -C "$REGRESSION_REPO" -c user.name=HelmBench -c user.email=helmbench@example.test commit --quiet -m 'Fix seeded app behavior with test'
 REGRESSION_COMMIT="$(git -C "$REGRESSION_REPO" rev-parse HEAD)"
 cargo run -- init-git-regression-suite \
   --repo "$REGRESSION_REPO" \
   --suite-out "$TMP_DIR/git-regressions.json" \
   --health-out "$TMP_DIR/git-regressions-health.json" \
   --suite-name verify-git-regressions \
-  --success-command-template 'test -f {changed_tests}' \
+  --success-command-template 'sh {changed_tests}' \
   --commit "$REGRESSION_COMMIT" \
   --require-changed-tests \
   --check-success-commands \
   --force
 cargo run -- validate-suite "$TMP_DIR/git-regressions.json"
 grep -q '"name": "verify-git-regressions"' "$TMP_DIR/git-regressions.json"
-grep -q 'git revert --no-commit' "$TMP_DIR/git-regressions.json"
-grep -q '"successCommand": "test -f' "$TMP_DIR/git-regressions.json"
+grep -Eq 'git checkout .*\^ --' "$TMP_DIR/git-regressions.json"
+grep -q '"successCommand": "sh' "$TMP_DIR/git-regressions.json"
 grep -q 'tests/app.test.sh' "$TMP_DIR/git-regressions.json"
 grep -q '"evidenceUse": "outcome_ready"' "$TMP_DIR/git-regressions-health.json"
 grep -q '"validationBaselineReady": true' "$TMP_DIR/git-regressions-health.json"

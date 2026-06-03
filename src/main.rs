@@ -168,6 +168,10 @@ enum Command {
         #[arg(long, default_value_t = 250)]
         scan_commits: usize,
         #[arg(long)]
+        max_changed_tests: Option<usize>,
+        #[arg(long)]
+        require_code_files: bool,
+        #[arg(long)]
         require_changed_tests: bool,
         #[arg(long, default_value_t = 1)]
         min_commits: u64,
@@ -948,6 +952,8 @@ fn main() -> Result<()> {
             commit,
             max_tasks,
             scan_commits,
+            max_changed_tests,
+            require_code_files,
             require_changed_tests,
             min_commits,
             allow_dirty_health,
@@ -966,6 +972,8 @@ fn main() -> Result<()> {
                 commits: commit,
                 max_tasks,
                 scan_commits,
+                max_changed_tests,
+                require_code_files,
                 require_changed_tests,
                 min_commits,
                 allow_dirty_health,
@@ -3047,6 +3055,8 @@ struct GitRegressionSuiteOptions {
     commits: Vec<String>,
     max_tasks: usize,
     scan_commits: usize,
+    max_changed_tests: Option<usize>,
+    require_code_files: bool,
     require_changed_tests: bool,
     min_commits: u64,
     allow_dirty_health: bool,
@@ -3062,6 +3072,9 @@ fn init_git_regression_suite(options: GitRegressionSuiteOptions) -> Result<()> {
     }
     if options.scan_commits == 0 {
         anyhow::bail!("--scan-commits must be greater than zero");
+    }
+    if options.max_changed_tests.is_some_and(|max| max == 0) {
+        anyhow::bail!("--max-changed-tests must be greater than zero when supplied");
     }
     if options
         .success_command
@@ -3140,27 +3153,52 @@ fn git_regression_suite(options: &GitRegressionSuiteOptions) -> Result<helmbench
         if options.require_changed_tests && expected_tests.is_empty() {
             continue;
         }
-        let mut expected_files = changed_files
+        if options
+            .max_changed_tests
+            .is_some_and(|max| expected_tests.len() > max)
+        {
+            continue;
+        }
+        let expected_files = changed_files
             .iter()
             .filter(|path| !looks_like_test_path(path))
             .cloned()
             .collect::<Vec<_>>();
-        if expected_files.is_empty() {
-            expected_files = changed_files.clone();
+        if options.require_changed_tests && expected_files.is_empty() {
+            continue;
         }
+        if options.require_code_files
+            && !expected_files.iter().any(|path| looks_like_code_path(path))
+        {
+            continue;
+        }
+        if options
+            .success_command_template
+            .as_deref()
+            .is_some_and(|template| template.contains("{gradle_test_filters}"))
+            && gradle_test_filters(&expected_tests).trim().is_empty()
+        {
+            continue;
+        }
+        let expected_files = if expected_files.is_empty() {
+            changed_files.clone()
+        } else {
+            expected_files
+        };
         let short_hash = short_commit_hash(&commit.hash);
         let success_command =
             git_regression_success_command(options, &changed_files, &expected_tests)?;
+        let setup_commands = git_regression_setup_commands(&commit.hash, &expected_files);
         tasks.push(helmbench::BenchTask {
             id: format!("git-regression-{short_hash}"),
             prompt: format!(
-                "Recreate the behavior from public commit {short_hash}: {}. The task setup reverts that commit; inspect the changed paths and restore the intended behavior without unrelated edits.",
+                "Recreate the behavior from public commit {short_hash}: {}. The task setup restores expected implementation files from the parent commit while keeping current tests; inspect the changed paths and restore the intended behavior without unrelated edits.",
                 commit.subject
             ),
             expected_files,
             expected_tests,
             success_command: Some(success_command),
-            setup_commands: vec![format!("git revert --no-commit {}", commit.hash)],
+            setup_commands,
             tags: vec![
                 "public_repo".to_string(),
                 "git_regression".to_string(),
@@ -3179,7 +3217,7 @@ fn git_regression_suite(options: &GitRegressionSuiteOptions) -> Result<helmbench
     Ok(helmbench::TaskSuite {
         schema_version: helmbench::SUITE_SCHEMA_VERSION,
         name: suite_name,
-        description: "Source-free git regression suite generated from public commits; each task setup reverts one commit in an isolated clone.".to_string(),
+        description: "Source-free git regression suite generated from public commits; each task setup restores expected files from the parent commit in an isolated clone.".to_string(),
         tasks,
     })
 }
@@ -3269,6 +3307,14 @@ fn git_regression_success_command(
     }
 }
 
+fn git_regression_setup_commands(commit: &str, expected_files: &[String]) -> Vec<String> {
+    vec![format!(
+        "git checkout {}^ -- {}",
+        commit,
+        shell_words(expected_files)
+    )]
+}
+
 fn render_success_command_template(
     template: &str,
     changed_files: &[String],
@@ -3316,6 +3362,15 @@ fn looks_like_test_path(path: &str) -> bool {
         || normalized.contains("spec")
         || normalized.starts_with("tests/")
         || normalized.starts_with("test/")
+}
+
+fn looks_like_code_path(path: &str) -> bool {
+    path.starts_with("src/main/")
+        || path.ends_with("build.gradle")
+        || path.ends_with("build.gradle.kts")
+        || path.ends_with("pom.xml")
+        || path.ends_with("Cargo.toml")
+        || path.ends_with("package.json")
 }
 
 fn short_commit_hash(hash: &str) -> String {
@@ -3850,6 +3905,8 @@ fn success_command_baseline(
     fail_fast_on_pass: bool,
 ) -> Result<(Vec<SuccessCommandBaseline>, Vec<String>)> {
     let temp = TempDirGuard::create("helmbench-success-baseline")?;
+    let task_dir = temp.path().join("repo");
+    clone_repo(repo, &task_dir)?;
     let mut results = Vec::new();
     let mut tasks_failed_setup_command = Vec::new();
     for task in &suite.tasks {
@@ -3860,8 +3917,7 @@ fn success_command_baseline(
         else {
             continue;
         };
-        let task_dir = temp.path().join(safe_task_dir_name(&task.id));
-        clone_repo(repo, &task_dir)?;
+        reset_success_baseline_repo(&task_dir)?;
         if !run_task_setup_commands(task, &task_dir, true)? {
             tasks_failed_setup_command.push(task.id.clone());
             continue;
@@ -3881,6 +3937,16 @@ fn success_command_baseline(
         }
     }
     Ok((results, tasks_failed_setup_command))
+}
+
+fn reset_success_baseline_repo(repo: &Path) -> Result<()> {
+    if !git_status_ok_suppressed(repo, &["reset", "--hard", "HEAD"]) {
+        anyhow::bail!("git reset failed in {}", repo.display());
+    }
+    if !git_status_ok_suppressed(repo, &["clean", "-ffd"]) {
+        anyhow::bail!("git clean failed in {}", repo.display());
+    }
+    Ok(())
 }
 
 fn run_task_setup_commands(
@@ -4191,6 +4257,18 @@ fn git_status_ok(repo: &Path, args: &[&str]) -> bool {
         .arg("-C")
         .arg(repo)
         .args(args)
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+fn git_status_ok_suppressed(repo: &Path, args: &[&str]) -> bool {
+    ProcessCommand::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(args)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .status()
         .map(|status| status.success())
         .unwrap_or(false)
@@ -8146,7 +8224,6 @@ fn clone_repo(repo: &Path, out: &Path) -> Result<()> {
         .arg("init.defaultBranch=main")
         .arg("clone")
         .arg("--quiet")
-        .arg("--no-hardlinks")
         .arg(repo)
         .arg(out)
         .status()
@@ -9576,6 +9653,8 @@ mod tests {
             commits: vec![head.clone()],
             max_tasks: 10,
             scan_commits: 10,
+            max_changed_tests: None,
+            require_code_files: false,
             require_changed_tests: false,
             min_commits: 1,
             allow_dirty_health: false,
@@ -9593,7 +9672,7 @@ mod tests {
         assert!(suite.tasks[0].expected_tests.is_empty());
         assert_eq!(
             suite.tasks[0].setup_commands,
-            vec![format!("git revert --no-commit {head}")]
+            vec![format!("git checkout {head}^ -- 'app.txt'")]
         );
         assert!(suite.tasks[0].tags.contains(&"git_regression".to_string()));
 
@@ -9644,6 +9723,12 @@ mod tests {
 
         write_demo_file(
             &repo,
+            "src/main/java/App.java",
+            "class App { int value() { return 2; }}\n",
+        )
+        .expect("code and test change");
+        write_demo_file(
+            &repo,
             "src/test/java/org/example/AppTest.java",
             "package org.example; class AppTest {}\n",
         )
@@ -9670,9 +9755,10 @@ mod tests {
             .status()
             .expect("git commit");
         assert!(commit.success());
+        let head = git_output(&repo, &["rev-parse", "HEAD"]).expect("head");
 
         let suite = git_regression_suite(&GitRegressionSuiteOptions {
-            repo,
+            repo: repo.clone(),
             suite_out: temp.path().join("suite.json"),
             health_out: None,
             suite_name: Some("templated-git-regressions".to_string()),
@@ -9681,6 +9767,8 @@ mod tests {
             commits: Vec::new(),
             max_tasks: 1,
             scan_commits: 2,
+            max_changed_tests: None,
+            require_code_files: false,
             require_changed_tests: true,
             min_commits: 1,
             allow_dirty_health: false,
@@ -9699,6 +9787,10 @@ mod tests {
         assert_eq!(
             suite.tasks[0].success_command.as_deref(),
             Some("./gradlew test --tests 'org.example.AppTest'")
+        );
+        assert_eq!(
+            suite.tasks[0].setup_commands,
+            vec![format!("git checkout {head}^ -- 'src/main/java/App.java'")]
         );
     }
 
@@ -9746,6 +9838,8 @@ mod tests {
                 commits: vec![head],
                 max_tasks: 10,
                 scan_commits: 10,
+                max_changed_tests: None,
+                require_code_files: false,
                 require_changed_tests: false,
                 min_commits: 1,
                 allow_dirty_health: false,

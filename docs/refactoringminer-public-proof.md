@@ -27,9 +27,10 @@ The checked fixture health report proves:
 Health artifact:
 [`reports/refactoringminer-suite-health.json`](../reports/refactoringminer-suite-health.json)
 
-## Outcome Readiness
+## Recommendation-Suite Outcome Readiness
 
-The current RefactoringMiner suite is **not** ready for task-success claims.
+The recommendation-oriented RefactoringMiner suite is **not** ready for
+task-success claims.
 The source-free validation-baseline gate was run with
 `--check-success-commands --fail-fast-success-commands` and stopped after the
 first clean-checkout validation command passed before any agent changes.
@@ -44,8 +45,30 @@ Outcome-health artifact:
 | Baseline success-command passes | 1 |
 | Baseline success-command skipped by fail-fast | 9 |
 
-This means the checked RefactoringMiner proof should be treated as a
-navigation/recommendation proof until seeded task setup is added.
+This means the checked `ctxhelm prepare-task` proof should be treated as a
+navigation/recommendation proof.
+
+## Seeded Outcome Suite
+
+For task-success evidence, HelmBench now includes a generated git-regression
+suite that seeds each task by restoring expected implementation files from the
+parent commit while keeping current tests as the oracle.
+
+Suite artifact:
+[`suites/refactoring-miner-git-regressions.json`](../suites/refactoring-miner-git-regressions.json)
+
+Health artifact:
+[`reports/refactoringminer-git-regressions-health.json`](../reports/refactoringminer-git-regressions-health.json)
+
+| Metric | Value |
+| --- | ---: |
+| Evidence use | outcome_ready |
+| Tasks | 10 |
+| Validation baseline ready | true |
+| Baseline success-command failures | 10 |
+| Baseline success-command passes | 0 |
+| Setup failures | 0 |
+| Validation timeouts | 0 |
 
 ## Result
 
@@ -118,10 +141,9 @@ raw transcripts, raw terminal logs, raw MCP payloads, or ctxhelm pack snippets.
 
 ## Next Step
 
-The next launch-grade proof is a full `run-matrix` over this same 10-task suite
-with at least one real agent baseline and one ctxhelm-guided agent row, but
-only after the validation baseline is checked. Use the `preset=claude-code` or
-`preset=codex` matrix rows from
+The next launch-grade proof is a full `run-matrix` over the seeded
+git-regression suite with at least one real agent baseline and one
+ctxhelm-guided agent row. Use the `preset=claude-code` or `preset=codex` matrix rows from
 [`docs/run-matrix.md`](run-matrix.md) so HelmBench injects the source-free event
 contract instead of relying on hand-written adapter commands.
 
@@ -133,10 +155,21 @@ cargo run -- init-git-regression-suite \
   --repo <refactoringminer-repo> \
   --suite-out /tmp/refactoring-miner-git-regressions.json \
   --health-out /tmp/refactoring-miner-git-regressions-health.json \
-  --success-command-template './gradlew test {gradle_test_filters}' \
+  --success-command-template 'JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo "$JAVA_HOME") ./gradlew --no-daemon test {gradle_test_filters}' \
   --require-changed-tests \
+  --require-code-files \
   --max-tasks 10 \
-  --scan-commits 500 \
+  --max-changed-tests 4 \
+  --commit 949bddcd3509 \
+  --commit 4fa3c1a48ad4 \
+  --commit bd0b2277933f \
+  --commit 1b9f2cf08b3c \
+  --commit 092c13f035f9 \
+  --commit fa8df046b0e0 \
+  --commit 1b04d6aae2e4 \
+  --commit 23e298ae221c \
+  --commit 97e31265fd95 \
+  --commit fa29ed0c80c8 \
   --check-success-commands \
   --fail-fast-success-commands \
   --force

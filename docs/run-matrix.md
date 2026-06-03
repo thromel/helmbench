@@ -130,10 +130,21 @@ helmbench init-git-regression-suite \
   --repo /tmp/RefactoringMiner \
   --suite-out /tmp/refactoring-miner-git-regressions.json \
   --health-out /tmp/refactoring-miner-git-regressions-health.json \
-  --success-command-template './gradlew test {gradle_test_filters}' \
+  --success-command-template 'JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo "$JAVA_HOME") ./gradlew --no-daemon test {gradle_test_filters}' \
   --require-changed-tests \
+  --require-code-files \
   --max-tasks 10 \
-  --scan-commits 500 \
+  --max-changed-tests 4 \
+  --commit 949bddcd3509 \
+  --commit 4fa3c1a48ad4 \
+  --commit bd0b2277933f \
+  --commit 1b9f2cf08b3c \
+  --commit 092c13f035f9 \
+  --commit fa8df046b0e0 \
+  --commit 1b04d6aae2e4 \
+  --commit 23e298ae221c \
+  --commit 97e31265fd95 \
+  --commit fa29ed0c80c8 \
   --check-success-commands \
   --fail-fast-success-commands \
   --force

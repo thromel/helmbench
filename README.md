@@ -35,6 +35,14 @@ Its checked outcome-readiness report classifies the evidence as
 `navigation_only`, not task-success evidence, because validation can pass before
 any agent change.
 
+HelmBench also includes a seeded
+[RefactoringMiner git-regression suite](suites/refactoring-miner-git-regressions.json)
+with an `outcome_ready`
+[source-free health report](reports/refactoringminer-git-regressions-health.json):
+10 tasks, 10 failing pre-agent validation baselines, zero setup failures, and
+zero validation timeouts. This is the launch-grade public task substrate for the
+next real-agent matrix run.
+
 The checked-in [real Claude Code smoke report](docs/claude-real-smoke.md)
 launches Claude Code through `claude-run` on the local smoke suite and records
 `100.0%` task success with one relevant file read, zero irrelevant reads, and
@@ -346,18 +354,30 @@ under `suites/ripgrep-public.json` and
 
 For outcome-ready public tasks, generate a git-regression suite from public
 commits. Each task stores paths and commit IDs, seeds the isolated clone with
-`git revert --no-commit <commit>`, and can write a source-free health report
-that proves validation fails before the agent edits anything:
+parent-commit versions of the expected implementation files while keeping the
+current tests, and can write a source-free health report that proves validation
+fails before the agent edits anything:
 
 ```bash
 cargo run -- init-git-regression-suite \
   --repo ../ctxhelm-proof-fixtures/RefactoringMiner \
   --suite-out /tmp/refactoringminer-git-regressions.json \
   --health-out /tmp/refactoringminer-git-regressions-health.json \
-  --success-command-template './gradlew test {gradle_test_filters}' \
+  --success-command-template 'JAVA_HOME=$(/usr/libexec/java_home -v 17 2>/dev/null || echo "$JAVA_HOME") ./gradlew --no-daemon test {gradle_test_filters}' \
   --require-changed-tests \
+  --require-code-files \
   --max-tasks 10 \
-  --scan-commits 500 \
+  --max-changed-tests 4 \
+  --commit 949bddcd3509 \
+  --commit 4fa3c1a48ad4 \
+  --commit bd0b2277933f \
+  --commit 1b9f2cf08b3c \
+  --commit 092c13f035f9 \
+  --commit fa8df046b0e0 \
+  --commit 1b04d6aae2e4 \
+  --commit 23e298ae221c \
+  --commit 97e31265fd95 \
+  --commit fa29ed0c80c8 \
   --check-success-commands \
   --fail-fast-success-commands \
   --force
