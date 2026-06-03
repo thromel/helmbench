@@ -140,6 +140,9 @@ cargo run -- demo-run \
   --force
 
 cargo run -- validate-suite "$TMP_DIR/demo-suite.json"
+grep -q '"setupCommands"' "$TMP_DIR/demo-suite.json"
+(cd "$TMP_DIR/demo-repo" && sh tests/auth/session.test.sh)
+(cd "$TMP_DIR/demo-repo" && sh tests/billing/invoice.test.sh)
 
 cargo run -- suite-health \
   --suite "$TMP_DIR/demo-suite.json" \
@@ -161,6 +164,8 @@ cargo run -- suite-health \
 grep -q '"successCommandCheckRequested": true' "$TMP_DIR/suite-health-baseline.json"
 grep -q '"successCommandCheckFailFast": true' "$TMP_DIR/suite-health-baseline.json"
 grep -q '"validationBaselineReady": true' "$TMP_DIR/suite-health-baseline.json"
+grep -q '"baselineSuccessCommandFailCount": 2' "$TMP_DIR/suite-health-baseline.json"
+grep -q '"tasksFailedSetupCommand": \[\]' "$TMP_DIR/suite-health-baseline.json"
 
 cargo run -- suite-health \
   --suite suites/local-run-smoke.json \

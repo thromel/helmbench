@@ -6139,7 +6139,7 @@ fn init_demo_repo(repo_out: &Path, suite_out: &Path, force: bool) -> Result<()> 
     write_demo_file(
         repo_out,
         "src/auth/session.txt",
-        "expired sessions redirect to /expired\nactive sessions redirect to /dashboard\n",
+        "expired sessions redirect to /login\nactive sessions redirect to /dashboard\n",
     )?;
     write_demo_file(
         repo_out,
@@ -6149,7 +6149,7 @@ fn init_demo_repo(repo_out: &Path, suite_out: &Path, force: bool) -> Result<()> 
     write_demo_file(
         repo_out,
         "src/billing/invoice.txt",
-        "invoice rounding mode: floor\ncurrency: USD\n",
+        "invoice rounding mode: round half up\ncurrency: USD\n",
     )?;
     write_demo_file(
         repo_out,
@@ -6184,7 +6184,9 @@ fn init_demo_repo(repo_out: &Path, suite_out: &Path, force: bool) -> Result<()> 
                 expected_files: vec!["src/auth/session.txt".to_string()],
                 expected_tests: vec!["tests/auth/session.test.sh".to_string()],
                 success_command: Some("sh tests/auth/session.test.sh".to_string()),
-                setup_commands: Vec::new(),
+                setup_commands: vec![
+                    "printf 'expired sessions redirect to /expired\\nactive sessions redirect to /dashboard\\n' > src/auth/session.txt".to_string(),
+                ],
                 tags: vec!["bug_fix".to_string(), "auth".to_string()],
                 timeout_seconds: Some(60),
             },
@@ -6194,7 +6196,10 @@ fn init_demo_repo(repo_out: &Path, suite_out: &Path, force: bool) -> Result<()> 
                 expected_files: vec!["src/billing/invoice.txt".to_string()],
                 expected_tests: vec!["tests/billing/invoice.test.sh".to_string()],
                 success_command: Some("sh tests/billing/invoice.test.sh".to_string()),
-                setup_commands: Vec::new(),
+                setup_commands: vec![
+                    "printf 'invoice rounding mode: floor\\ncurrency: USD\\n' > src/billing/invoice.txt"
+                        .to_string(),
+                ],
                 tags: vec!["bug_fix".to_string(), "billing".to_string()],
                 timeout_seconds: Some(60),
             },

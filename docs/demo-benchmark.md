@@ -39,7 +39,9 @@ helmbench verify-bundle \
 
 ## Create The Demo Repo
 
-`init-demo-repo` is the lower-level fixture generator used by `demo-run`.
+`init-demo-repo` is the lower-level fixture generator used by `demo-run`. The
+generated repo is healthy at rest; the generated suite uses task-level
+`setupCommands` to seed each task's failing state inside isolated clones.
 
 ```bash
 helmbench init-demo-repo \
@@ -55,6 +57,17 @@ The generated repo contains two tasks:
 
 It also contains `scripts/demo-agent.sh`, a deterministic adapter that emits
 source-free read/recommendation events and makes the expected fixes.
+
+Before publishing task-success claims from the generated fixture, prove the
+validation baseline:
+
+```bash
+helmbench suite-health \
+  --suite /tmp/helmbench-demo-suite.json \
+  --repo /tmp/helmbench-demo-repo \
+  --check-success-commands \
+  --out /tmp/helmbench-demo-health.json
+```
 
 ## Manual Pipeline
 
