@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/quality-gate.schema.json",
+  "title": "HelmBench Quality Gate",
+  "description": "Source-free CI decision report generated from a benchmark summary.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteName",
+    "passed",
+    "warnings",
+    "checks",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "suiteName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "passed": {
+      "type": "boolean"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/check"
+      }
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "agentVariant": {
+      "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "headAgent",
+        "headVariant",
+        "metric",
+        "operator",
+        "actual",
+        "threshold",
+        "passed"
+      ],
+      "properties": {
+        "headAgent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "headVariant": {
+          "$ref": "#/$defs/agentVariant"
+        },
+        "metric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operator": {
+          "enum": [">=", "<="]
+        },
+        "actual": {
+          "type": "number"
+        },
+        "threshold": {
+          "type": "number"
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}

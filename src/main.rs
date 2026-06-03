@@ -492,6 +492,7 @@ enum SchemaKind {
     AgentEvent,
     RunReport,
     BenchmarkSummary,
+    QualityGate,
     RunMatrixManifest,
     RunMatrixPrivacyReport,
 }
@@ -1281,6 +1282,7 @@ fn schema_contract(kind: SchemaKind) -> &'static str {
         SchemaKind::AgentEvent => include_str!("../schemas/agent-event.schema.json"),
         SchemaKind::RunReport => include_str!("../schemas/run-report.schema.json"),
         SchemaKind::BenchmarkSummary => include_str!("../schemas/benchmark-summary.schema.json"),
+        SchemaKind::QualityGate => include_str!("../schemas/quality-gate.schema.json"),
         SchemaKind::RunMatrixManifest => {
             include_str!("../schemas/run-matrix-manifest.schema.json")
         }
@@ -7041,6 +7043,7 @@ mod tests {
             (SchemaKind::AgentEvent, "HelmBench Agent Event"),
             (SchemaKind::RunReport, "HelmBench Run Report"),
             (SchemaKind::BenchmarkSummary, "HelmBench Benchmark Summary"),
+            (SchemaKind::QualityGate, "HelmBench Quality Gate"),
             (
                 SchemaKind::RunMatrixManifest,
                 "HelmBench Run Matrix Manifest",
@@ -7067,6 +7070,12 @@ mod tests {
                 assert_eq!(
                     value["properties"]["schemaVersion"]["const"],
                     helmbench::BENCHMARK_SUMMARY_SCHEMA_VERSION
+                );
+            }
+            if matches!(kind, SchemaKind::QualityGate) {
+                assert_eq!(
+                    value["properties"]["schemaVersion"]["const"],
+                    helmbench::QUALITY_GATE_SCHEMA_VERSION
                 );
             }
             if matches!(kind, SchemaKind::RunMatrixManifest) {

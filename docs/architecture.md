@@ -82,9 +82,10 @@ It does not record raw code or model transcripts.
 
 Published JSON Schema contracts live under `schemas/` and can be emitted with
 `helmbench schema --kind <kind>`. These schemas cover suites, traces, events,
-run reports, benchmark summaries, matrix manifests, and matrix privacy reports.
-They are intended for adapters, CI checks, and downstream dashboards that need
-to validate HelmBench artifacts without depending on Rust internals.
+run reports, benchmark summaries, quality gates, matrix manifests, and matrix
+privacy reports. They are intended for adapters, CI checks, and downstream
+dashboards that need to validate HelmBench artifacts without depending on Rust
+internals.
 
 Run reports aggregate command observations into source-free command-class
 summaries. The report stores counts for test, build, lint, typecheck, other,
