@@ -153,6 +153,9 @@
         "$ref": "#/$defs/successCommandBaseline"
       }
     },
+    "evidenceUse": {
+      "enum": ["outcome_ready", "navigation_only", "unhealthy"]
+    },
     "ok": {
       "type": "boolean"
     },

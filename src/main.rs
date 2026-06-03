@@ -1890,8 +1890,33 @@ struct PublicSuiteHealth {
     baseline_success_command_skipped_count: usize,
     #[serde(default)]
     baseline_success_commands: Vec<SuccessCommandBaseline>,
+    #[serde(default = "default_suite_evidence_use")]
+    evidence_use: SuiteEvidenceUse,
     ok: bool,
     privacy: PrivacyStatus,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum SuiteEvidenceUse {
+    OutcomeReady,
+    NavigationOnly,
+    Unhealthy,
+}
+
+fn default_suite_evidence_use() -> SuiteEvidenceUse {
+    SuiteEvidenceUse::NavigationOnly
+}
+
+impl std::fmt::Display for SuiteEvidenceUse {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let value = match self {
+            SuiteEvidenceUse::OutcomeReady => "outcome_ready",
+            SuiteEvidenceUse::NavigationOnly => "navigation_only",
+            SuiteEvidenceUse::Unhealthy => "unhealthy",
+        };
+        formatter.write_str(value)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2573,7 +2598,7 @@ fn suite_health_report(
         .map(|status| !status.trim().is_empty())
         .unwrap_or(true);
     let fsck_ok = git_status_ok(repo, &["fsck", "--no-progress"]);
-    let ok = repo.join(".git").exists()
+    let fixture_health_ok = repo.join(".git").exists()
         && head.is_some()
         && commit_count.is_some_and(|count| count >= min_commits)
         && (!dirty || allow_dirty)
@@ -2581,10 +2606,17 @@ fn suite_health_report(
         && validation_ready
         && setup_command_ready
         && tasks_failed_setup_command.is_empty()
-        && (!check_success_commands || validation_baseline_ready)
         && missing_files.is_empty()
         && missing_expected_files.is_empty()
         && missing_expected_tests.is_empty();
+    let evidence_use = if !fixture_health_ok {
+        SuiteEvidenceUse::Unhealthy
+    } else if check_success_commands && validation_baseline_ready {
+        SuiteEvidenceUse::OutcomeReady
+    } else {
+        SuiteEvidenceUse::NavigationOnly
+    };
+    let ok = fixture_health_ok && (!check_success_commands || validation_baseline_ready);
 
     Ok(PublicSuiteHealth {
         schema_version: SUITE_HEALTH_SCHEMA_VERSION,
@@ -2619,6 +2651,7 @@ fn suite_health_report(
         baseline_success_command_timeout_count,
         baseline_success_command_skipped_count,
         baseline_success_commands,
+        evidence_use,
         ok,
         privacy: PrivacyStatus::source_free(),
     })
@@ -2848,6 +2881,7 @@ fn render_markdown_suite_health(health: &PublicSuiteHealth) -> String {
         "| Validation baseline ready | {} |\n",
         yes_no(health.validation_baseline_ready)
     ));
+    out.push_str(&format!("| Evidence use | `{}` |\n", health.evidence_use));
     if health.success_command_check_requested {
         out.push_str(&format!(
             "| Baseline success commands pass / fail / timeout / skipped | {} / {} / {} / {} |\n",
@@ -8863,6 +8897,7 @@ mod tests {
         assert!(health.missing_expected_files.is_empty());
         assert!(health.missing_expected_tests.is_empty());
         assert!(health.tasks_missing_success_command.is_empty());
+        assert_eq!(health.evidence_use, SuiteEvidenceUse::NavigationOnly);
         assert!(health.privacy.source_free);
 
         let rendered = render_markdown_suite_health(&health);
@@ -8901,6 +8936,7 @@ mod tests {
         assert!(failing.success_command_check_requested);
         assert!(failing.success_command_check_ready);
         assert!(failing.validation_baseline_ready);
+        assert_eq!(failing.evidence_use, SuiteEvidenceUse::OutcomeReady);
         assert_eq!(failing.baseline_success_command_fail_count, 1);
         assert_eq!(failing.baseline_success_command_pass_count, 0);
         assert_eq!(failing.baseline_success_commands.len(), 1);
@@ -8914,6 +8950,7 @@ mod tests {
         assert!(!missing_setup.ok);
         assert!(missing_setup.setup_commands_required);
         assert!(!missing_setup.setup_command_ready);
+        assert_eq!(missing_setup.evidence_use, SuiteEvidenceUse::Unhealthy);
         assert_eq!(
             missing_setup.tasks_missing_setup_command,
             vec!["needs-agent-change"]
@@ -8928,6 +8965,7 @@ mod tests {
         assert!(seeded.setup_command_ready);
         assert!(seeded.tasks_missing_setup_command.is_empty());
         assert!(seeded.validation_baseline_ready);
+        assert_eq!(seeded.evidence_use, SuiteEvidenceUse::OutcomeReady);
         assert_eq!(seeded.baseline_success_command_fail_count, 1);
         assert!(seeded.tasks_failed_setup_command.is_empty());
 
@@ -8958,6 +8996,7 @@ mod tests {
             .expect("passing baseline health");
         assert!(!passing.ok);
         assert!(!passing.validation_baseline_ready);
+        assert_eq!(passing.evidence_use, SuiteEvidenceUse::NavigationOnly);
         assert_eq!(passing.baseline_success_command_pass_count, 1);
         assert_eq!(passing.baseline_success_commands.len(), 2);
 
@@ -8970,6 +9009,8 @@ mod tests {
         assert_eq!(fail_fast.baseline_success_commands.len(), 1);
         let rendered = render_markdown_suite_health(&passing);
         assert!(rendered.contains("Validation baseline"));
+        assert!(rendered.contains("Evidence use"));
+        assert!(rendered.contains("`navigation_only`"));
         assert!(!rendered.contains("test -f src/target.txt"));
     }
 
@@ -9095,6 +9136,7 @@ mod tests {
                 baseline_success_command_timeout_count: 0,
                 baseline_success_command_skipped_count: 0,
                 baseline_success_commands: Vec::new(),
+                evidence_use: SuiteEvidenceUse::NavigationOnly,
                 ok: true,
                 privacy: PrivacyStatus::source_free(),
             },

@@ -39,6 +39,7 @@ Outcome-health artifact:
 
 | Metric | Value |
 | --- | ---: |
+| Evidence use | navigation_only |
 | Validation baseline ready | false |
 | Baseline success-command passes | 1 |
 | Baseline success-command skipped by fail-fast | 9 |

@@ -65,6 +65,10 @@
   "missingFiles": [],
   "missingExpectedFiles": [],
   "missingExpectedTests": [],
+  "setupCommandsRequired": false,
+  "setupCommandReady": true,
+  "tasksMissingSetupCommand": [],
+  "tasksFailedSetupCommand": [],
   "tasksMissingSuccessCommand": [],
   "successCommandCheckRequested": true,
   "successCommandCheckFailFast": true,
@@ -80,10 +84,11 @@
       "commandClass": "test",
       "commandHash": "cmd:e9cca3c479fa7d5f",
       "exitStatus": 0,
-      "elapsedMillis": 72691,
+      "elapsedMillis": 144473,
       "timedOut": false
     }
   ],
+  "evidenceUse": "navigation_only",
   "ok": false,
   "privacy": {
     "sourceFree": true,

@@ -53,6 +53,7 @@ grep -q '"sourceFree": true' reports/claude-real-smoke.json
 grep -q 'Success rate: `100.0%`' docs/claude-real-smoke.md
 grep -q '"ok": true' reports/refactoringminer-suite-health.json
 grep -q '"ok": false' reports/refactoringminer-outcome-health.json
+grep -q '"evidenceUse": "navigation_only"' reports/refactoringminer-outcome-health.json
 grep -q '"validationBaselineReady": false' reports/refactoringminer-outcome-health.json
 grep -q '"successCommandCheckFailFast": true' reports/refactoringminer-outcome-health.json
 grep -q '"taskCount": 10' reports/refactoringminer-ctxhelm-plan.json
@@ -126,6 +127,7 @@ grep -q '"title": "HelmBench Diff Autopsy"' "$TMP_DIR/diff-autopsy.schema.json"
 grep -q '"title": "HelmBench Suite Health"' "$TMP_DIR/suite-health.schema.json"
 grep -q '"tasksFailedSetupCommand"' "$TMP_DIR/suite-health.schema.json"
 grep -q '"tasksMissingSetupCommand"' "$TMP_DIR/suite-health.schema.json"
+grep -q '"evidenceUse"' "$TMP_DIR/suite-health.schema.json"
 grep -q '"title": "HelmBench Evidence Bundle"' "$TMP_DIR/evidence-bundle.schema.json"
 grep -q '"title": "HelmBench Run Matrix Manifest"' "$TMP_DIR/run-matrix-manifest.schema.json"
 grep -q '"adapterPreset"' "$TMP_DIR/run-matrix-manifest.schema.json"

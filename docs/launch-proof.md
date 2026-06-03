@@ -107,8 +107,9 @@ one real agent baseline and one ctxhelm-guided agent row, then publishing the
 verified matrix directory and evidence bundle. That is the path from
 recommendation proof to launch-grade agent outcome evidence. The checked
 RefactoringMiner outcome-readiness report currently shows validation can pass
-before any agent change, so seeded task setup is required before treating that
-suite as task-success evidence. Use
+before any agent change and classifies the evidence as `navigation_only`, so
+seeded task setup is required before treating that suite as task-success
+evidence. Use
 `init-public-matrix` to generate that matrix config after the RefactoringMiner
 fixture passes suite health, run `suite-health --check-success-commands` to
 prove validation does not already pass before the agent runs, using

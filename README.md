@@ -27,8 +27,9 @@ Express presets.
 The checked-in [RefactoringMiner public recommendation proof](docs/refactoringminer-public-proof.md)
 runs `ctxhelm prepare-task` over a healthy 10-task public suite and records
 `61.3%` average recommendation recall with source-free artifacts.
-Its checked outcome-readiness report shows the suite is not yet valid for
-task-success claims because validation can pass before any agent change.
+Its checked outcome-readiness report classifies the evidence as
+`navigation_only`, not task-success evidence, because validation can pass before
+any agent change.
 
 The checked-in [real Claude Code smoke report](docs/claude-real-smoke.md)
 launches Claude Code through `claude-run` on the local smoke suite and records

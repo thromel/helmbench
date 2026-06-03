@@ -52,6 +52,12 @@ and records the remaining tasks as skipped, which is useful for large public
 suites. Use `--preset` for generated public suites so the report includes the
 preset label and preset-specific anchor-file checks.
 
+The report also includes `evidenceUse`:
+
+- `outcome_ready`: fixture health is good and validation fails before the agent;
+- `navigation_only`: fixture health is good, but task-success claims are not proven;
+- `unhealthy`: the suite or repo preflight is not trustworthy enough to publish.
+
 Use `--require-setup-commands` when an outcome suite should keep the fixture
 repo healthy at rest and seed each task's failing state inside the isolated
 clone. The report records only task ids in `tasksMissingSetupCommand` when a
@@ -85,6 +91,7 @@ The report records only source-free metadata:
 - tasks whose per-task setup command failed;
 - optional validation-baseline status for `successCommand`s, including whether
   the check ran in fail-fast mode;
+- `evidenceUse`, a source-free classification for how the report may be used;
 - source-free privacy flags.
 
 It does not store raw source, prompts beyond suite task prompts, transcripts,
