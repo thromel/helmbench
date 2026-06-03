@@ -6,10 +6,10 @@ use std::path::{Path, PathBuf};
 
 pub const SUITE_SCHEMA_VERSION: u32 = 1;
 pub const TRACE_SCHEMA_VERSION: u32 = 1;
-pub const REPORT_SCHEMA_VERSION: u32 = 1;
+pub const REPORT_SCHEMA_VERSION: u32 = 2;
 pub const AUTOPSY_SCHEMA_VERSION: u32 = 1;
 pub const DIFF_AUTOPSY_SCHEMA_VERSION: u32 = 1;
-pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 3;
+pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 4;
 pub const QUALITY_GATE_SCHEMA_VERSION: u32 = 1;
 pub const CONFIDENCE_LEVEL_95: f32 = 0.95;
 pub const MIN_RECOMMENDED_BENCHMARK_TASKS: usize = 10;
@@ -199,6 +199,21 @@ pub struct ReportSummary {
     pub average_time_to_first_relevant_file_millis: Option<f32>,
     pub total_tool_calls: u32,
     pub total_token_estimate: u64,
+    #[serde(default)]
+    pub command_summary: CommandSummary,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CommandSummary {
+    pub total_command_count: usize,
+    pub test_command_count: usize,
+    pub build_command_count: usize,
+    pub lint_command_count: usize,
+    pub typecheck_command_count: usize,
+    pub other_command_count: usize,
+    pub successful_command_count: usize,
+    pub failed_command_count: usize,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -221,6 +236,8 @@ pub struct TaskReport {
     pub context_precision: f32,
     pub edited_file_recall: f32,
     pub validation_covered: bool,
+    #[serde(default)]
+    pub command_summary: CommandSummary,
     pub tool_call_count: u32,
     pub token_estimate: u64,
     pub elapsed_millis: Option<u64>,
@@ -278,6 +295,8 @@ pub struct BenchmarkRunSummary {
     pub edited_file_recall: f32,
     pub total_tool_calls: u32,
     pub total_token_estimate: u64,
+    #[serde(default)]
+    pub command_summary: CommandSummary,
     pub failure_taxonomy: BenchmarkFailureTaxonomy,
 }
 
@@ -876,6 +895,7 @@ fn benchmark_run_summary(report: &RunReport) -> BenchmarkRunSummary {
         edited_file_recall: report.summary.average_edited_file_recall,
         total_tool_calls: report.summary.total_tool_calls,
         total_token_estimate: report.summary.total_token_estimate,
+        command_summary: report.summary.command_summary.clone(),
         failure_taxonomy,
     }
 }
@@ -1239,12 +1259,28 @@ pub fn render_markdown_report(report: &RunReport) -> String {
         report.summary.total_token_estimate,
         report.privacy.source_free
     ));
+    out.push_str("## Command Summary\n\n");
+    out.push_str("| Total | Test | Build | Lint | Typecheck | Other | Successful | Failed |\n");
+    out.push_str("| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    out.push_str(&format!(
+        "| {} | {} | {} | {} | {} | {} | {} | {} |\n\n",
+        report.summary.command_summary.total_command_count,
+        report.summary.command_summary.test_command_count,
+        report.summary.command_summary.build_command_count,
+        report.summary.command_summary.lint_command_count,
+        report.summary.command_summary.typecheck_command_count,
+        report.summary.command_summary.other_command_count,
+        report.summary.command_summary.successful_command_count,
+        report.summary.command_summary.failed_command_count
+    ));
     out.push_str("## Tasks\n\n");
-    out.push_str("| Task | Status | Recommendations | Rec recall | Reads | Irrelevant reads | Context precision | Validation | Tool calls |\n");
-    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: |\n");
+    out.push_str("| Task | Status | Recommendations | Rec recall | Reads | Irrelevant reads | Context precision | Validation | Commands | Test commands | Failed commands | Tool calls |\n");
+    out.push_str(
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |\n",
+    );
     for task in &report.tasks {
         out.push_str(&format!(
-            "| `{}` | {:?} | {} | {:.1}% | {} | {} | {:.1}% | {} | {} |\n",
+            "| `{}` | {:?} | {} | {:.1}% | {} | {} | {:.1}% | {} | {} | {} | {} | {} |\n",
             task.task_id,
             task.status,
             task.recommended_file_count,
@@ -1253,6 +1289,9 @@ pub fn render_markdown_report(report: &RunReport) -> String {
             task.irrelevant_file_read_count,
             pct(task.context_precision),
             if task.validation_covered { "yes" } else { "no" },
+            task.command_summary.total_command_count,
+            task.command_summary.test_command_count,
+            task.command_summary.failed_command_count,
             task.tool_call_count
         ));
     }
@@ -1351,6 +1390,27 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
             pct(run.irrelevant_read_rate),
             run.total_tool_calls,
             run.total_token_estimate
+        ));
+    }
+
+    out.push_str("\n## Command Mix\n\n");
+    out.push_str(
+        "| Run | Total | Test | Build | Lint | Typecheck | Other | Successful | Failed |\n",
+    );
+    out.push_str("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    for run in &report.runs {
+        out.push_str(&format!(
+            "| {} / {:?} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+            run.agent,
+            run.variant,
+            run.command_summary.total_command_count,
+            run.command_summary.test_command_count,
+            run.command_summary.build_command_count,
+            run.command_summary.lint_command_count,
+            run.command_summary.typecheck_command_count,
+            run.command_summary.other_command_count,
+            run.command_summary.successful_command_count,
+            run.command_summary.failed_command_count
         ));
     }
 
@@ -1822,6 +1882,22 @@ pub fn render_html_dashboard(reports: &[RunReport]) -> Result<String> {
         out.push_str(&fact(
             "Tool calls",
             report.summary.total_tool_calls.to_string(),
+        ));
+        out.push_str(&fact(
+            "Commands",
+            report
+                .summary
+                .command_summary
+                .total_command_count
+                .to_string(),
+        ));
+        out.push_str(&fact(
+            "Test commands",
+            report
+                .summary
+                .command_summary
+                .test_command_count
+                .to_string(),
         ));
         out.push_str(&fact(
             "Token estimate",
@@ -2686,6 +2762,7 @@ fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
         context_precision,
         edited_file_recall,
         validation_covered,
+        command_summary: command_summary(&trace.commands),
         tool_call_count: trace.tool_call_count,
         token_estimate: trace.token_estimate.unwrap_or(0),
         elapsed_millis: trace.elapsed_millis,
@@ -2693,6 +2770,43 @@ fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
             .time_to_first_relevant_file_millis
             .or_else(|| infer_time_to_first_relevant_file(&trace.files_read, &expected_files)),
     }
+}
+
+fn command_summary(commands: &[CommandObservation]) -> CommandSummary {
+    let mut summary = CommandSummary {
+        total_command_count: commands.len(),
+        ..CommandSummary::default()
+    };
+    for command in commands {
+        match command.command_class {
+            CommandClass::Test => summary.test_command_count += 1,
+            CommandClass::Build => summary.build_command_count += 1,
+            CommandClass::Lint => summary.lint_command_count += 1,
+            CommandClass::Typecheck => summary.typecheck_command_count += 1,
+            CommandClass::Other => summary.other_command_count += 1,
+        }
+        match command.exit_status {
+            Some(status) if status != 0 => summary.failed_command_count += 1,
+            _ => summary.successful_command_count += 1,
+        }
+    }
+    summary
+}
+
+fn aggregate_command_summary(tasks: &[TaskReport]) -> CommandSummary {
+    tasks
+        .iter()
+        .fold(CommandSummary::default(), |mut total, task| {
+            total.total_command_count += task.command_summary.total_command_count;
+            total.test_command_count += task.command_summary.test_command_count;
+            total.build_command_count += task.command_summary.build_command_count;
+            total.lint_command_count += task.command_summary.lint_command_count;
+            total.typecheck_command_count += task.command_summary.typecheck_command_count;
+            total.other_command_count += task.command_summary.other_command_count;
+            total.successful_command_count += task.command_summary.successful_command_count;
+            total.failed_command_count += task.command_summary.failed_command_count;
+            total
+        })
 }
 
 fn validation_covered(trace: &AgentTrace, expected_tests: &BTreeSet<String>) -> bool {
@@ -2767,6 +2881,7 @@ fn summarize(tasks: &[TaskReport]) -> ReportSummary {
             .then(|| average(times.into_iter())),
         total_tool_calls: tasks.iter().map(|task| task.tool_call_count).sum(),
         total_token_estimate: tasks.iter().map(|task| task.token_estimate).sum(),
+        command_summary: aggregate_command_summary(tasks),
     }
 }
 
@@ -2868,13 +2983,22 @@ mod tests {
                 timed_path("src/auth/middleware.ts", 30),
             ],
             files_edited: vec![path("src/auth/session.ts")],
-            commands: vec![CommandObservation {
-                command_class: CommandClass::Test,
-                command_hash: Some("hash:test".to_string()),
-                touched_tests: vec!["tests/auth/session.test.ts".to_string()],
-                exit_status: Some(0),
-                elapsed_millis: Some(1000),
-            }],
+            commands: vec![
+                CommandObservation {
+                    command_class: CommandClass::Test,
+                    command_hash: Some("hash:test".to_string()),
+                    touched_tests: vec!["tests/auth/session.test.ts".to_string()],
+                    exit_status: Some(0),
+                    elapsed_millis: Some(1000),
+                },
+                CommandObservation {
+                    command_class: CommandClass::Lint,
+                    command_hash: Some("hash:lint".to_string()),
+                    touched_tests: Vec::new(),
+                    exit_status: Some(1),
+                    elapsed_millis: Some(400),
+                },
+            ],
             tool_call_count: 6,
             token_estimate: Some(1200),
             elapsed_millis: Some(2000),
@@ -2889,6 +3013,16 @@ mod tests {
         assert_eq!(report.tasks[0].time_to_first_relevant_file_millis, Some(20));
         assert!(report.tasks[0].validation_covered);
         assert_eq!(report.summary.total_tool_calls, 6);
+        assert_eq!(report.tasks[0].command_summary.total_command_count, 2);
+        assert_eq!(report.tasks[0].command_summary.test_command_count, 1);
+        assert_eq!(report.tasks[0].command_summary.lint_command_count, 1);
+        assert_eq!(report.tasks[0].command_summary.failed_command_count, 1);
+        assert_eq!(report.summary.command_summary.total_command_count, 2);
+        assert_eq!(report.summary.command_summary.test_command_count, 1);
+        assert_eq!(report.summary.command_summary.failed_command_count, 1);
+        let markdown = render_markdown_report(&report);
+        assert!(markdown.contains("Command Summary"));
+        assert!(markdown.contains("Failed commands"));
     }
 
     #[test]
@@ -2998,6 +3132,10 @@ mod tests {
         assert_eq!(summary.runs[0].success_count, 0);
         assert_eq!(summary.runs[1].success_count, 1);
         assert_eq!(summary.runs[1].validation_covered_count, 1);
+        assert_eq!(summary.runs[0].command_summary.total_command_count, 0);
+        assert_eq!(summary.runs[1].command_summary.total_command_count, 1);
+        assert_eq!(summary.runs[1].command_summary.test_command_count, 1);
+        assert_eq!(summary.runs[1].command_summary.successful_command_count, 1);
         assert_eq!(summary.runs[0].failure_taxonomy.failed_task_count, 1);
         assert_eq!(summary.runs[0].failure_taxonomy.validation_gap_count, 1);
         assert_eq!(
@@ -3023,6 +3161,7 @@ mod tests {
         assert!(markdown.contains("Confidence"));
         assert!(markdown.contains("Low sample warning"));
         assert!(markdown.contains("95% CI"));
+        assert!(markdown.contains("Command Mix"));
         assert!(markdown.contains("Failure Taxonomy"));
         assert!(markdown.contains("Validation gaps"));
         assert!(markdown.contains("Deltas From Baseline"));

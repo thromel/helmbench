@@ -62,6 +62,8 @@ This repository currently implements the core HelmBench workflow:
   paths, byte counts, and content hashes
 - `quality-gate` checks that fail CI when benchmark-summary deltas regress
 - recommendation precision and recall metrics for context-plan evaluation
+- source-free command-class summaries for test/build/lint/typecheck/other
+  validation behavior
 
 It does **not** yet parse raw Claude Code, Codex, Cursor, or other agent
 transcripts. The current runner ingests source-free traces, can generate ctxhelm
@@ -457,6 +459,7 @@ pollute ctxhelm recommendation quality.
 | 95% confidence intervals | Wilson score intervals for binary per-task rates in benchmark summaries. |
 | Low-sample warning | Whether a benchmark suite has fewer than the recommended 10 tasks. |
 | Failure taxonomy | Source-free counts for failed/skipped tasks, validation gaps, context misses, edit misses, recommendation misses, and irrelevant-read tasks. |
+| Command mix | Source-free counts of test, build, lint, typecheck, other, successful, and failed commands. |
 | Files read | Source-free paths the agent inspected. |
 | Irrelevant file reads | Files read that were not in the expected evidence set. |
 | Recommendation precision | Expected evidence paths divided by recommended paths. |

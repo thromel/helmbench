@@ -147,6 +147,8 @@ suite has fewer than 10 tasks, so small demo runs are clearly marked as
 directional evidence. Each run summary also includes a source-free failure
 taxonomy for failed/skipped tasks, validation gaps, missing relevant reads,
 missing expected edits, recommendation misses, and irrelevant-read tasks.
+Run reports and benchmark summaries also include command mix counts for test,
+build, lint, typecheck, other, successful, and failed commands.
 
 Verify the bundle before publishing:
 

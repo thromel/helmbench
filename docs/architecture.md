@@ -70,6 +70,11 @@ A trace records only evaluation-safe metadata:
 
 It does not record raw code or model transcripts.
 
+Run reports aggregate command observations into source-free command-class
+summaries. The report stores counts for test, build, lint, typecheck, other,
+successful, and failed commands so validation behavior can be audited without
+storing raw terminal text.
+
 Generated reports and traces should be excluded from the repository context
 engine used under test. This repo includes `.ctxhelmignore` so ctxhelm does not
 rank HelmBench's own benchmark artifacts as task evidence.
@@ -174,6 +179,8 @@ The summary artifact includes:
 - source-free failure taxonomy counts for failed/skipped tasks, validation
   gaps, missing relevant reads, missing expected edits, recommendation misses,
   and tasks with irrelevant reads;
+- source-free command mix counts for test/build/lint/typecheck/other commands
+  plus successful and failed command counts;
 - deltas from baseline for success, validation, recommendation recall, context
   precision, edited-file recall, irrelevant reads, tool calls, and token
   estimate;
