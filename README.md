@@ -24,6 +24,10 @@ summary, dashboard, privacy contract, and regeneration commands. This is a
 proofs should use `run-matrix` on the RefactoringMiner, Flask, ripgrep, or
 Express presets.
 
+The checked-in [RefactoringMiner public recommendation proof](docs/refactoringminer-public-proof.md)
+runs `ctxhelm prepare-task` over a healthy 10-task public suite and records
+`61.3%` average recommendation recall with source-free artifacts.
+
 ## Current status
 
 This repository currently implements the core HelmBench workflow:

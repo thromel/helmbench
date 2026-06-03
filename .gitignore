@@ -7,3 +7,5 @@
 !/reports/example-ctxhelm.json
 !/reports/example-ctxhelm-plan-meta.json
 !/reports/example-claude-code.json
+!/reports/refactoringminer-suite-health.json
+!/reports/refactoringminer-ctxhelm-plan.json

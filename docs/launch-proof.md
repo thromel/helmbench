@@ -83,7 +83,11 @@ snippets.
 
 ## Next Proof Step
 
-Run the same matrix shape on a public suite with at least `10` tasks, such as
-the RefactoringMiner preset, then publish the verified matrix directory and
-evidence bundle. That is the path from smoke proof to launch-grade benchmark
-evidence.
+HelmBench now also has a 10-task
+[RefactoringMiner public recommendation proof](refactoringminer-public-proof.md)
+that measures ctxhelm recommendation quality on a real public repository suite.
+
+The next proof step is a full `run-matrix` over that same suite with at least
+one real agent baseline and one ctxhelm-guided agent row, then publishing the
+verified matrix directory and evidence bundle. That is the path from
+recommendation proof to launch-grade agent outcome evidence.

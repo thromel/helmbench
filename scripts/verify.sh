@@ -31,9 +31,19 @@ do
 done
 test -f docs/launch-proof.md
 test -f docs/example-benchmark-summary.md
+test -f docs/refactoringminer-public-proof.md
+test -f docs/refactoringminer-ctxhelm-plan.md
+test -f reports/refactoringminer-suite-health.json
+test -f reports/refactoringminer-ctxhelm-plan.json
+test -f suites/refactoring-miner-public.json
 grep -q 'HelmBench Launch Proof' docs/launch-proof.md
 grep -q 'Low sample size: 1 task' docs/example-benchmark-summary.md
 grep -q 'raw source' docs/launch-proof.md
+grep -q '"ok": true' reports/refactoringminer-suite-health.json
+grep -q '"taskCount": 10' reports/refactoringminer-ctxhelm-plan.json
+grep -q '"sourceFree": true' reports/refactoringminer-ctxhelm-plan.json
+grep -q 'Recommendation recall: `61.3%`' docs/refactoringminer-ctxhelm-plan.md
+grep -q 'Average recommendation recall | 61.3%' docs/refactoringminer-public-proof.md
 
 cargo fmt --check
 cargo test

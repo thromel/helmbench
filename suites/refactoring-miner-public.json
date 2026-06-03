@@ -1,0 +1,208 @@
+{
+  "schemaVersion": 1,
+  "name": "refactoringminer-public",
+  "description": "Source-free public-repo suite for RefactoringMiner agent navigation, validation, and ctxhelm comparison.",
+  "tasks": [
+    {
+      "id": "rm-mcp-intent-validation-001",
+      "prompt": "Tighten MCP refactoring-intent validation without changing unrelated server behavior.",
+      "expectedFiles": [
+        "src/main/java/org/refactoringminer/mcp/McpIntentValidator.java",
+        "src/main/java/org/refactoringminer/mcp/McpValidationResult.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/mcp/McpIntentValidatorTest.java",
+        "src/test/java/org/refactoringminer/mcp/McpValidationContractTest.java"
+      ],
+      "successCommand": "./gradlew test --tests org.refactoringminer.mcp.McpIntentValidatorTest --tests org.refactoringminer.mcp.McpValidationContractTest",
+      "tags": [
+        "public_repo",
+        "mcp",
+        "bug_fix"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "rm-mcp-tools-contract-001",
+      "prompt": "Update the MCP tools layer while preserving service contracts and source-free validation behavior.",
+      "expectedFiles": [
+        "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java",
+        "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java",
+        "src/main/java/org/refactoringminer/mcp/WorktreeChangeCollector.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpToolsTest.java",
+        "src/test/java/org/refactoringminer/mcp/WorktreeChangeCollectorTest.java"
+      ],
+      "successCommand": "./gradlew test --tests org.refactoringminer.mcp.RefactoringMinerMcpToolsTest --tests org.refactoringminer.mcp.WorktreeChangeCollectorTest",
+      "tags": [
+        "public_repo",
+        "mcp",
+        "feature"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "rm-webdiff-viewed-files-001",
+      "prompt": "Fix viewed-file tracking in the web diff UI without altering unrelated diff rendering.",
+      "expectedFiles": [
+        "src/main/java/gui/MarkAsViewed.java",
+        "src/main/java/gui/webdiff/viewers/spv/SinglePageView.java"
+      ],
+      "expectedTests": [
+        "src/test/java/gui/MarkAsViewedTest.java",
+        "src/test/java/gui/webdiff/viewers/spv/SinglePageViewViewedFilesTest.java"
+      ],
+      "successCommand": "./gradlew test --tests gui.MarkAsViewedTest --tests gui.webdiff.viewers.spv.SinglePageViewViewedFilesTest",
+      "tags": [
+        "public_repo",
+        "webdiff",
+        "bug_fix"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "rm-git-history-merge-001",
+      "prompt": "Improve merge-commit handling in git-history refactoring detection and keep existing merge tests targeted.",
+      "expectedFiles": [
+        "src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java",
+        "src/main/java/org/refactoringminer/util/GitServiceImpl.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImplMergeCommitTest.java",
+        "src/test/java/org/refactoringminer/util/GitServiceImplTest.java"
+      ],
+      "successCommand": "./gradlew test --tests org.refactoringminer.rm1.GitHistoryRefactoringMinerImplMergeCommitTest --tests org.refactoringminer.util.GitServiceImplTest",
+      "tags": [
+        "public_repo",
+        "git_history",
+        "bug_fix"
+      ],
+      "timeoutSeconds": 1200
+    },
+    {
+      "id": "rm-mcp-service-repository-001",
+      "prompt": "Tighten MCP service repository handling while preserving analysis and refactoring result contracts.",
+      "expectedFiles": [
+        "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java",
+        "src/main/java/org/refactoringminer/mcp/McpAnalysisResult.java",
+        "src/main/java/org/refactoringminer/mcp/McpRefactoringResult.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServiceTest.java",
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServiceRepositoryTest.java"
+      ],
+      "successCommand": "./gradlew test --tests org.refactoringminer.mcp.RefactoringMinerMcpServiceTest --tests org.refactoringminer.mcp.RefactoringMinerMcpServiceRepositoryTest",
+      "tags": [
+        "public_repo",
+        "mcp",
+        "repository",
+        "bug_fix"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "rm-mcp-server-startup-001",
+      "prompt": "Improve MCP server startup and web-diff launcher behavior without changing unrelated tool contracts.",
+      "expectedFiles": [
+        "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpServer.java",
+        "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java",
+        "src/main/java/org/refactoringminer/mcp/DiffBrowserLauncher.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServerStartupTest.java",
+        "src/test/java/org/refactoringminer/mcp/WebDiffBrowserLauncherTest.java"
+      ],
+      "successCommand": "./gradlew test --tests org.refactoringminer.mcp.RefactoringMinerMcpServerStartupTest --tests org.refactoringminer.mcp.WebDiffBrowserLauncherTest",
+      "tags": [
+        "public_repo",
+        "mcp",
+        "startup",
+        "feature"
+      ],
+      "timeoutSeconds": 900
+    },
+    {
+      "id": "rm-astdiff-comments-001",
+      "prompt": "Adjust AST diff comment handling while keeping comment-aware and comment-ignoring visitor behavior targeted.",
+      "expectedFiles": [
+        "src/main/java/org/refactoringminer/astDiff/visitors/JdtVisitor.java",
+        "src/main/java/org/refactoringminer/astDiff/visitors/JdtWithCommentsVisitor.java",
+        "src/main/java/org/refactoringminer/astDiff/matchers/ProjectASTDiffer.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/astDiff/tests/ConsideringCommentsVisitorTest.java",
+        "src/test/java/org/refactoringminer/astDiff/tests/IgnoringCommentsVisitorTest.java"
+      ],
+      "successCommand": "./gradlew test --tests org.refactoringminer.astDiff.tests.ConsideringCommentsVisitorTest --tests org.refactoringminer.astDiff.tests.IgnoringCommentsVisitorTest",
+      "tags": [
+        "public_repo",
+        "ast_diff",
+        "comments",
+        "bug_fix"
+      ],
+      "timeoutSeconds": 1200
+    },
+    {
+      "id": "rm-astdiff-python-001",
+      "prompt": "Improve Python AST diff parsing or stringification while preserving parser tree regression coverage.",
+      "expectedFiles": [
+        "src/main/java/extension/ast/builder/python/PyASTBuilder.java",
+        "src/main/java/extension/ast/stringifier/PyASTFlattener.java",
+        "src/main/java/extension/base/LangSupportedEnum.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/astDiff/tests/PythonDiffTest.java",
+        "src/test/java/org/refactoringminer/astDiff/tests/TreeFromParserTest.java"
+      ],
+      "successCommand": "./gradlew test --tests org.refactoringminer.astDiff.tests.PythonDiffTest --tests org.refactoringminer.astDiff.tests.TreeFromParserTest",
+      "tags": [
+        "public_repo",
+        "ast_diff",
+        "python",
+        "feature"
+      ],
+      "timeoutSeconds": 1200
+    },
+    {
+      "id": "rm-astdiff-matchers-001",
+      "prompt": "Tune AST tree matching behavior while preserving specific-case and matcher regression coverage.",
+      "expectedFiles": [
+        "src/main/java/org/refactoringminer/astDiff/matchers/TreeMatcher.java",
+        "src/main/java/org/refactoringminer/astDiff/matchers/statement/CompositeMatcher.java",
+        "src/main/java/org/refactoringminer/astDiff/matchers/statement/LeafMatcher.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/astDiff/tests/TreeMatcherTest.java",
+        "src/test/java/org/refactoringminer/astDiff/tests/SpecificCasesTest.java"
+      ],
+      "successCommand": "./gradlew test --tests org.refactoringminer.astDiff.tests.TreeMatcherTest --tests org.refactoringminer.astDiff.tests.SpecificCasesTest",
+      "tags": [
+        "public_repo",
+        "ast_diff",
+        "matcher",
+        "refactor"
+      ],
+      "timeoutSeconds": 1200
+    },
+    {
+      "id": "rm-cli-command-line-001",
+      "prompt": "Improve command-line refactoring detection behavior without changing unrelated API contracts.",
+      "expectedFiles": [
+        "src/main/java/org/refactoringminer/RefactoringMiner.java",
+        "src/main/java/org/refactoringminer/api/GitHistoryRefactoringMiner.java"
+      ],
+      "expectedTests": [
+        "src/test/java/org/refactoringminer/test/TestCommandLine.java"
+      ],
+      "successCommand": "./gradlew test --tests org.refactoringminer.test.TestCommandLine",
+      "tags": [
+        "public_repo",
+        "cli",
+        "git_history",
+        "bug_fix"
+      ],
+      "timeoutSeconds": 1200
+    }
+  ]
+}

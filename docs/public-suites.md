@@ -74,6 +74,11 @@ metadata, and a targeted Gradle `successCommand`. The suite is meant to compare
 agent navigation and validation behavior across variants such as native agent
 runs, ctxhelm plan traces, ctxhelm-guided runs, and ctxhelm pack runs.
 
+The checked-in
+[RefactoringMiner public recommendation proof](refactoringminer-public-proof.md)
+uses this preset to score `ctxhelm prepare-task` recommendations over all 10
+tasks with source-free artifacts.
+
 ## Flask
 
 ```bash
