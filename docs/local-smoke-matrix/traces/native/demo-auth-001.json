@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "taskId": "demo-auth-001",
+  "agent": "demo-baseline",
+  "variant": "native",
+  "status": "failure",
+  "recommendedFiles": [],
+  "filesRead": [],
+  "filesEdited": [],
+  "commands": [
+    {
+      "commandClass": "other",
+      "commandHash": "cmd:4b4b762bdcf0cc0f",
+      "touchedTests": [
+        "examples/demo-app/auth.test"
+      ],
+      "exitStatus": 1,
+      "elapsedMillis": 30
+    }
+  ],
+  "toolCallCount": 2,
+  "tokenEstimate": null,
+  "elapsedMillis": 537,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

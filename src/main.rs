@@ -2077,11 +2077,21 @@ fn build_launch_readiness_report(
     ));
 
     let mut verified_matrices = 0usize;
+    let mut verified_matching_matrices = 0usize;
+    let mut matrix_suite_mismatches = 0usize;
     let mut matrix_failures = 0usize;
     for path in matrix_paths {
         match verify_run_matrix(path) {
             Ok(manifest) => {
                 verified_matrices += 1;
+                let matrix_summary_path =
+                    matrix_path(path, &manifest.artifacts.benchmark_summary_json)?;
+                let matrix_summary = read_benchmark_summary(&matrix_summary_path)?;
+                if matrix_summary.suite_name == suite.name {
+                    verified_matching_matrices += 1;
+                } else {
+                    matrix_suite_mismatches += 1;
+                }
                 artifacts.push(launch_artifact("matrix", path));
                 artifacts.push(LaunchReadinessArtifact {
                     kind: "matrix_evidence_use".to_string(),
@@ -2099,14 +2109,16 @@ fn build_launch_readiness_report(
         "verified run matrix",
         if matrix_failures > 0 {
             LaunchReadinessCheckStatus::Fail
-        } else if verified_matrices > 0 {
+        } else if verified_matching_matrices > 0 {
             LaunchReadinessCheckStatus::Pass
         } else {
             LaunchReadinessCheckStatus::Warn
         },
         "run_matrix".to_string(),
         if verified_matrices > 0 || matrix_failures > 0 {
-            format!("{verified_matrices} verified matrix output(s), {matrix_failures} failure(s)")
+            format!(
+                "{verified_matching_matrices} matching verified matrix output(s), {matrix_suite_mismatches} suite mismatch(es), {matrix_failures} failure(s)"
+            )
         } else {
             "no verified run-matrix artifact was supplied".to_string()
         },

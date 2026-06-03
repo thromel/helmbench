@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 2,
+  "suiteName": "local-run-smoke",
+  "agent": "demo-search",
+  "variant": "native_search",
+  "summary": {
+    "taskCount": 1,
+    "successCount": 1,
+    "successRate": 1.0,
+    "totalFilesRead": 1,
+    "totalIrrelevantFileReads": 0,
+    "irrelevantReadRate": 0.0,
+    "averageRecommendationPrecision": 1.0,
+    "averageRecommendationRecall": 0.5,
+    "averageContextPrecision": 1.0,
+    "averageEditedFileRecall": 1.0,
+    "validationCoverageRate": 1.0,
+    "averageTimeToFirstRelevantFileMillis": 20.0,
+    "totalToolCalls": 5,
+    "totalTokenEstimate": 0,
+    "commandSummary": {
+      "totalCommandCount": 1,
+      "testCommandCount": 0,
+      "buildCommandCount": 0,
+      "lintCommandCount": 0,
+      "typecheckCommandCount": 0,
+      "otherCommandCount": 1,
+      "successfulCommandCount": 1,
+      "failedCommandCount": 0
+    }
+  },
+  "tasks": [
+    {
+      "taskId": "demo-auth-001",
+      "status": "success",
+      "expectedFileCount": 1,
+      "expectedTestCount": 1,
+      "recommendedFileCount": 1,
+      "relevantRecommendedFileCount": 1,
+      "irrelevantRecommendedFileCount": 0,
+      "recommendationPrecision": 1.0,
+      "recommendationRecall": 0.5,
+      "filesReadCount": 1,
+      "relevantFilesReadCount": 1,
+      "irrelevantFileReadCount": 0,
+      "filesEditedCount": 1,
+      "expectedFilesEditedCount": 1,
+      "contextPrecision": 1.0,
+      "editedFileRecall": 1.0,
+      "validationCovered": true,
+      "commandSummary": {
+        "totalCommandCount": 1,
+        "testCommandCount": 0,
+        "buildCommandCount": 0,
+        "lintCommandCount": 0,
+        "typecheckCommandCount": 0,
+        "otherCommandCount": 1,
+        "successfulCommandCount": 1,
+        "failedCommandCount": 0
+      },
+      "toolCallCount": 5,
+      "tokenEstimate": 0,
+      "elapsedMillis": 1290,
+      "timeToFirstRelevantFileMillis": 20
+    }
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

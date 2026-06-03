@@ -21,10 +21,11 @@ file from `2600 ms` to `600 ms`.
 See [HelmBench Launch Proof](docs/launch-proof.md) and the generated
 [Launch Readiness](docs/launch-readiness.md) report for the artifact-backed
 summary, dashboard, privacy contract, and regeneration commands. The current
-readiness status is `smoke_proof`: it is a 1-task proof with explicit warnings
-for the missing 10-task outcome matrix and matching outcome-health evidence.
-Larger public-suite proofs should use `run-matrix` on the RefactoringMiner,
-Flask, ripgrep, or Express presets.
+readiness status is `smoke_proof`: it now includes a verified, source-free
+local smoke matrix with outcome-ready suite health, but still warns that the
+launch-grade proof needs a 10-task real-agent public matrix. Larger
+public-suite proofs should use `run-matrix` on the RefactoringMiner, Flask,
+ripgrep, or Express presets.
 
 The checked-in [RefactoringMiner public recommendation proof](docs/refactoringminer-public-proof.md)
 runs `ctxhelm prepare-task` over a healthy 10-task public suite and records
@@ -90,6 +91,9 @@ This repository currently implements the core HelmBench workflow:
   local adapter variants and emits reports, comparisons, dashboard, quality
   gate, suite-health, per-run autopsies, privacy report, reproduction guide,
   evidence bundle artifacts, and source-free reproducibility provenance
+- checked-in verified local smoke matrix under `docs/local-smoke-matrix/`,
+  including outcome-ready suite health, privacy report, evidence bundle, and
+  matrix manifest
 - `launch-readiness` report that classifies checked-in proof artifacts as
   `launch_ready`, `smoke_proof`, or `not_ready` without storing source
 - first-class `run-matrix` row presets for Claude Code and Codex, so real

@@ -31,6 +31,8 @@ do
 done
 test -f docs/launch-proof.md
 test -f docs/launch-readiness.md
+test -f docs/local-smoke-matrix/matrix-manifest.json
+test -f docs/local-smoke-matrix/evidence/manifest.json
 test -f docs/example-benchmark-summary.md
 test -f docs/refactoringminer-public-proof.md
 test -f docs/refactoringminer-ctxhelm-plan.md
@@ -49,6 +51,10 @@ grep -q 'HelmBench Launch Proof' docs/launch-proof.md
 grep -q 'Status: \*\*smoke_proof\*\*' docs/launch-readiness.md
 grep -q '"status": "smoke_proof"' reports/launch-readiness.json
 grep -q '"lowSampleWarning": true' reports/launch-readiness.json
+grep -q 'outcome-health evidence | `pass`' docs/launch-readiness.md
+grep -q 'verified run matrix | `pass`' docs/launch-readiness.md
+grep -q '"suiteEvidenceUse": "outcome_ready"' docs/local-smoke-matrix/matrix-manifest.json
+grep -q '"evidenceUse": "outcome_ready"' docs/local-smoke-matrix/evidence/manifest.json
 grep -q 'claude-real-smoke' docs/launch-proof.md
 grep -q 'claude-real-smoke' docs/direct-agent-runs.md
 grep -q 'Low sample size: 1 task' docs/example-benchmark-summary.md
@@ -94,6 +100,9 @@ cargo run -- doctor --repo . --format json --out "$TMP_DIR/doctor.json"
 grep -q '"ok": true' "$TMP_DIR/doctor.json"
 grep -q '"sourceFree": true' "$TMP_DIR/doctor.json"
 grep -q '"directRunners"' "$TMP_DIR/doctor.json"
+
+cargo run -- verify-matrix \
+  --matrix docs/local-smoke-matrix
 
 cargo run -- schema --kind task-suite --out "$TMP_DIR/task-suite.schema.json"
 cargo run -- schema --kind agent-trace --out "$TMP_DIR/agent-trace.schema.json"
@@ -334,21 +343,27 @@ cargo run -- benchmark-summary \
   --format json
 
 cargo run -- launch-readiness \
-  --suite suites/example-auth-bugs.json \
-  --base-report reports/example-native.json \
-  --head-report reports/example-ctxhelm.json \
-  --head-report reports/example-claude-code.json \
+  --suite suites/local-run-smoke.json \
+  --base-report docs/local-smoke-matrix/reports/native.json \
+  --head-report docs/local-smoke-matrix/reports/native-search.json \
+  --head-report docs/local-smoke-matrix/reports/guided.json \
+  --health docs/local-smoke-matrix/reports/suite-health.json \
+  --matrix docs/local-smoke-matrix \
   --out "$TMP_DIR/launch-readiness.md" \
   --format markdown
 
 cargo run -- launch-readiness \
-  --suite suites/example-auth-bugs.json \
-  --base-report reports/example-native.json \
-  --head-report reports/example-ctxhelm.json \
-  --head-report reports/example-claude-code.json \
+  --suite suites/local-run-smoke.json \
+  --base-report docs/local-smoke-matrix/reports/native.json \
+  --head-report docs/local-smoke-matrix/reports/native-search.json \
+  --head-report docs/local-smoke-matrix/reports/guided.json \
+  --health docs/local-smoke-matrix/reports/suite-health.json \
+  --matrix docs/local-smoke-matrix \
   --out "$TMP_DIR/launch-readiness.json" \
   --format json
 grep -q 'Status: \*\*smoke_proof\*\*' "$TMP_DIR/launch-readiness.md"
+grep -q 'outcome-health evidence | `pass`' "$TMP_DIR/launch-readiness.md"
+grep -q 'verified run matrix | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q '"status": "smoke_proof"' "$TMP_DIR/launch-readiness.json"
 grep -q '"sourceFree": true' "$TMP_DIR/launch-readiness.json"
 

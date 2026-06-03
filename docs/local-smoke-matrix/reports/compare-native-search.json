@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "baseAgent": "demo-baseline",
+  "baseVariant": "native",
+  "headAgent": "demo-search",
+  "headVariant": "native_search",
+  "taskCountDelta": 0,
+  "successRateDelta": 1.0,
+  "irrelevantReadRateDelta": 0.0,
+  "averageRecommendationPrecisionDelta": 1.0,
+  "averageRecommendationRecallDelta": 0.5,
+  "averageContextPrecisionDelta": 1.0,
+  "averageEditedFileRecallDelta": 1.0,
+  "validationCoverageRateDelta": 1.0,
+  "totalToolCallsDelta": 3,
+  "totalTokenEstimateDelta": 0,
+  "toolCallsPerSuccessDelta": null,
+  "tokenEstimatePerSuccessDelta": null
+}

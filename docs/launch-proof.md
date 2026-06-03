@@ -23,8 +23,9 @@ The current checked-in proof is intentionally small: `1` task from
 not a statistically powered benchmark. The generated summary records the same
 low-sample warning. The generated
 [launch-readiness report](launch-readiness.md) classifies the current checked-in
-proof as `smoke_proof`, with explicit warnings for the missing 10-task outcome
-matrix and matching outcome-health evidence.
+proof as `smoke_proof`. It verifies the checked-in local smoke matrix and
+outcome-ready suite-health evidence, while still warning that launch-grade proof
+requires a 10-task real-agent public matrix.
 
 HelmBench also includes a real direct-agent smoke run over
 `suites/local-run-smoke.json`. That proof launches Claude Code through
@@ -75,6 +76,8 @@ Best checked-in ctxhelm-guided row: `claude-code / ctxhelm_mcp`
 - Launch readiness Markdown: [`docs/launch-readiness.md`](launch-readiness.md)
 - Launch readiness JSON:
   [`reports/launch-readiness.json`](../reports/launch-readiness.json)
+- Verified local smoke matrix:
+  [`docs/local-smoke-matrix/matrix-manifest.json`](local-smoke-matrix/matrix-manifest.json)
 
 ## Regenerate
 
@@ -93,18 +96,22 @@ cargo run -- dashboard \
   --out docs/example-dashboard.html
 
 cargo run -- launch-readiness \
-  --suite suites/example-auth-bugs.json \
-  --base-report reports/example-native.json \
-  --head-report reports/example-ctxhelm.json \
-  --head-report reports/example-claude-code.json \
+  --suite suites/local-run-smoke.json \
+  --base-report docs/local-smoke-matrix/reports/native.json \
+  --head-report docs/local-smoke-matrix/reports/native-search.json \
+  --head-report docs/local-smoke-matrix/reports/guided.json \
+  --health docs/local-smoke-matrix/reports/suite-health.json \
+  --matrix docs/local-smoke-matrix \
   --out docs/launch-readiness.md \
   --format markdown
 
 cargo run -- launch-readiness \
-  --suite suites/example-auth-bugs.json \
-  --base-report reports/example-native.json \
-  --head-report reports/example-ctxhelm.json \
-  --head-report reports/example-claude-code.json \
+  --suite suites/local-run-smoke.json \
+  --base-report docs/local-smoke-matrix/reports/native.json \
+  --head-report docs/local-smoke-matrix/reports/native-search.json \
+  --head-report docs/local-smoke-matrix/reports/guided.json \
+  --health docs/local-smoke-matrix/reports/suite-health.json \
+  --matrix docs/local-smoke-matrix \
   --out reports/launch-readiness.json \
   --format json
 

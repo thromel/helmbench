@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "preset": "custom",
+  "suiteName": "local-run-smoke",
+  "taskCount": 1,
+  "repoName": "repo",
+  "head": "dd41d7c579ec42ef8292cabd29be1feb56a2f1fc",
+  "commitCount": 94,
+  "minCommits": 1,
+  "allowDirty": true,
+  "dirty": false,
+  "fsckOk": true,
+  "validationReady": true,
+  "expectedFileCount": 1,
+  "expectedTestCount": 1,
+  "checkedFiles": [
+    "examples/demo-app/auth.test",
+    "examples/demo-app/auth.txt"
+  ],
+  "missingFiles": [],
+  "missingExpectedFiles": [],
+  "missingExpectedTests": [],
+  "setupCommandsRequired": true,
+  "setupCommandReady": true,
+  "tasksMissingSetupCommand": [],
+  "tasksFailedSetupCommand": [],
+  "tasksMissingSuccessCommand": [],
+  "successCommandCheckRequested": true,
+  "successCommandCheckFailFast": false,
+  "successCommandCheckReady": true,
+  "validationBaselineReady": true,
+  "baselineSuccessCommandPassCount": 0,
+  "baselineSuccessCommandFailCount": 1,
+  "baselineSuccessCommandTimeoutCount": 0,
+  "baselineSuccessCommandSkippedCount": 0,
+  "baselineSuccessCommands": [
+    {
+      "taskId": "demo-auth-001",
+      "commandClass": "other",
+      "commandHash": "cmd:4b4b762bdcf0cc0f",
+      "exitStatus": 1,
+      "elapsedMillis": 35,
+      "timedOut": false
+    }
+  ],
+  "evidenceUse": "outcome_ready",
+  "ok": true,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

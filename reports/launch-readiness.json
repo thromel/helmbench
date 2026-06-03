@@ -1,39 +1,54 @@
 {
   "schemaVersion": 1,
-  "suiteName": "example-auth-bugs",
+  "suiteName": "local-run-smoke",
   "status": "smoke_proof",
   "minTaskCount": 10,
   "minRealAgentRows": 1,
   "benchmark": {
     "taskCount": 1,
     "runCount": 3,
-    "realAgentRunCount": 3,
+    "realAgentRunCount": 0,
     "lowSampleWarning": true,
     "bestSuccessRate": 1.0,
     "bestValidationCoverageRate": 1.0,
     "bestRecommendationRecall": 1.0,
-    "bestContextPrecision": 0.5,
+    "bestContextPrecision": 1.0,
     "bestEditedFileRecall": 1.0
   },
   "artifacts": [
     {
       "kind": "suite",
-      "label": "suite:ea0afd9fc6dc6762",
+      "label": "suite:c086296f696d9338",
       "sourceFree": true
     },
     {
       "kind": "base_report",
-      "label": "base_report:5f76f396d2220151",
+      "label": "base_report:f852f451ef6918ca",
       "sourceFree": true
     },
     {
       "kind": "head_report",
-      "label": "head_report:7ccc8f4cb3498567",
+      "label": "head_report:728e11ac30307a17",
       "sourceFree": true
     },
     {
       "kind": "head_report",
-      "label": "head_report:03339f5e8144cbb4",
+      "label": "head_report:79bc53e09722fd5b",
+      "sourceFree": true
+    },
+    {
+      "kind": "health",
+      "label": "health:7de86413dc8bde4c",
+      "sourceFree": true
+    },
+    {
+      "kind": "matrix",
+      "label": "matrix:2b1d7fc8d4c043a4",
+      "sourceFree": true
+    },
+    {
+      "kind": "matrix_evidence_use",
+      "label": "outcome_ready",
       "sourceFree": true
     }
   ],
@@ -42,7 +57,7 @@
       "name": "suite contract",
       "status": "pass",
       "evidence": "suite",
-      "detail": "suite `example-auth-bugs` validates with 1 task(s)"
+      "detail": "suite `local-run-smoke` validates with 1 task(s)"
     },
     {
       "name": "source-free reports",
@@ -58,21 +73,21 @@
     },
     {
       "name": "real-agent rows",
-      "status": "pass",
+      "status": "warn",
       "evidence": "benchmark_summary",
-      "detail": "3 real-agent row(s) observed; launch target is 1"
+      "detail": "0 real-agent row(s) observed; launch target is 1"
     },
     {
       "name": "outcome-health evidence",
-      "status": "warn",
+      "status": "pass",
       "evidence": "suite_health",
-      "detail": "no matching suite-health artifact was supplied"
+      "detail": "matching suite-health evidenceUse: outcome_ready"
     },
     {
       "name": "verified run matrix",
-      "status": "warn",
+      "status": "pass",
       "evidence": "run_matrix",
-      "detail": "no verified run-matrix artifact was supplied"
+      "detail": "1 matching verified matrix output(s), 0 suite mismatch(es), 0 failure(s)"
     },
     {
       "name": "privacy boundary",

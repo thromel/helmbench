@@ -1,6 +1,6 @@
 # HelmBench Launch Readiness
 
-Suite: `example-auth-bugs`
+Suite: `local-run-smoke`
 
 Status: **smoke_proof**
 
@@ -10,33 +10,36 @@ Status: **smoke_proof**
 | --- | ---: |
 | Tasks | 1 |
 | Runs | 3 |
-| Real-agent rows | 3 |
+| Real-agent rows | 0 |
 | Best success rate | 100.0% |
 | Best validation coverage | 100.0% |
 | Best recommendation recall | 100.0% |
-| Best context precision | 50.0% |
+| Best context precision | 100.0% |
 | Best edited-file recall | 100.0% |
 
 ## Checks
 
 | Check | Status | Detail |
 | --- | --- | --- |
-| suite contract | `pass` | suite `example-auth-bugs` validates with 1 task(s) |
+| suite contract | `pass` | suite `local-run-smoke` validates with 1 task(s) |
 | source-free reports | `pass` | 3 report(s) accepted by benchmark-summary |
 | recommended task count | `warn` | 1 task(s) observed; launch target is 10 |
-| real-agent rows | `pass` | 3 real-agent row(s) observed; launch target is 1 |
-| outcome-health evidence | `warn` | no matching suite-health artifact was supplied |
-| verified run matrix | `warn` | no verified run-matrix artifact was supplied |
+| real-agent rows | `warn` | 0 real-agent row(s) observed; launch target is 1 |
+| outcome-health evidence | `pass` | matching suite-health evidenceUse: outcome_ready |
+| verified run matrix | `pass` | 1 matching verified matrix output(s), 0 suite mismatch(es), 0 failure(s) |
 | privacy boundary | `pass` | artifacts store paths, counts, statuses, hashes, and source-free flags only |
 
 ## Artifacts
 
 | Kind | Label | Source-free |
 | --- | --- | --- |
-| `suite` | `suite:ea0afd9fc6dc6762` | yes |
-| `base_report` | `base_report:5f76f396d2220151` | yes |
-| `head_report` | `head_report:7ccc8f4cb3498567` | yes |
-| `head_report` | `head_report:03339f5e8144cbb4` | yes |
+| `suite` | `suite:c086296f696d9338` | yes |
+| `base_report` | `base_report:f852f451ef6918ca` | yes |
+| `head_report` | `head_report:728e11ac30307a17` | yes |
+| `head_report` | `head_report:79bc53e09722fd5b` | yes |
+| `health` | `health:7de86413dc8bde4c` | yes |
+| `matrix` | `matrix:2b1d7fc8d4c043a4` | yes |
+| `matrix_evidence_use` | `outcome_ready` | yes |
 
 ## Privacy
 

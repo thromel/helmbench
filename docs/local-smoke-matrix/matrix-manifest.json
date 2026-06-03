@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 6,
+  "suitePath": "suites/local-run-smoke.json",
+  "repoPath": ".",
+  "outDir": "docs/local-smoke-matrix",
+  "provenance": {
+    "helmbenchVersion": "0.1.0",
+    "suiteHash": "suite:24f1f885604b852d",
+    "repoHead": "dd41d7c579ec42ef8292cabd29be1feb56a2f1fc",
+    "repoDirty": true,
+    "setupCommandCount": 0,
+    "setupCommandHashes": []
+  },
+  "suiteEvidenceUse": "outcome_ready",
+  "baseline": {
+    "name": "native",
+    "agent": "demo-baseline",
+    "variant": "native",
+    "reportPath": "reports/native.json",
+    "traceDir": "traces/native",
+    "autopsyMarkdown": "docs/native-autopsy.md",
+    "comparisonJson": null,
+    "comparisonMarkdown": null,
+    "ctxhelmEnabled": false,
+    "packEnabled": false,
+    "streamCaptureEnabled": false,
+    "adapterPreset": null,
+    "adapterCommandHash": null,
+    "ctxhelmConfigHash": null
+  },
+  "heads": [
+    {
+      "name": "native-search",
+      "agent": "demo-search",
+      "variant": "native_search",
+      "reportPath": "reports/native-search.json",
+      "traceDir": "traces/native-search",
+      "autopsyMarkdown": "docs/native-search-autopsy.md",
+      "comparisonJson": "reports/compare-native-search.json",
+      "comparisonMarkdown": "docs/compare-native-search.md",
+      "ctxhelmEnabled": false,
+      "packEnabled": false,
+      "streamCaptureEnabled": false,
+      "adapterPreset": "claude-code",
+      "adapterCommandHash": "cmd:9e066200e1e53d23",
+      "ctxhelmConfigHash": null
+    },
+    {
+      "name": "guided",
+      "agent": "demo-guided",
+      "variant": "ctxhelm_mcp",
+      "reportPath": "reports/guided.json",
+      "traceDir": "traces/guided",
+      "autopsyMarkdown": "docs/guided-autopsy.md",
+      "comparisonJson": "reports/compare-guided.json",
+      "comparisonMarkdown": "docs/compare-guided.md",
+      "ctxhelmEnabled": true,
+      "packEnabled": true,
+      "streamCaptureEnabled": false,
+      "adapterPreset": "claude-code",
+      "adapterCommandHash": "cmd:9e066200e1e53d23",
+      "ctxhelmConfigHash": "ctxhelm:0a4cd58a5b88f97e"
+    }
+  ],
+  "artifacts": {
+    "suiteHealthJson": "reports/suite-health.json",
+    "benchmarkSummaryJson": "reports/benchmark-summary.json",
+    "benchmarkSummaryMarkdown": "docs/benchmark-summary.md",
+    "qualityGateJson": "reports/quality-gate.json",
+    "qualityGateMarkdown": "docs/quality-gate.md",
+    "privacyReportJson": "reports/privacy-report.json",
+    "privacyReportMarkdown": "docs/privacy-report.md",
+    "dashboardHtml": "docs/dashboard.html",
+    "baselineAutopsyMarkdown": "docs/native-autopsy.md",
+    "reproductionMarkdown": "docs/reproduction.md",
+    "evidenceManifest": "evidence/manifest.json"
+  },
+  "artifactDigests": [
+    {
+      "path": "docs/benchmark-summary.md",
+      "byteCount": 2599,
+      "contentHash": "fnv64:b1e1db93cab08129"
+    },
+    {
+      "path": "docs/compare-guided.md",
+      "byteCount": 431,
+      "contentHash": "fnv64:efeb80aa8e09e81e"
+    },
+    {
+      "path": "docs/compare-native-search.md",
+      "byteCount": 431,
+      "contentHash": "fnv64:4ccd265f692f3165"
+    },
+    {
+      "path": "docs/dashboard.html",
+      "byteCount": 8501,
+      "contentHash": "fnv64:99ee80607a7591f3"
+    },
+    {
+      "path": "docs/guided-autopsy.md",
+      "byteCount": 867,
+      "contentHash": "fnv64:737270f2e4d70cc5"
+    },
+    {
+      "path": "docs/native-autopsy.md",
+      "byteCount": 958,
+      "contentHash": "fnv64:ebf97b0337f6700a"
+    },
+    {
+      "path": "docs/native-search-autopsy.md",
+      "byteCount": 869,
+      "contentHash": "fnv64:2e4e28930e2e0889"
+    },
+    {
+      "path": "docs/privacy-report.md",
+      "byteCount": 1821,
+      "contentHash": "fnv64:ea5c8ca5c0c6ffdd"
+    },
+    {
+      "path": "docs/quality-gate.md",
+      "byteCount": 1409,
+      "contentHash": "fnv64:e95eff7443c7f72d"
+    },
+    {
+      "path": "docs/reproduction.md",
+      "byteCount": 2719,
+      "contentHash": "fnv64:ff3e292e0de4eef7"
+    },
+    {
+      "path": "evidence/manifest.json",
+      "byteCount": 1892,
+      "contentHash": "fnv64:dad7a8b9b6aea3b6"
+    },
+    {
+      "path": "reports/benchmark-summary.json",
+      "byteCount": 7204,
+      "contentHash": "fnv64:7da52aeccccb4004"
+    },
+    {
+      "path": "reports/compare-guided.json",
+      "byteCount": 571,
+      "contentHash": "fnv64:5fe418935c2472a6"
+    },
+    {
+      "path": "reports/compare-native-search.json",
+      "byteCount": 572,
+      "contentHash": "fnv64:f38fb9154d45355d"
+    },
+    {
+      "path": "reports/guided.json",
+      "byteCount": 2054,
+      "contentHash": "fnv64:c8e11b9f824459a6"
+    },
+    {
+      "path": "reports/native-search.json",
+      "byteCount": 2052,
+      "contentHash": "fnv64:523b504af1ced6ef"
+    },
+    {
+      "path": "reports/native.json",
+      "byteCount": 2049,
+      "contentHash": "fnv64:f2de4816ae536d12"
+    },
+    {
+      "path": "reports/privacy-report.json",
+      "byteCount": 2657,
+      "contentHash": "fnv64:ff1e747cbf00f80e"
+    },
+    {
+      "path": "reports/quality-gate.json",
+      "byteCount": 3081,
+      "contentHash": "fnv64:9992cb3ba06ff46e"
+    },
+    {
+      "path": "reports/suite-health.json",
+      "byteCount": 1456,
+      "contentHash": "fnv64:647c968d0ee14400"
+    },
+    {
+      "path": "traces/guided/demo-auth-001.json",
+      "byteCount": 1563,
+      "contentHash": "fnv64:f6900bbc970b6464"
+    },
+    {
+      "path": "traces/native-search/demo-auth-001.json",
+      "byteCount": 1102,
+      "contentHash": "fnv64:68231e81701e8dac"
+    },
+    {
+      "path": "traces/native/demo-auth-001.json",
+      "byteCount": 703,
+      "contentHash": "fnv64:fdd14564f8608d87"
+    }
+  ],
+  "qualityGatePassed": true,
+  "evidenceBundleVerified": true,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "taskId": "demo-auth-001",
+  "agent": "demo-search",
+  "variant": "native_search",
+  "status": "success",
+  "recommendedFiles": [
+    {
+      "path": "examples/demo-app/auth.txt",
+      "pathHash": "path:73d086281b248017",
+      "observedAtMillis": 10
+    }
+  ],
+  "filesRead": [
+    {
+      "path": "examples/demo-app/auth.txt",
+      "pathHash": "path:73d086281b248017",
+      "observedAtMillis": 20
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "examples/demo-app/auth.txt",
+      "pathHash": "path:73d086281b248017",
+      "observedAtMillis": null
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "other",
+      "commandHash": "cmd:4b4b762bdcf0cc0f",
+      "touchedTests": [
+        "examples/demo-app/auth.test"
+      ],
+      "exitStatus": 0,
+      "elapsedMillis": 26
+    }
+  ],
+  "toolCallCount": 5,
+  "tokenEstimate": null,
+  "elapsedMillis": 1290,
+  "timeToFirstRelevantFileMillis": 20,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

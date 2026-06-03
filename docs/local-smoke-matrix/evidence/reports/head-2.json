@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 2,
+  "suiteName": "local-run-smoke",
+  "agent": "demo-guided",
+  "variant": "ctxhelm_mcp",
+  "summary": {
+    "taskCount": 1,
+    "successCount": 1,
+    "successRate": 1.0,
+    "totalFilesRead": 1,
+    "totalIrrelevantFileReads": 0,
+    "irrelevantReadRate": 0.0,
+    "averageRecommendationPrecision": 1.0,
+    "averageRecommendationRecall": 1.0,
+    "averageContextPrecision": 1.0,
+    "averageEditedFileRecall": 1.0,
+    "validationCoverageRate": 1.0,
+    "averageTimeToFirstRelevantFileMillis": 20.0,
+    "totalToolCalls": 10,
+    "totalTokenEstimate": 64,
+    "commandSummary": {
+      "totalCommandCount": 3,
+      "testCommandCount": 0,
+      "buildCommandCount": 0,
+      "lintCommandCount": 0,
+      "typecheckCommandCount": 0,
+      "otherCommandCount": 3,
+      "successfulCommandCount": 3,
+      "failedCommandCount": 0
+    }
+  },
+  "tasks": [
+    {
+      "taskId": "demo-auth-001",
+      "status": "success",
+      "expectedFileCount": 1,
+      "expectedTestCount": 1,
+      "recommendedFileCount": 2,
+      "relevantRecommendedFileCount": 2,
+      "irrelevantRecommendedFileCount": 0,
+      "recommendationPrecision": 1.0,
+      "recommendationRecall": 1.0,
+      "filesReadCount": 1,
+      "relevantFilesReadCount": 1,
+      "irrelevantFileReadCount": 0,
+      "filesEditedCount": 1,
+      "expectedFilesEditedCount": 1,
+      "contextPrecision": 1.0,
+      "editedFileRecall": 1.0,
+      "validationCovered": true,
+      "commandSummary": {
+        "totalCommandCount": 3,
+        "testCommandCount": 0,
+        "buildCommandCount": 0,
+        "lintCommandCount": 0,
+        "typecheckCommandCount": 0,
+        "otherCommandCount": 3,
+        "successfulCommandCount": 3,
+        "failedCommandCount": 0
+      },
+      "toolCallCount": 10,
+      "tokenEstimate": 64,
+      "elapsedMillis": 1222,
+      "timeToFirstRelevantFileMillis": 20
+    }
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

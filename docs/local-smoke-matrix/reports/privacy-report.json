@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "suiteName": "local-run-smoke",
+  "taskCount": 1,
+  "runCount": 3,
+  "traceCount": 3,
+  "recordedMetadata": [
+    "task ids",
+    "agent labels",
+    "variant labels",
+    "relative file paths and path hashes",
+    "command classes and command hashes",
+    "touched expected-test paths",
+    "exit statuses",
+    "task status",
+    "tool-call counts",
+    "token estimates",
+    "elapsed timing metadata",
+    "ctxhelm recommendation paths",
+    "ctxhelm pack token estimates",
+    "artifact byte counts and hashes"
+  ],
+  "forbiddenRawData": [
+    "raw source",
+    "raw prompts",
+    "raw model transcripts",
+    "raw terminal logs",
+    "raw adapter commands",
+    "raw setup commands",
+    "raw MCP payloads",
+    "raw ctxhelm pack sections or snippets",
+    "secrets"
+  ],
+  "safeguards": [
+    "trace and report readers reject privacy flags that indicate raw data logging",
+    "structured streams are parsed in memory and not persisted by capture-stream",
+    "adapter and setup commands are stored as source-free hashes",
+    "matrix artifact paths are safe relative paths",
+    "published matrix artifacts are byte-counted and content-hashed",
+    "evidence bundles are verified before the matrix manifest is written"
+  ],
+  "runs": [
+    {
+      "name": "native",
+      "agent": "demo-baseline",
+      "variant": "native",
+      "reportPath": "reports/native.json",
+      "traceDir": "traces/native",
+      "traceCount": 1,
+      "sourceFreeTraceCount": 1,
+      "reportSourceFree": true,
+      "rawSourceLogged": false,
+      "rawPromptLogged": false,
+      "rawTranscriptLogged": false,
+      "rawTerminalLogged": false
+    },
+    {
+      "name": "native-search",
+      "agent": "demo-search",
+      "variant": "native_search",
+      "reportPath": "reports/native-search.json",
+      "traceDir": "traces/native-search",
+      "traceCount": 1,
+      "sourceFreeTraceCount": 1,
+      "reportSourceFree": true,
+      "rawSourceLogged": false,
+      "rawPromptLogged": false,
+      "rawTranscriptLogged": false,
+      "rawTerminalLogged": false
+    },
+    {
+      "name": "guided",
+      "agent": "demo-guided",
+      "variant": "ctxhelm_mcp",
+      "reportPath": "reports/guided.json",
+      "traceDir": "traces/guided",
+      "traceCount": 1,
+      "sourceFreeTraceCount": 1,
+      "reportSourceFree": true,
+      "rawSourceLogged": false,
+      "rawPromptLogged": false,
+      "rawTranscriptLogged": false,
+      "rawTerminalLogged": false
+    }
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

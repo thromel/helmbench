@@ -1,0 +1,72 @@
+{
+  "schemaVersion": 1,
+  "suiteName": "local-run-smoke",
+  "baselineAgent": "demo-baseline",
+  "baselineVariant": "native",
+  "evidenceUse": "outcome_ready",
+  "artifacts": [
+    {
+      "kind": "suite",
+      "path": "suite.json",
+      "sourceName": "local-run-smoke.json",
+      "byteCount": 764,
+      "contentHash": "fnv64:24f1f885604b852d",
+      "sourceFreeChecked": true
+    },
+    {
+      "kind": "health",
+      "path": "health.json",
+      "sourceName": "suite-health.json",
+      "byteCount": 1456,
+      "contentHash": "fnv64:647c968d0ee14400",
+      "sourceFreeChecked": true
+    },
+    {
+      "kind": "base_report",
+      "path": "reports/base.json",
+      "sourceName": "native.json",
+      "byteCount": 2049,
+      "contentHash": "fnv64:f2de4816ae536d12",
+      "sourceFreeChecked": true
+    },
+    {
+      "kind": "head_report",
+      "path": "reports/head-1.json",
+      "sourceName": "native-search.json",
+      "byteCount": 2052,
+      "contentHash": "fnv64:523b504af1ced6ef",
+      "sourceFreeChecked": true
+    },
+    {
+      "kind": "head_report",
+      "path": "reports/head-2.json",
+      "sourceName": "guided.json",
+      "byteCount": 2054,
+      "contentHash": "fnv64:c8e11b9f824459a6",
+      "sourceFreeChecked": true
+    },
+    {
+      "kind": "benchmark_summary_json",
+      "path": "benchmark-summary.json",
+      "sourceName": "generated",
+      "byteCount": 7204,
+      "contentHash": "fnv64:7da52aeccccb4004",
+      "sourceFreeChecked": true
+    },
+    {
+      "kind": "benchmark_summary_markdown",
+      "path": "benchmark-summary.md",
+      "sourceName": "generated",
+      "byteCount": 2599,
+      "contentHash": "fnv64:b1e1db93cab08129",
+      "sourceFreeChecked": true
+    }
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

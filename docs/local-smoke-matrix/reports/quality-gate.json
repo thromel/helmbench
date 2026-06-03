@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 1,
+  "suiteName": "local-run-smoke",
+  "passed": true,
+  "warnings": [
+    "Low sample size: 1 task(s). Treat deltas as directional until the suite has at least 10 tasks.",
+    "Intervals use a Wilson score interval for binary per-task rates."
+  ],
+  "checks": [
+    {
+      "headAgent": "demo-search",
+      "headVariant": "native_search",
+      "metric": "success_rate_delta",
+      "operator": ">=",
+      "actual": 1.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-search",
+      "headVariant": "native_search",
+      "metric": "validation_coverage_rate_delta",
+      "operator": ">=",
+      "actual": 1.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-search",
+      "headVariant": "native_search",
+      "metric": "irrelevant_read_rate_delta",
+      "operator": "<=",
+      "actual": 0.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-search",
+      "headVariant": "native_search",
+      "metric": "recommendation_recall_delta",
+      "operator": ">=",
+      "actual": 0.5,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-search",
+      "headVariant": "native_search",
+      "metric": "context_precision_delta",
+      "operator": ">=",
+      "actual": 1.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-search",
+      "headVariant": "native_search",
+      "metric": "edited_file_recall_delta",
+      "operator": ">=",
+      "actual": 1.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-guided",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "success_rate_delta",
+      "operator": ">=",
+      "actual": 1.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-guided",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "validation_coverage_rate_delta",
+      "operator": ">=",
+      "actual": 1.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-guided",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "irrelevant_read_rate_delta",
+      "operator": "<=",
+      "actual": 0.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-guided",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "recommendation_recall_delta",
+      "operator": ">=",
+      "actual": 1.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-guided",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "context_precision_delta",
+      "operator": ">=",
+      "actual": 1.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-guided",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "edited_file_recall_delta",
+      "operator": ">=",
+      "actual": 1.0,
+      "threshold": 0.0,
+      "passed": true
+    }
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

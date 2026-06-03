@@ -1,0 +1,249 @@
+{
+  "schemaVersion": 7,
+  "suiteName": "local-run-smoke",
+  "baseline": {
+    "agent": "demo-baseline",
+    "variant": "native",
+    "taskCount": 1,
+    "successCount": 0,
+    "successRate": 0.0,
+    "successRateInterval": {
+      "confidenceLevel": 0.95,
+      "lower": 0.0,
+      "upper": 0.7934507
+    },
+    "validationCoveredCount": 0,
+    "validationCoverageRate": 0.0,
+    "validationCoverageRateInterval": {
+      "confidenceLevel": 0.95,
+      "lower": 0.0,
+      "upper": 0.7934507
+    },
+    "irrelevantReadRate": 0.0,
+    "recommendationPrecision": 0.0,
+    "recommendationRecall": 0.0,
+    "contextPrecision": 0.0,
+    "editedFileRecall": 0.0,
+    "averageTimeToFirstRelevantFileMillis": null,
+    "totalToolCalls": 2,
+    "totalTokenEstimate": 0,
+    "toolCallsPerSuccess": null,
+    "tokenEstimatePerSuccess": null,
+    "commandSummary": {
+      "totalCommandCount": 1,
+      "testCommandCount": 0,
+      "buildCommandCount": 0,
+      "lintCommandCount": 0,
+      "typecheckCommandCount": 0,
+      "otherCommandCount": 1,
+      "successfulCommandCount": 0,
+      "failedCommandCount": 1
+    },
+    "failureTaxonomy": {
+      "failedTaskCount": 1,
+      "skippedTaskCount": 0,
+      "validationGapCount": 1,
+      "noRelevantFileReadCount": 1,
+      "noExpectedEditCount": 1,
+      "recommendationMissCount": 1,
+      "irrelevantReadTaskCount": 0
+    }
+  },
+  "runs": [
+    {
+      "agent": "demo-baseline",
+      "variant": "native",
+      "taskCount": 1,
+      "successCount": 0,
+      "successRate": 0.0,
+      "successRateInterval": {
+        "confidenceLevel": 0.95,
+        "lower": 0.0,
+        "upper": 0.7934507
+      },
+      "validationCoveredCount": 0,
+      "validationCoverageRate": 0.0,
+      "validationCoverageRateInterval": {
+        "confidenceLevel": 0.95,
+        "lower": 0.0,
+        "upper": 0.7934507
+      },
+      "irrelevantReadRate": 0.0,
+      "recommendationPrecision": 0.0,
+      "recommendationRecall": 0.0,
+      "contextPrecision": 0.0,
+      "editedFileRecall": 0.0,
+      "averageTimeToFirstRelevantFileMillis": null,
+      "totalToolCalls": 2,
+      "totalTokenEstimate": 0,
+      "toolCallsPerSuccess": null,
+      "tokenEstimatePerSuccess": null,
+      "commandSummary": {
+        "totalCommandCount": 1,
+        "testCommandCount": 0,
+        "buildCommandCount": 0,
+        "lintCommandCount": 0,
+        "typecheckCommandCount": 0,
+        "otherCommandCount": 1,
+        "successfulCommandCount": 0,
+        "failedCommandCount": 1
+      },
+      "failureTaxonomy": {
+        "failedTaskCount": 1,
+        "skippedTaskCount": 0,
+        "validationGapCount": 1,
+        "noRelevantFileReadCount": 1,
+        "noExpectedEditCount": 1,
+        "recommendationMissCount": 1,
+        "irrelevantReadTaskCount": 0
+      }
+    },
+    {
+      "agent": "demo-search",
+      "variant": "native_search",
+      "taskCount": 1,
+      "successCount": 1,
+      "successRate": 1.0,
+      "successRateInterval": {
+        "confidenceLevel": 0.95,
+        "lower": 0.20654932,
+        "upper": 1.0
+      },
+      "validationCoveredCount": 1,
+      "validationCoverageRate": 1.0,
+      "validationCoverageRateInterval": {
+        "confidenceLevel": 0.95,
+        "lower": 0.20654932,
+        "upper": 1.0
+      },
+      "irrelevantReadRate": 0.0,
+      "recommendationPrecision": 1.0,
+      "recommendationRecall": 0.5,
+      "contextPrecision": 1.0,
+      "editedFileRecall": 1.0,
+      "averageTimeToFirstRelevantFileMillis": 20.0,
+      "totalToolCalls": 5,
+      "totalTokenEstimate": 0,
+      "toolCallsPerSuccess": 5.0,
+      "tokenEstimatePerSuccess": 0.0,
+      "commandSummary": {
+        "totalCommandCount": 1,
+        "testCommandCount": 0,
+        "buildCommandCount": 0,
+        "lintCommandCount": 0,
+        "typecheckCommandCount": 0,
+        "otherCommandCount": 1,
+        "successfulCommandCount": 1,
+        "failedCommandCount": 0
+      },
+      "failureTaxonomy": {
+        "failedTaskCount": 0,
+        "skippedTaskCount": 0,
+        "validationGapCount": 0,
+        "noRelevantFileReadCount": 0,
+        "noExpectedEditCount": 0,
+        "recommendationMissCount": 0,
+        "irrelevantReadTaskCount": 0
+      }
+    },
+    {
+      "agent": "demo-guided",
+      "variant": "ctxhelm_mcp",
+      "taskCount": 1,
+      "successCount": 1,
+      "successRate": 1.0,
+      "successRateInterval": {
+        "confidenceLevel": 0.95,
+        "lower": 0.20654932,
+        "upper": 1.0
+      },
+      "validationCoveredCount": 1,
+      "validationCoverageRate": 1.0,
+      "validationCoverageRateInterval": {
+        "confidenceLevel": 0.95,
+        "lower": 0.20654932,
+        "upper": 1.0
+      },
+      "irrelevantReadRate": 0.0,
+      "recommendationPrecision": 1.0,
+      "recommendationRecall": 1.0,
+      "contextPrecision": 1.0,
+      "editedFileRecall": 1.0,
+      "averageTimeToFirstRelevantFileMillis": 20.0,
+      "totalToolCalls": 10,
+      "totalTokenEstimate": 64,
+      "toolCallsPerSuccess": 10.0,
+      "tokenEstimatePerSuccess": 64.0,
+      "commandSummary": {
+        "totalCommandCount": 3,
+        "testCommandCount": 0,
+        "buildCommandCount": 0,
+        "lintCommandCount": 0,
+        "typecheckCommandCount": 0,
+        "otherCommandCount": 3,
+        "successfulCommandCount": 3,
+        "failedCommandCount": 0
+      },
+      "failureTaxonomy": {
+        "failedTaskCount": 0,
+        "skippedTaskCount": 0,
+        "validationGapCount": 0,
+        "noRelevantFileReadCount": 0,
+        "noExpectedEditCount": 0,
+        "recommendationMissCount": 0,
+        "irrelevantReadTaskCount": 0
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "headAgent": "demo-search",
+      "headVariant": "native_search",
+      "successRateDelta": 1.0,
+      "validationCoverageRateDelta": 1.0,
+      "irrelevantReadRateDelta": 0.0,
+      "recommendationRecallDelta": 0.5,
+      "contextPrecisionDelta": 1.0,
+      "editedFileRecallDelta": 1.0,
+      "averageTimeToFirstRelevantFileMillisDelta": null,
+      "totalToolCallsDelta": 3,
+      "totalTokenEstimateDelta": 0,
+      "toolCallsPerSuccessDelta": null,
+      "tokenEstimatePerSuccessDelta": null,
+      "verdict": "mixed"
+    },
+    {
+      "headAgent": "demo-guided",
+      "headVariant": "ctxhelm_mcp",
+      "successRateDelta": 1.0,
+      "validationCoverageRateDelta": 1.0,
+      "irrelevantReadRateDelta": 0.0,
+      "recommendationRecallDelta": 1.0,
+      "contextPrecisionDelta": 1.0,
+      "editedFileRecallDelta": 1.0,
+      "averageTimeToFirstRelevantFileMillisDelta": null,
+      "totalToolCallsDelta": 8,
+      "totalTokenEstimateDelta": 64,
+      "toolCallsPerSuccessDelta": null,
+      "tokenEstimatePerSuccessDelta": null,
+      "verdict": "mixed"
+    }
+  ],
+  "confidence": {
+    "confidenceLevel": 0.95,
+    "minRecommendedTaskCount": 10,
+    "taskCount": 1,
+    "lowSampleWarning": true,
+    "notes": [
+      "Low sample size: 1 task(s). Treat deltas as directional until the suite has at least 10 tasks.",
+      "Intervals use a Wilson score interval for binary per-task rates."
+    ]
+  },
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

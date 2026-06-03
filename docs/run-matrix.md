@@ -138,6 +138,12 @@ uses the tracked `local-run-smoke` suite plus `scripts/demo-ctxhelm.sh`, so it
 can be validated and run from a fresh HelmBench checkout without a real ctxhelm
 install.
 
+The repository also commits the generated, verified local smoke matrix under
+[`docs/local-smoke-matrix/`](local-smoke-matrix/). It is intentionally small,
+but it exercises the publishable matrix path with outcome-ready suite health,
+source-free privacy reporting, evidence bundle verification, and a matrix
+manifest that `verify-matrix` can re-check.
+
 Before any agent row executes, `run-matrix` writes `reports/suite-health.json`
 and fails if the suite/repo preflight is unhealthy. This keeps publishable
 matrix evidence tied to a checked git repo, expected file/test existence,
