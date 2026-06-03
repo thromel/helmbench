@@ -147,6 +147,35 @@ enum Command {
         #[arg(long)]
         force: bool,
     },
+    /// Generate outcome-seeded task suites from public git commits.
+    InitGitRegressionSuite {
+        #[arg(long)]
+        repo: PathBuf,
+        #[arg(long)]
+        suite_out: PathBuf,
+        #[arg(long)]
+        health_out: Option<PathBuf>,
+        #[arg(long)]
+        suite_name: Option<String>,
+        #[arg(long)]
+        success_command: String,
+        #[arg(long)]
+        commit: Vec<String>,
+        #[arg(long, default_value_t = helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS)]
+        max_tasks: usize,
+        #[arg(long, default_value_t = 1)]
+        min_commits: u64,
+        #[arg(long)]
+        allow_dirty_health: bool,
+        #[arg(long)]
+        check_success_commands: bool,
+        #[arg(long)]
+        fail_fast_success_commands: bool,
+        #[arg(long, default_value_t = 900)]
+        timeout_seconds: u64,
+        #[arg(long)]
+        force: bool,
+    },
     /// Generate a repeatable public-repo run-matrix config for a real agent proof.
     InitPublicMatrix {
         #[arg(long, value_enum)]
@@ -855,6 +884,37 @@ fn main() -> Result<()> {
             init_public_suite(preset, &repo, &suite_out, &health_out, min_commits, force)?;
             println!("wrote {}", suite_out.display());
             println!("wrote {}", health_out.display());
+        }
+        Command::InitGitRegressionSuite {
+            repo,
+            suite_out,
+            health_out,
+            suite_name,
+            success_command,
+            commit,
+            max_tasks,
+            min_commits,
+            allow_dirty_health,
+            check_success_commands,
+            fail_fast_success_commands,
+            timeout_seconds,
+            force,
+        } => {
+            init_git_regression_suite(GitRegressionSuiteOptions {
+                repo,
+                suite_out,
+                health_out,
+                suite_name,
+                success_command,
+                commits: commit,
+                max_tasks,
+                min_commits,
+                allow_dirty_health,
+                check_success_commands,
+                fail_fast_success_commands,
+                timeout_seconds,
+                force,
+            })?;
         }
         Command::InitPublicMatrix {
             preset,
@@ -2866,6 +2926,218 @@ fn init_public_suite(
 
     write_json(&suite, suite_out)?;
     Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct GitRegressionSuiteOptions {
+    repo: PathBuf,
+    suite_out: PathBuf,
+    health_out: Option<PathBuf>,
+    suite_name: Option<String>,
+    success_command: String,
+    commits: Vec<String>,
+    max_tasks: usize,
+    min_commits: u64,
+    allow_dirty_health: bool,
+    check_success_commands: bool,
+    fail_fast_success_commands: bool,
+    timeout_seconds: u64,
+    force: bool,
+}
+
+fn init_git_regression_suite(options: GitRegressionSuiteOptions) -> Result<()> {
+    if options.max_tasks == 0 {
+        anyhow::bail!("--max-tasks must be greater than zero");
+    }
+    if options.success_command.trim().is_empty() {
+        anyhow::bail!("--success-command must not be empty");
+    }
+    ensure_output_path_available(&options.suite_out, options.force)?;
+    if let Some(path) = &options.health_out {
+        ensure_output_path_available(path, options.force)?;
+    }
+
+    let suite = git_regression_suite(&options)?;
+    validate_suite(&suite)?;
+    write_json(&suite, &options.suite_out)?;
+    println!("wrote {}", options.suite_out.display());
+
+    if let Some(health_out) = &options.health_out {
+        let health = suite_health_report(
+            Some("git-regression"),
+            &options.repo,
+            options.min_commits,
+            options.allow_dirty_health,
+            options.check_success_commands,
+            options.fail_fast_success_commands,
+            options.check_success_commands,
+            &suite,
+            &[],
+        )?;
+        write_json(&health, health_out)?;
+        println!("wrote {}", health_out.display());
+        if !health.ok {
+            anyhow::bail!(
+                "git regression suite health failed; wrote source-free health report to {}",
+                health_out.display()
+            );
+        }
+    }
+
+    Ok(())
+}
+
+fn git_regression_suite(options: &GitRegressionSuiteOptions) -> Result<helmbench::TaskSuite> {
+    let repo_name = options
+        .repo
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("repo");
+    let suite_name = options
+        .suite_name
+        .clone()
+        .unwrap_or_else(|| format!("{}-git-regressions", safe_task_dir_name(repo_name)));
+    let commits = git_regression_commits(&options.repo, &options.commits, options.max_tasks)?;
+    let mut tasks = Vec::new();
+    for commit in commits {
+        let changed_files = git_changed_files(&options.repo, &commit.hash)?;
+        if changed_files.is_empty() {
+            continue;
+        }
+        let expected_tests = changed_files
+            .iter()
+            .filter(|path| looks_like_test_path(path))
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut expected_files = changed_files
+            .iter()
+            .filter(|path| !looks_like_test_path(path))
+            .cloned()
+            .collect::<Vec<_>>();
+        if expected_files.is_empty() {
+            expected_files = changed_files.clone();
+        }
+        let short_hash = short_commit_hash(&commit.hash);
+        tasks.push(helmbench::BenchTask {
+            id: format!("git-regression-{short_hash}"),
+            prompt: format!(
+                "Recreate the behavior from public commit {short_hash}: {}. The task setup reverts that commit; inspect the changed paths and restore the intended behavior without unrelated edits.",
+                commit.subject
+            ),
+            expected_files,
+            expected_tests,
+            success_command: Some(options.success_command.clone()),
+            setup_commands: vec![format!("git revert --no-commit {}", commit.hash)],
+            tags: vec![
+                "public_repo".to_string(),
+                "git_regression".to_string(),
+                "outcome_seed".to_string(),
+                format!("commit:{short_hash}"),
+            ],
+            timeout_seconds: Some(options.timeout_seconds),
+        });
+        if tasks.len() >= options.max_tasks {
+            break;
+        }
+    }
+    if tasks.is_empty() {
+        anyhow::bail!("no usable git regression commits found");
+    }
+    Ok(helmbench::TaskSuite {
+        schema_version: helmbench::SUITE_SCHEMA_VERSION,
+        name: suite_name,
+        description: "Source-free git regression suite generated from public commits; each task setup reverts one commit in an isolated clone.".to_string(),
+        tasks,
+    })
+}
+
+#[derive(Debug, Clone)]
+struct GitRegressionCommit {
+    hash: String,
+    subject: String,
+}
+
+fn git_regression_commits(
+    repo: &Path,
+    requested: &[String],
+    max_tasks: usize,
+) -> Result<Vec<GitRegressionCommit>> {
+    let raw = if requested.is_empty() {
+        let limit = format!("-n{max_tasks}");
+        git_output(repo, &["log", "--no-merges", "--format=%H%x1f%s", &limit])?
+    } else {
+        let mut rows = Vec::new();
+        for commit in requested.iter().take(max_tasks) {
+            let hash = git_output(repo, &["rev-parse", commit])?;
+            let subject = git_output(repo, &["show", "-s", "--format=%s", &hash])?;
+            rows.push(format!("{hash}\u{1f}{subject}"));
+        }
+        rows.join("\n")
+    };
+    raw.lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let (hash, subject) = line
+                .split_once('\u{1f}')
+                .context("git log row missing separator")?;
+            Ok(GitRegressionCommit {
+                hash: hash.to_string(),
+                subject: source_free_commit_subject(subject),
+            })
+        })
+        .collect()
+}
+
+fn git_changed_files(repo: &Path, commit: &str) -> Result<Vec<String>> {
+    let raw = git_output(
+        repo,
+        &[
+            "diff-tree",
+            "--no-commit-id",
+            "--name-only",
+            "-r",
+            "--root",
+            "--diff-filter=ACMRT",
+            commit,
+        ],
+    )?;
+    let mut paths = Vec::new();
+    for line in raw.lines() {
+        let path = line.trim();
+        if path.is_empty() {
+            continue;
+        }
+        helmbench::validate_safe_relative_path_for_cli(path)?;
+        if repo.join(path).exists() {
+            paths.push(path.to_string());
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    Ok(paths)
+}
+
+fn looks_like_test_path(path: &str) -> bool {
+    let normalized = path.to_ascii_lowercase();
+    normalized.contains("test")
+        || normalized.contains("spec")
+        || normalized.starts_with("tests/")
+        || normalized.starts_with("test/")
+}
+
+fn short_commit_hash(hash: &str) -> String {
+    hash.chars().take(12).collect()
+}
+
+fn source_free_commit_subject(subject: &str) -> String {
+    subject
+        .chars()
+        .filter(|ch| !ch.is_control())
+        .collect::<String>()
+        .trim()
+        .chars()
+        .take(120)
+        .collect()
 }
 
 #[derive(Debug, Clone)]
@@ -8920,6 +9192,77 @@ mod tests {
         assert!(override_request.health_check_success_commands);
         assert!(override_request.health_fail_fast_success_commands);
         assert!(override_request.health_require_setup_commands);
+    }
+
+    #[test]
+    fn init_git_regression_suite_writes_outcome_ready_revert_tasks() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).expect("repo dir");
+        write_demo_file(&repo, "app.txt", "state=old\n").expect("old file");
+        init_git_repo(&repo).expect("initial commit");
+
+        write_demo_file(&repo, "app.txt", "state=fixed\n").expect("fixed file");
+        let add = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("add")
+            .arg(".")
+            .status()
+            .expect("git add");
+        assert!(add.success());
+        let commit = ProcessCommand::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .arg("-c")
+            .arg("user.name=HelmBench")
+            .arg("-c")
+            .arg("user.email=helmbench@example.test")
+            .arg("commit")
+            .arg("--quiet")
+            .arg("-m")
+            .arg("Fix seeded app behavior")
+            .status()
+            .expect("git commit");
+        assert!(commit.success());
+        let head = git_output(&repo, &["rev-parse", "HEAD"]).expect("head");
+
+        let suite_path = temp.path().join("git-regressions.json");
+        let health_path = temp.path().join("git-regressions-health.json");
+        init_git_regression_suite(GitRegressionSuiteOptions {
+            repo: repo.clone(),
+            suite_out: suite_path.clone(),
+            health_out: Some(health_path.clone()),
+            suite_name: Some("fixture-git-regressions".to_string()),
+            success_command: "grep -q fixed app.txt".to_string(),
+            commits: vec![head.clone()],
+            max_tasks: 10,
+            min_commits: 1,
+            allow_dirty_health: false,
+            check_success_commands: true,
+            fail_fast_success_commands: false,
+            timeout_seconds: 60,
+            force: false,
+        })
+        .expect("git regression suite");
+
+        let suite = load_suite(&suite_path).expect("suite");
+        assert_eq!(suite.name, "fixture-git-regressions");
+        assert_eq!(suite.tasks.len(), 1);
+        assert_eq!(suite.tasks[0].expected_files, vec!["app.txt"]);
+        assert!(suite.tasks[0].expected_tests.is_empty());
+        assert_eq!(
+            suite.tasks[0].setup_commands,
+            vec![format!("git revert --no-commit {head}")]
+        );
+        assert!(suite.tasks[0].tags.contains(&"git_regression".to_string()));
+
+        let health = read_public_suite_health(&health_path).expect("health");
+        assert!(health.ok);
+        assert_eq!(health.evidence_use, SuiteEvidenceUse::OutcomeReady);
+        assert_eq!(health.baseline_success_command_fail_count, 1);
+        assert_eq!(health.baseline_success_command_pass_count, 0);
+        assert_eq!(health.tasks_failed_setup_command.len(), 0);
     }
 
     #[test]

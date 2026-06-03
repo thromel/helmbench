@@ -144,12 +144,8 @@ recommendation proof to launch-grade agent outcome evidence. The checked
 RefactoringMiner outcome-readiness report currently shows validation can pass
 before any agent change and classifies the evidence as `navigation_only`, so
 seeded task setup is required before treating that suite as task-success
-evidence. Use
-`init-public-matrix` to generate that matrix config after the RefactoringMiner
-fixture passes suite health, run `suite-health --check-success-commands` to
-prove validation does not already pass before the agent runs, using
-`--fail-fast-success-commands` for large suites when needed, then run
+evidence. Use `init-git-regression-suite` to derive seeded public tasks from
+real commits and write a health artifact with `evidenceUse: outcome_ready`.
+Then use `init-public-matrix` or a normal `run-matrix` config with
+`healthCheckSuccessCommands` and `healthRequireSetupCommands`, and run
 `verify-matrix` on the generated output.
-After the suite has seeded task setup, pass `--health-check-success-commands`
-and `--health-require-setup-commands` to `init-public-matrix` so the generated
-config enforces that outcome-health proof automatically.

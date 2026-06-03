@@ -344,6 +344,28 @@ under `suites/ripgrep-public.json` and
 `suites/express-public.json` and
 `.helmbench/express-public-suite-health.json`.
 
+For outcome-ready public tasks, generate a git-regression suite from public
+commits. Each task stores paths and commit IDs, seeds the isolated clone with
+`git revert --no-commit <commit>`, and can write a source-free health report
+that proves validation fails before the agent edits anything:
+
+```bash
+cargo run -- init-git-regression-suite \
+  --repo ../ctxhelm-proof-fixtures/RefactoringMiner \
+  --suite-out /tmp/refactoringminer-git-regressions.json \
+  --health-out /tmp/refactoringminer-git-regressions-health.json \
+  --success-command './gradlew test' \
+  --max-tasks 10 \
+  --check-success-commands \
+  --fail-fast-success-commands \
+  --force
+```
+
+Use repeated `--commit <sha>` values when you want a fixed suite instead of the
+latest non-merge commits. Publish only suites whose health report records
+`evidenceUse: outcome_ready`; otherwise the run is navigation evidence, not a
+task-success benchmark.
+
 Validate a suite:
 
 ```bash
@@ -709,6 +731,7 @@ helmbench-cli
   demo-run
   run-matrix
   init-public-suite
+  init-git-regression-suite
   init-public-matrix
   suite-health
   validate-suite

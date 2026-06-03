@@ -121,6 +121,25 @@ that stronger suite-health gate before writing, then stores
 `healthCheckSuccessCommands` and `healthRequireSetupCommands` in the matrix
 config so `run-matrix` repeats the same preflight.
 
+One way to produce those seeded public suites is `init-git-regression-suite`.
+It derives tasks from public git commits and adds task-level setup commands
+that revert each selected commit in the isolated clone:
+
+```bash
+helmbench init-git-regression-suite \
+  --repo /tmp/RefactoringMiner \
+  --suite-out /tmp/refactoring-miner-git-regressions.json \
+  --health-out /tmp/refactoring-miner-git-regressions-health.json \
+  --success-command './gradlew test' \
+  --max-tasks 10 \
+  --check-success-commands \
+  --fail-fast-success-commands \
+  --force
+```
+
+The generated health report must show `evidenceUse: outcome_ready` before the
+suite should be used for launch-grade task-success claims.
+
 CLI values override `suite`, `repo`, `outDir`, `baseline`, and `heads` when
 provided. `qualityGate` configures the source-free quality gate written to
 `reports/quality-gate.json`; the `--min-task-count`,

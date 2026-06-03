@@ -90,6 +90,7 @@ cargo run -- validate-matrix --help >/dev/null
 cargo run -- run-matrix --help >/dev/null
 cargo run -- init-public-matrix --help | grep -q -- '--health-out'
 cargo run -- init-public-matrix --help | grep -q -- '--health-check-success-commands'
+cargo run -- init-git-regression-suite --help | grep -q -- '--check-success-commands'
 cargo run -- matrix-history --help >/dev/null
 cargo run -- init-public-suite --help >/dev/null
 cargo run -- suite-health --help >/dev/null
@@ -223,6 +224,33 @@ grep -q '"tasksMissingSetupCommand": \[\]' "$TMP_DIR/local-run-smoke-health-base
 grep -q '"validationBaselineReady": true' "$TMP_DIR/local-run-smoke-health-baseline.json"
 grep -q '"baselineSuccessCommandFailCount": 1' "$TMP_DIR/local-run-smoke-health-baseline.json"
 grep -q '"tasksFailedSetupCommand": \[\]' "$TMP_DIR/local-run-smoke-health-baseline.json"
+
+REGRESSION_REPO="$TMP_DIR/git-regression-repo"
+mkdir -p "$REGRESSION_REPO"
+printf 'state=old\n' > "$REGRESSION_REPO/app.txt"
+git -C "$REGRESSION_REPO" init --quiet
+git -C "$REGRESSION_REPO" add .
+git -C "$REGRESSION_REPO" -c user.name=HelmBench -c user.email=helmbench@example.test commit --quiet -m 'Create regression fixture'
+printf 'state=fixed\n' > "$REGRESSION_REPO/app.txt"
+git -C "$REGRESSION_REPO" add .
+git -C "$REGRESSION_REPO" -c user.name=HelmBench -c user.email=helmbench@example.test commit --quiet -m 'Fix seeded app behavior'
+REGRESSION_COMMIT="$(git -C "$REGRESSION_REPO" rev-parse HEAD)"
+cargo run -- init-git-regression-suite \
+  --repo "$REGRESSION_REPO" \
+  --suite-out "$TMP_DIR/git-regressions.json" \
+  --health-out "$TMP_DIR/git-regressions-health.json" \
+  --suite-name verify-git-regressions \
+  --success-command 'grep -q fixed app.txt' \
+  --commit "$REGRESSION_COMMIT" \
+  --check-success-commands \
+  --force
+cargo run -- validate-suite "$TMP_DIR/git-regressions.json"
+grep -q '"name": "verify-git-regressions"' "$TMP_DIR/git-regressions.json"
+grep -q 'git revert --no-commit' "$TMP_DIR/git-regressions.json"
+grep -q '"evidenceUse": "outcome_ready"' "$TMP_DIR/git-regressions-health.json"
+grep -q '"validationBaselineReady": true' "$TMP_DIR/git-regressions-health.json"
+grep -q '"baselineSuccessCommandFailCount": 1' "$TMP_DIR/git-regressions-health.json"
+grep -q '"sourceFree": true' "$TMP_DIR/git-regressions-health.json"
 
 cargo run -- local-run \
   --suite "$TMP_DIR/demo-suite.json" \

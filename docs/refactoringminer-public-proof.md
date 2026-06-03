@@ -125,6 +125,21 @@ only after the validation baseline is checked. Use the `preset=claude-code` or
 [`docs/run-matrix.md`](run-matrix.md) so HelmBench injects the source-free event
 contract instead of relying on hand-written adapter commands.
 
+For task-success evidence, first generate a seeded git-regression suite from
+public commits and require an outcome-ready health report:
+
+```bash
+cargo run -- init-git-regression-suite \
+  --repo <refactoringminer-repo> \
+  --suite-out /tmp/refactoring-miner-git-regressions.json \
+  --health-out /tmp/refactoring-miner-git-regressions-health.json \
+  --success-command './gradlew test' \
+  --max-tasks 10 \
+  --check-success-commands \
+  --fail-fast-success-commands \
+  --force
+```
+
 Generate the matrix config with suite-health checked up front:
 
 ```bash
