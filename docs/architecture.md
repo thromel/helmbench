@@ -217,11 +217,13 @@ if any check fails.
 
 Default thresholds require no regression in success rate, validation coverage,
 recommendation recall, context precision, edited-file recall, or irrelevant read
-rate. Optional thresholds can also cap tool-call, token, and average time to
-first relevant file deltas. Timing checks are skipped with a warning when either
-side of a comparison lacks timing metadata.
+rate. Optional thresholds can require a minimum task count and cap tool-call,
+token, and average time to first relevant file deltas. Timing checks are skipped
+with a warning when either side of a comparison lacks timing metadata.
 Quality-gate reports preserve benchmark-summary confidence warnings; a gate can
-pass while still warning that the suite is too small for strong claims.
+pass while still warning that the suite is too small for strong claims unless
+`minTaskCount` or `--min-task-count` turns that confidence floor into a failing
+check.
 
 This is the command to use when ctxhelm changes should be blocked unless they
 preserve or improve agent behavior on a suite.

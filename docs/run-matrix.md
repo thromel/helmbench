@@ -39,6 +39,7 @@ Config format:
   "setupCommands": [],
   "failOnRegression": true,
   "qualityGate": {
+    "minTaskCount": 10,
     "maxAverageTimeToFirstRelevantFileMillisDelta": 0,
     "maxTotalToolCallsDelta": 0,
     "maxTotalTokenEstimateDelta": 0
@@ -67,9 +68,10 @@ Config format:
 
 CLI values override `suite`, `repo`, `outDir`, `baseline`, and `heads` when
 provided. `qualityGate` configures the source-free quality gate written to
-`reports/quality-gate.json`; the `--max-average-time-to-first-relevant-file-millis-delta`,
-`--max-total-tool-calls-delta`, and `--max-total-token-estimate-delta` CLI
-flags override those optional caps for one run. `healthMinCommits` and
+`reports/quality-gate.json`; the `--min-task-count`,
+`--max-average-time-to-first-relevant-file-millis-delta`,
+`--max-total-tool-calls-delta`, and `--max-total-token-estimate-delta` CLI flags
+override those optional thresholds for one run. `healthMinCommits` and
 `allowDirtyHealth` control the matrix suite-health gate. `setupCommands` from
 the config run before additional `--setup-command` values. Config paths are
 resolved from the current working directory.
@@ -153,12 +155,14 @@ raw local commands.
 `reports/benchmark-summary.json` includes confidence metadata. HelmBench writes
 95% Wilson score intervals for success and validation coverage and warns when a
 suite has fewer than 10 tasks, so small demo runs are clearly marked as
-directional evidence. Each run summary also includes a source-free failure
-taxonomy for failed/skipped tasks, validation gaps, missing relevant reads,
-missing expected edits, recommendation misses, and irrelevant-read tasks.
-Run reports and benchmark summaries also include command mix counts for test,
-build, lint, typecheck, other, successful, and failed commands plus average
-time to first relevant file when traces include timing metadata.
+directional evidence. Use `qualityGate.minTaskCount` or `--min-task-count` when
+CI should fail instead of only warning on underpowered suites. Each run summary
+also includes a source-free failure taxonomy for failed/skipped tasks,
+validation gaps, missing relevant reads, missing expected edits,
+recommendation misses, and irrelevant-read tasks. Run reports and benchmark
+summaries also include command mix counts for test, build, lint, typecheck,
+other, successful, and failed commands plus average time to first relevant file
+when traces include timing metadata.
 
 Verify the bundle before publishing:
 

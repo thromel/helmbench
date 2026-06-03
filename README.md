@@ -165,8 +165,8 @@ Every successful matrix run writes `matrix-manifest.json`, a source-free
 top-level index of run labels, suite-health, report paths,
 dashboard/evidence artifacts, quality-gate status, and evidence verification
 status.
-Matrix configs can include a `qualityGate` block, including an optional cap for
-average time-to-first-relevant-file delta.
+Matrix configs can include a `qualityGate` block, including an optional minimum
+task count and caps for average time-to-first-relevant-file delta.
 Use `verify-matrix --matrix <out-dir>` to validate the manifest, referenced
 artifact hashes, and nested evidence bundle before publishing results.
 
@@ -460,7 +460,7 @@ pollute ctxhelm recommendation quality.
 | --- | --- |
 | Task success | Whether the trace reports success, failure, or skip. |
 | 95% confidence intervals | Wilson score intervals for binary per-task rates in benchmark summaries. |
-| Low-sample warning | Whether a benchmark suite has fewer than the recommended 10 tasks. |
+| Low-sample warning | Whether a benchmark suite has fewer than the recommended 10 tasks; CI gates can require a minimum task count. |
 | Failure taxonomy | Source-free counts for failed/skipped tasks, validation gaps, context misses, edit misses, recommendation misses, and irrelevant-read tasks. |
 | Command mix | Source-free counts of test, build, lint, typecheck, other, successful, and failed commands. |
 | Files read | Source-free paths the agent inspected. |

@@ -84,6 +84,8 @@ enum Command {
         #[arg(long)]
         fail_on_regression: bool,
         #[arg(long)]
+        min_task_count: Option<usize>,
+        #[arg(long)]
         max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
         #[arg(long)]
         max_total_tool_calls_delta: Option<i64>,
@@ -383,6 +385,8 @@ enum Command {
         out: Option<PathBuf>,
         #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
         format: OutputFormat,
+        #[arg(long)]
+        min_task_count: Option<usize>,
         #[arg(long, default_value_t = 0.0)]
         min_success_rate_delta: f32,
         #[arg(long, default_value_t = 0.0)]
@@ -580,6 +584,7 @@ fn main() -> Result<()> {
                 None,
                 None,
                 None,
+                None,
             )?;
             let suite = validate_run_matrix_request(&request)?;
             println!(
@@ -602,6 +607,7 @@ fn main() -> Result<()> {
             force,
             keep_workdirs,
             fail_on_regression,
+            min_task_count,
             max_average_time_to_first_relevant_file_millis_delta,
             max_total_tool_calls_delta,
             max_total_token_estimate_delta,
@@ -621,6 +627,7 @@ fn main() -> Result<()> {
                 fail_on_regression,
                 health_min_commits,
                 allow_dirty_health,
+                min_task_count,
                 max_average_time_to_first_relevant_file_millis_delta,
                 max_total_tool_calls_delta,
                 max_total_token_estimate_delta,
@@ -1081,6 +1088,7 @@ fn main() -> Result<()> {
             summary,
             out,
             format,
+            min_task_count,
             min_success_rate_delta,
             min_validation_coverage_rate_delta,
             max_irrelevant_read_rate_delta,
@@ -1095,6 +1103,7 @@ fn main() -> Result<()> {
             let gate = evaluate_quality_gate(
                 &summary,
                 &QualityGateConfig {
+                    min_task_count,
                     min_success_rate_delta,
                     min_validation_coverage_rate_delta,
                     max_irrelevant_read_rate_delta,
@@ -2321,6 +2330,8 @@ struct RunMatrixConfigSpec {
 #[serde(rename_all = "camelCase")]
 struct RunMatrixQualityGateConfig {
     #[serde(default)]
+    min_task_count: Option<usize>,
+    #[serde(default)]
     min_success_rate_delta: Option<f32>,
     #[serde(default)]
     min_validation_coverage_rate_delta: Option<f32>,
@@ -2354,6 +2365,7 @@ fn build_run_matrix_request(
     fail_on_regression: bool,
     health_min_commits: u64,
     allow_dirty_health: bool,
+    min_task_count: Option<usize>,
     max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
     max_total_tool_calls_delta: Option<i64>,
     max_total_token_estimate_delta: Option<i64>,
@@ -2432,6 +2444,7 @@ fn build_run_matrix_request(
         config
             .as_ref()
             .and_then(|config| config.quality_gate.as_ref()),
+        min_task_count,
         max_average_time_to_first_relevant_file_millis_delta,
         max_total_tool_calls_delta,
         max_total_token_estimate_delta,
@@ -2456,12 +2469,16 @@ fn build_run_matrix_request(
 
 fn run_matrix_quality_gate_config(
     config: Option<&RunMatrixQualityGateConfig>,
+    min_task_count: Option<usize>,
     max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
     max_total_tool_calls_delta: Option<i64>,
     max_total_token_estimate_delta: Option<i64>,
 ) -> QualityGateConfig {
     let mut gate = QualityGateConfig::default();
     if let Some(config) = config {
+        if let Some(value) = config.min_task_count {
+            gate.min_task_count = Some(value);
+        }
         if let Some(value) = config.min_success_rate_delta {
             gate.min_success_rate_delta = value;
         }
@@ -2489,6 +2506,9 @@ fn run_matrix_quality_gate_config(
         if let Some(value) = config.max_total_token_estimate_delta {
             gate.max_total_token_estimate_delta = Some(value);
         }
+    }
+    if min_task_count.is_some() {
+        gate.min_task_count = min_task_count;
     }
     if max_average_time_to_first_relevant_file_millis_delta.is_some() {
         gate.max_average_time_to_first_relevant_file_millis_delta =
@@ -5431,6 +5451,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .expect("matrix request");
         run_matrix(&request).expect("run matrix");
@@ -5691,6 +5712,7 @@ mod tests {
                 "healthMinCommits": 2,
                 "allowDirtyHealth": true,
                 "qualityGate": {
+                    "minTaskCount": 10,
                     "maxAverageTimeToFirstRelevantFileMillisDelta": 0.0,
                     "maxTotalToolCallsDelta": 0,
                     "maxTotalTokenEstimateDelta": 0
@@ -5733,6 +5755,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .expect("request");
 
@@ -5741,6 +5764,7 @@ mod tests {
         assert_eq!(request.out_dir, PathBuf::from("matrix-out"));
         assert!(request.force);
         assert!(request.fail_on_regression);
+        assert_eq!(request.quality_gate_config.min_task_count, Some(10));
         assert_eq!(
             request
                 .quality_gate_config
@@ -5790,6 +5814,7 @@ mod tests {
             true,
             3,
             false,
+            Some(20),
             Some(-10.0),
             Some(5),
             Some(100),
@@ -5809,6 +5834,10 @@ mod tests {
         );
         assert!(override_request.keep_workdirs);
         assert!(override_request.fail_on_regression);
+        assert_eq!(
+            override_request.quality_gate_config.min_task_count,
+            Some(20)
+        );
         assert_eq!(
             override_request
                 .quality_gate_config
@@ -5873,6 +5902,7 @@ mod tests {
             false,
             1,
             false,
+            None,
             None,
             None,
             None,

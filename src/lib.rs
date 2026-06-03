@@ -382,6 +382,7 @@ pub struct QualityGateCheck {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct QualityGateConfig {
+    pub min_task_count: Option<usize>,
     pub min_success_rate_delta: f32,
     pub min_validation_coverage_rate_delta: f32,
     pub max_irrelevant_read_rate_delta: f32,
@@ -396,6 +397,7 @@ pub struct QualityGateConfig {
 impl Default for QualityGateConfig {
     fn default() -> Self {
         Self {
+            min_task_count: None,
             min_success_rate_delta: 0.0,
             min_validation_coverage_rate_delta: 0.0,
             max_irrelevant_read_rate_delta: 0.0,
@@ -1497,6 +1499,17 @@ pub fn evaluate_quality_gate(
 
     let mut checks = Vec::new();
     let mut warnings = quality_gate_warnings(summary);
+    if let Some(threshold) = config.min_task_count {
+        checks.push(QualityGateCheck {
+            head_agent: "all".to_string(),
+            head_variant: AgentVariant::Other,
+            metric: "task_count".to_string(),
+            operator: ">=".to_string(),
+            actual: summary.confidence.task_count as f64,
+            threshold: threshold as f64,
+            passed: summary.confidence.task_count >= threshold,
+        });
+    }
     for comparison in &summary.comparisons {
         push_min_check(
             &mut checks,
@@ -3326,6 +3339,7 @@ mod tests {
         let pass = evaluate_quality_gate(
             &summary,
             &QualityGateConfig {
+                min_task_count: Some(1),
                 max_average_time_to_first_relevant_file_millis_delta: Some(0.0),
                 max_total_tool_calls_delta: Some(0),
                 max_total_token_estimate_delta: Some(0),
@@ -3336,6 +3350,10 @@ mod tests {
         assert!(pass.passed);
         assert!(!pass.warnings.is_empty());
         assert!(pass.warnings[0].contains("Low sample size"));
+        assert!(pass
+            .checks
+            .iter()
+            .any(|check| check.metric == "task_count" && check.passed));
         assert!(pass.checks.iter().any(|check| {
             check.metric == "average_time_to_first_relevant_file_millis_delta" && check.passed
         }));
@@ -3355,6 +3373,20 @@ mod tests {
             .checks
             .iter()
             .any(|check| check.metric == "success_rate_delta" && !check.passed));
+
+        let task_count_fail = evaluate_quality_gate(
+            &summary,
+            &QualityGateConfig {
+                min_task_count: Some(2),
+                ..QualityGateConfig::default()
+            },
+        )
+        .expect("task count gate");
+        assert!(!task_count_fail.passed);
+        assert!(task_count_fail
+            .checks
+            .iter()
+            .any(|check| check.metric == "task_count" && !check.passed));
 
         let latency_fail = evaluate_quality_gate(
             &summary,
