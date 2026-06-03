@@ -25,8 +25,9 @@ low-sample warning. The generated
 [launch-readiness report](launch-readiness.md) classifies the current checked-in
 proof as `smoke_proof`. It verifies the checked-in local smoke matrix and
 outcome-ready suite-health evidence, and it counts the checked-in real Claude
-Code smoke report as real-agent evidence. It still warns that launch-grade
-proof requires a 10-task real-agent public matrix.
+Code smoke report as real-agent evidence. It counts the RefactoringMiner
+10-task recommendation proof as public benchmark coverage, while still warning
+that launch-grade proof requires a 10-task real-agent public matrix.
 
 HelmBench also includes a real direct-agent smoke run over
 `suites/local-run-smoke.json`. That proof launches Claude Code through
@@ -104,6 +105,7 @@ cargo run -- launch-readiness \
   --health docs/local-smoke-matrix/reports/suite-health.json \
   --matrix docs/local-smoke-matrix \
   --real-agent-report reports/claude-real-smoke.json \
+  --public-report reports/refactoringminer-ctxhelm-plan.json \
   --out docs/launch-readiness.md \
   --format markdown
 
@@ -115,6 +117,7 @@ cargo run -- launch-readiness \
   --health docs/local-smoke-matrix/reports/suite-health.json \
   --matrix docs/local-smoke-matrix \
   --real-agent-report reports/claude-real-smoke.json \
+  --public-report reports/refactoringminer-ctxhelm-plan.json \
   --out reports/launch-readiness.json \
   --format json
 

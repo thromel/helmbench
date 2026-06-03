@@ -450,6 +450,8 @@ enum Command {
         matrix: Vec<PathBuf>,
         #[arg(long)]
         real_agent_report: Vec<PathBuf>,
+        #[arg(long)]
+        public_report: Vec<PathBuf>,
         #[arg(long, default_value_t = helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS)]
         min_task_count: usize,
         #[arg(long, default_value_t = 1)]
@@ -1312,6 +1314,7 @@ fn main() -> Result<()> {
             health,
             matrix,
             real_agent_report,
+            public_report,
             min_task_count,
             min_real_agent_rows,
             out,
@@ -1324,6 +1327,7 @@ fn main() -> Result<()> {
                 health_paths: &health,
                 matrix_paths: &matrix,
                 real_agent_report_paths: &real_agent_report,
+                public_report_paths: &public_report,
                 min_task_count,
                 min_real_agent_rows,
             })?;
@@ -1932,6 +1936,8 @@ struct LaunchReadinessBenchmark {
     run_count: usize,
     real_agent_run_count: usize,
     real_agent_report_count: usize,
+    public_report_count: usize,
+    public_task_count: usize,
     low_sample_warning: bool,
     best_success_rate: f32,
     best_validation_coverage_rate: f32,
@@ -1947,6 +1953,7 @@ struct LaunchReadinessInputs<'a> {
     health_paths: &'a [PathBuf],
     matrix_paths: &'a [PathBuf],
     real_agent_report_paths: &'a [PathBuf],
+    public_report_paths: &'a [PathBuf],
     min_task_count: usize,
     min_real_agent_rows: usize,
 }
@@ -2015,6 +2022,16 @@ fn build_launch_readiness_report(
         }
     }
     let real_agent_evidence_count = real_agent_run_count + real_agent_report_count;
+
+    let mut public_report_count = 0usize;
+    let mut public_task_count = 0usize;
+    for path in inputs.public_report_paths {
+        let report = read_report(path)?;
+        artifacts.push(launch_artifact("public_report", path));
+        public_report_count += 1;
+        public_task_count = public_task_count.max(report.summary.task_count);
+    }
+
     let best = summary
         .runs
         .iter()
@@ -2030,17 +2047,18 @@ fn build_launch_readiness_report(
         })
         .context("benchmark summary has no runs")?;
 
+    let task_count_evidence = summary.confidence.task_count.max(public_task_count);
     checks.push(launch_check(
-        "recommended task count",
-        if summary.confidence.task_count >= inputs.min_task_count {
+        "public benchmark coverage",
+        if task_count_evidence >= inputs.min_task_count {
             LaunchReadinessCheckStatus::Pass
         } else {
             LaunchReadinessCheckStatus::Warn
         },
         "benchmark_summary".to_string(),
         format!(
-            "{} task(s) observed; launch target is {}",
-            summary.confidence.task_count, inputs.min_task_count
+            "{} outcome task(s), {} public recommendation task(s); launch target is {}",
+            summary.confidence.task_count, public_task_count, inputs.min_task_count
         ),
     ));
     checks.push(launch_check(
@@ -2111,12 +2129,17 @@ fn build_launch_readiness_report(
 
     let mut verified_matrices = 0usize;
     let mut verified_matching_matrices = 0usize;
+    let mut launch_grade_public_matrices = 0usize;
     let mut matrix_suite_mismatches = 0usize;
     let mut matrix_failures = 0usize;
     for path in inputs.matrix_paths {
         match verify_run_matrix(path) {
             Ok(manifest) => {
                 verified_matrices += 1;
+                let matrix_real_agent_rows = std::iter::once(&manifest.baseline)
+                    .chain(manifest.heads.iter())
+                    .filter(|run| launch_agent_label_is_real(&run.agent))
+                    .count();
                 let matrix_summary_path =
                     matrix_path(path, &manifest.artifacts.benchmark_summary_json)?;
                 let matrix_summary = read_benchmark_summary(&matrix_summary_path)?;
@@ -2124,6 +2147,11 @@ fn build_launch_readiness_report(
                     verified_matching_matrices += 1;
                 } else {
                     matrix_suite_mismatches += 1;
+                }
+                if matrix_summary.confidence.task_count >= inputs.min_task_count
+                    && matrix_real_agent_rows >= inputs.min_real_agent_rows
+                {
+                    launch_grade_public_matrices += 1;
                 }
                 artifacts.push(launch_artifact("matrix", path));
                 artifacts.push(LaunchReadinessArtifact {
@@ -2155,6 +2183,21 @@ fn build_launch_readiness_report(
         } else {
             "no verified run-matrix artifact was supplied".to_string()
         },
+    ));
+    checks.push(launch_check(
+        "launch-grade public matrix",
+        if matrix_failures > 0 {
+            LaunchReadinessCheckStatus::Fail
+        } else if launch_grade_public_matrices > 0 {
+            LaunchReadinessCheckStatus::Pass
+        } else {
+            LaunchReadinessCheckStatus::Warn
+        },
+        "run_matrix".to_string(),
+        format!(
+            "{launch_grade_public_matrices} verified real-agent matrix output(s) at {}+ task(s); launch target is {} real-agent row(s)",
+            inputs.min_task_count, inputs.min_real_agent_rows
+        ),
     ));
 
     checks.push(launch_check(
@@ -2189,6 +2232,8 @@ fn build_launch_readiness_report(
             run_count: summary.runs.len(),
             real_agent_run_count,
             real_agent_report_count,
+            public_report_count,
+            public_task_count,
             low_sample_warning: summary.confidence.low_sample_warning,
             best_success_rate: best.success_rate,
             best_validation_coverage_rate: best.validation_coverage_rate,
@@ -2220,6 +2265,14 @@ fn render_markdown_launch_readiness(report: &LaunchReadinessReport) -> String {
     out.push_str(&format!(
         "| Real-agent reports | {} |\n",
         report.benchmark.real_agent_report_count
+    ));
+    out.push_str(&format!(
+        "| Public reports | {} |\n",
+        report.benchmark.public_report_count
+    ));
+    out.push_str(&format!(
+        "| Public report tasks | {} |\n",
+        report.benchmark.public_task_count
     ));
     out.push_str(&format!(
         "| Best success rate | {} |\n",
@@ -9873,6 +9926,7 @@ mod tests {
             health_paths: &[],
             matrix_paths: &[],
             real_agent_report_paths: &[],
+            public_report_paths: &[],
             min_task_count: helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS,
             min_real_agent_rows: 2,
         })
@@ -9887,7 +9941,7 @@ mod tests {
         assert!(report.benchmark.low_sample_warning);
         assert!(report.privacy.source_free);
         assert!(report.checks.iter().any(|check| {
-            check.name == "recommended task count"
+            check.name == "public benchmark coverage"
                 && check.status == LaunchReadinessCheckStatus::Warn
         }));
         assert!(report.checks.iter().any(|check| {
@@ -9917,6 +9971,7 @@ mod tests {
             health_paths: &[root.join("docs/local-smoke-matrix/reports/suite-health.json")],
             matrix_paths: &[root.join("docs/local-smoke-matrix")],
             real_agent_report_paths: &[root.join("reports/claude-real-smoke.json")],
+            public_report_paths: &[root.join("reports/refactoringminer-ctxhelm-plan.json")],
             min_task_count: helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS,
             min_real_agent_rows: 1,
         })
@@ -9925,6 +9980,8 @@ mod tests {
         assert_eq!(report.status, LaunchReadinessStatus::SmokeProof);
         assert_eq!(report.benchmark.real_agent_run_count, 0);
         assert_eq!(report.benchmark.real_agent_report_count, 1);
+        assert_eq!(report.benchmark.public_report_count, 1);
+        assert_eq!(report.benchmark.public_task_count, 10);
         assert!(report.checks.iter().any(|check| {
             check.name == "real-agent evidence" && check.status == LaunchReadinessCheckStatus::Pass
         }));
@@ -9932,13 +9989,19 @@ mod tests {
             check.name == "verified run matrix" && check.status == LaunchReadinessCheckStatus::Pass
         }));
         assert!(report.checks.iter().any(|check| {
-            check.name == "recommended task count"
+            check.name == "public benchmark coverage"
+                && check.status == LaunchReadinessCheckStatus::Pass
+        }));
+        assert!(report.checks.iter().any(|check| {
+            check.name == "launch-grade public matrix"
                 && check.status == LaunchReadinessCheckStatus::Warn
         }));
 
         let json = serde_json::to_string(&report).expect("json");
         assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));
         assert!(json.contains("\"realAgentReportCount\":1"));
+        assert!(json.contains("\"publicReportCount\":1"));
+        assert!(json.contains("\"publicTaskCount\":10"));
     }
 
     #[test]

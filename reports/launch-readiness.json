@@ -9,6 +9,8 @@
     "runCount": 3,
     "realAgentRunCount": 0,
     "realAgentReportCount": 1,
+    "publicReportCount": 1,
+    "publicTaskCount": 10,
     "lowSampleWarning": true,
     "bestSuccessRate": 1.0,
     "bestValidationCoverageRate": 1.0,
@@ -43,6 +45,11 @@
       "sourceFree": true
     },
     {
+      "kind": "public_report",
+      "label": "public_report:a5dde3393a65557c",
+      "sourceFree": true
+    },
+    {
       "kind": "health",
       "label": "health:7de86413dc8bde4c",
       "sourceFree": true
@@ -72,10 +79,10 @@
       "detail": "3 report(s) accepted by benchmark-summary"
     },
     {
-      "name": "recommended task count",
-      "status": "warn",
+      "name": "public benchmark coverage",
+      "status": "pass",
       "evidence": "benchmark_summary",
-      "detail": "1 task(s) observed; launch target is 10"
+      "detail": "1 outcome task(s), 10 public recommendation task(s); launch target is 10"
     },
     {
       "name": "real-agent evidence",
@@ -94,6 +101,12 @@
       "status": "pass",
       "evidence": "run_matrix",
       "detail": "1 matching verified matrix output(s), 0 suite mismatch(es), 0 failure(s)"
+    },
+    {
+      "name": "launch-grade public matrix",
+      "status": "warn",
+      "evidence": "run_matrix",
+      "detail": "0 verified real-agent matrix output(s) at 10+ task(s); launch target is 1 real-agent row(s)"
     },
     {
       "name": "privacy boundary",
