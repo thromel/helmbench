@@ -181,6 +181,7 @@ The summary artifact includes:
   and tasks with irrelevant reads;
 - source-free command mix counts for test/build/lint/typecheck/other commands
   plus successful and failed command counts;
+- average time to first relevant file when traces include timing metadata;
 - deltas from baseline for success, validation, recommendation recall, context
   precision, edited-file recall, irrelevant reads, tool calls, and token
   estimate;
@@ -197,7 +198,8 @@ over time. It verifies every matrix, reads each matrix's source-free
 `reports/benchmark-summary.json`, requires the suite and run names to match,
 and reports first-to-last deltas for success, validation coverage,
 recommendation recall, context precision, edited-file recall, irrelevant reads,
-tool calls, and token estimates.
+tool calls, token estimates, and average time to first relevant file when
+timing is available.
 
 The Markdown, JSON, and static HTML reports intentionally do not echo absolute
 matrix paths. They use source-free sequence labels so a published history

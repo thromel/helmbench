@@ -2179,6 +2179,7 @@ struct MatrixHistoryRun {
     recommendation_recall: f32,
     context_precision: f32,
     edited_file_recall: f32,
+    average_time_to_first_relevant_file_millis: Option<f32>,
     total_tool_calls: u32,
     total_token_estimate: u64,
 }
@@ -2207,6 +2208,9 @@ struct MatrixRunTrend {
     first_edited_file_recall: f32,
     last_edited_file_recall: f32,
     edited_file_recall_delta: f32,
+    first_average_time_to_first_relevant_file_millis: Option<f32>,
+    last_average_time_to_first_relevant_file_millis: Option<f32>,
+    average_time_to_first_relevant_file_millis_delta: Option<f32>,
     total_tool_calls_delta: i64,
     total_token_estimate_delta: i64,
 }
@@ -3031,6 +3035,8 @@ fn matrix_history_run(
         recommendation_recall: summary_run.recommendation_recall,
         context_precision: summary_run.context_precision,
         edited_file_recall: summary_run.edited_file_recall,
+        average_time_to_first_relevant_file_millis: summary_run
+            .average_time_to_first_relevant_file_millis,
         total_tool_calls: summary_run.total_tool_calls,
         total_token_estimate: summary_run.total_token_estimate,
     })
@@ -3082,6 +3088,14 @@ fn matrix_history_trends(entries: &[MatrixHistoryEntry]) -> Result<Vec<MatrixRun
                 last_edited_file_recall: last_run.edited_file_recall,
                 edited_file_recall_delta: last_run.edited_file_recall
                     - first_run.edited_file_recall,
+                first_average_time_to_first_relevant_file_millis: first_run
+                    .average_time_to_first_relevant_file_millis,
+                last_average_time_to_first_relevant_file_millis: last_run
+                    .average_time_to_first_relevant_file_millis,
+                average_time_to_first_relevant_file_millis_delta: optional_delta(
+                    first_run.average_time_to_first_relevant_file_millis,
+                    last_run.average_time_to_first_relevant_file_millis,
+                ),
                 total_tool_calls_delta: last_run.total_tool_calls as i64
                     - first_run.total_tool_calls as i64,
                 total_token_estimate_delta: last_run.total_token_estimate as i64
@@ -3089,6 +3103,10 @@ fn matrix_history_trends(entries: &[MatrixHistoryEntry]) -> Result<Vec<MatrixRun
             })
         })
         .collect()
+}
+
+fn optional_delta(first: Option<f32>, last: Option<f32>) -> Option<f32> {
+    Some(last? - first?)
 }
 
 fn source_free_matrix_label(matrix_index: usize, matrix_dir: &Path) -> String {
@@ -3121,11 +3139,11 @@ fn render_markdown_matrix_history(report: &MatrixHistoryReport) -> String {
     }
 
     out.push_str("\n## First-To-Last Trends\n\n");
-    out.push_str("| Run | Variant | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | Tools | Tokens |\n");
-    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    out.push_str("| Run | Variant | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens |\n");
+    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
     for trend in &report.trends {
         out.push_str(&format!(
-            "| `{}` | {} / {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+} | {:+} |\n",
+            "| `{}` | {} / {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {} | {:+} | {:+} |\n",
             trend.name,
             trend.agent,
             trend.variant,
@@ -3135,6 +3153,7 @@ fn render_markdown_matrix_history(report: &MatrixHistoryReport) -> String {
             matrix_pct(trend.context_precision_delta),
             matrix_pct(trend.edited_file_recall_delta),
             matrix_pct(trend.irrelevant_read_rate_delta),
+            markdown_optional_millis_delta(trend.average_time_to_first_relevant_file_millis_delta),
             trend.total_tool_calls_delta,
             trend.total_token_estimate_delta
         ));
@@ -3201,6 +3220,11 @@ fn render_html_matrix_history(report: &MatrixHistoryReport) -> String {
             matrix_pct(trend.last_irrelevant_read_rate),
             history_delta(trend.irrelevant_read_rate_delta, false),
         ));
+        out.push_str(&history_metric_tile_text(
+            "First relevant",
+            html_optional_millis(trend.last_average_time_to_first_relevant_file_millis),
+            html_optional_millis_delta(trend.average_time_to_first_relevant_file_millis_delta),
+        ));
         out.push_str("</div>\n</article>\n");
     }
     out.push_str("</section>\n");
@@ -3208,10 +3232,10 @@ fn render_html_matrix_history(report: &MatrixHistoryReport) -> String {
     out.push_str("<section class=\"panel\">\n");
     out.push_str("<h2>First-To-Last Trends</h2>\n");
     out.push_str("<div class=\"table-wrap\"><table>\n");
-    out.push_str("<thead><tr><th>Run</th><th>Variant</th><th>Success</th><th>Validation</th><th>Recommendation recall</th><th>Context precision</th><th>Edited recall</th><th>Irrelevant reads</th><th>Tools</th><th>Tokens</th></tr></thead>\n<tbody>\n");
+    out.push_str("<thead><tr><th>Run</th><th>Variant</th><th>Success</th><th>Validation</th><th>Recommendation recall</th><th>Context precision</th><th>Edited recall</th><th>Irrelevant reads</th><th>First relevant</th><th>Tools</th><th>Tokens</th></tr></thead>\n<tbody>\n");
     for trend in &report.trends {
         out.push_str(&format!(
-            "<tr><td><strong>{}</strong><br>{}</td><td><code>{:?}</code></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{:+}</td><td>{:+}</td></tr>\n",
+            "<tr><td><strong>{}</strong><br>{}</td><td><code>{:?}</code></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{:+}</td><td>{:+}</td></tr>\n",
             matrix_html_escape(&trend.name),
             matrix_html_escape(&trend.agent),
             trend.variant,
@@ -3221,6 +3245,7 @@ fn render_html_matrix_history(report: &MatrixHistoryReport) -> String {
             history_delta(trend.context_precision_delta, true),
             history_delta(trend.edited_file_recall_delta, true),
             history_delta(trend.irrelevant_read_rate_delta, false),
+            html_optional_millis_delta(trend.average_time_to_first_relevant_file_millis_delta),
             trend.total_tool_calls_delta,
             trend.total_token_estimate_delta
         ));
@@ -3237,11 +3262,14 @@ fn render_html_matrix_history(report: &MatrixHistoryReport) -> String {
             .iter()
             .map(|run| {
                 format!(
-                    "{} ({:?}): {:.1}% success, {:.1}% validation",
+                    "{} ({:?}): {:.1}% success, {:.1}% validation, {} first relevant",
                     matrix_html_escape(&run.name),
                     run.variant,
                     matrix_pct(run.success_rate),
-                    matrix_pct(run.validation_coverage_rate)
+                    matrix_pct(run.validation_coverage_rate),
+                    matrix_html_escape(&markdown_optional_millis(
+                        run.average_time_to_first_relevant_file_millis
+                    ))
                 )
             })
             .collect::<Vec<_>>()
@@ -3273,6 +3301,15 @@ fn history_metric_tile(label: &str, value: f32, delta: String) -> String {
     )
 }
 
+fn history_metric_tile_text(label: &str, value: String, delta: String) -> String {
+    format!(
+        "<div class=\"metric\"><span>{}</span><strong>{}</strong><em>{}</em></div>\n",
+        matrix_html_escape(label),
+        matrix_html_escape(&value),
+        delta
+    )
+}
+
 fn history_delta(value: f32, higher_is_better: bool) -> String {
     let class = if value.abs() < f32::EPSILON {
         "flat"
@@ -3285,6 +3322,38 @@ fn history_delta(value: f32, higher_is_better: bool) -> String {
         "<span class=\"delta {class}\">{:+.1}%</span>",
         matrix_pct(value)
     )
+}
+
+fn markdown_optional_millis(value: Option<f32>) -> String {
+    value
+        .map(|value| format!("{value:.0} ms"))
+        .unwrap_or_else(|| "n/a".to_string())
+}
+
+fn markdown_optional_millis_delta(value: Option<f32>) -> String {
+    value
+        .map(|value| format!("{value:+.0} ms"))
+        .unwrap_or_else(|| "n/a".to_string())
+}
+
+fn html_optional_millis(value: Option<f32>) -> String {
+    markdown_optional_millis(value)
+}
+
+fn html_optional_millis_delta(value: Option<f32>) -> String {
+    match value {
+        Some(value) => {
+            let class = if value.abs() < f32::EPSILON {
+                "flat"
+            } else if value < 0.0 {
+                "good"
+            } else {
+                "bad"
+            };
+            format!("<span class=\"delta {class}\">{value:+.0} ms</span>")
+        }
+        None => "<span class=\"delta flat\">n/a</span>".to_string(),
+    }
 }
 
 fn matrix_pct(value: f32) -> f32 {
@@ -5186,6 +5255,11 @@ mod tests {
         let verified = verify_run_matrix(&out).expect("verify matrix");
         assert_eq!(verified.heads.len(), 1);
         assert!(verified.evidence_bundle_verified);
+        let first_summary_path = out.join("reports/benchmark-summary.json");
+        let mut first_summary =
+            read_benchmark_summary(&first_summary_path).expect("first benchmark summary");
+        first_summary.runs[1].average_time_to_first_relevant_file_millis = Some(150.0);
+        write_json(&first_summary, &first_summary_path).expect("mutated first summary");
 
         let out2 = temp.path().join("matrix-second");
         let mut request2 = request.clone();
@@ -5200,6 +5274,7 @@ mod tests {
         second_summary.runs[1].recommendation_recall = 0.5;
         second_summary.runs[1].context_precision = 0.5;
         second_summary.runs[1].edited_file_recall = 0.5;
+        second_summary.runs[1].average_time_to_first_relevant_file_millis = Some(75.0);
         second_summary.runs[1].total_tool_calls += 3;
         second_summary.runs[1].total_token_estimate += 100;
         write_json(&second_summary, &summary_path).expect("mutated second summary");
@@ -5211,17 +5286,23 @@ mod tests {
         assert_eq!(history.trends[1].name, "guided");
         assert!(history.trends[1].success_rate_delta < 0.0);
         assert!(history.trends[1].irrelevant_read_rate_delta > 0.0);
+        assert_eq!(
+            history.trends[1].average_time_to_first_relevant_file_millis_delta,
+            Some(-75.0)
+        );
         assert_eq!(history.trends[1].total_tool_calls_delta, 3);
         assert!(history.privacy.source_free);
         let rendered = render_markdown_matrix_history(&history);
         assert!(rendered.contains("First-To-Last Trends"));
         assert!(rendered.contains("`guided`"));
+        assert!(rendered.contains("-75 ms"));
         assert!(!rendered.contains(temp.path().to_string_lossy().as_ref()));
         let html = render_html_matrix_history(&history);
         assert!(html.contains("<title>HelmBench Matrix History</title>"));
         assert!(html.contains("Matrix History"));
         assert!(html.contains("Source-free"));
         assert!(html.contains("guided"));
+        assert!(html.contains("-75 ms"));
         assert!(!html.contains(temp.path().to_string_lossy().as_ref()));
 
         let mut tampered = verified;

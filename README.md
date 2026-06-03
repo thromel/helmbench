@@ -467,7 +467,7 @@ pollute ctxhelm recommendation quality.
 | Context precision | Relevant reads divided by all reads. |
 | Edited-file recall | Expected target files edited divided by expected files. |
 | Validation coverage | Whether expected tests or validation command classes were run successfully. |
-| Time to first relevant file | How quickly the agent reached a target file. |
+| Time to first relevant file | How quickly the agent reached a target file; benchmark summaries and matrix history report average latency when traces provide timing. |
 | Tool/token cost | Source-free cost proxies from trace metadata. |
 
 ## Source-Free Claude Event JSONL

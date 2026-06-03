@@ -9,7 +9,7 @@ pub const TRACE_SCHEMA_VERSION: u32 = 1;
 pub const REPORT_SCHEMA_VERSION: u32 = 2;
 pub const AUTOPSY_SCHEMA_VERSION: u32 = 1;
 pub const DIFF_AUTOPSY_SCHEMA_VERSION: u32 = 1;
-pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 4;
+pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 5;
 pub const QUALITY_GATE_SCHEMA_VERSION: u32 = 1;
 pub const CONFIDENCE_LEVEL_95: f32 = 0.95;
 pub const MIN_RECOMMENDED_BENCHMARK_TASKS: usize = 10;
@@ -293,6 +293,7 @@ pub struct BenchmarkRunSummary {
     pub recommendation_recall: f32,
     pub context_precision: f32,
     pub edited_file_recall: f32,
+    pub average_time_to_first_relevant_file_millis: Option<f32>,
     pub total_tool_calls: u32,
     pub total_token_estimate: u64,
     #[serde(default)]
@@ -893,6 +894,9 @@ fn benchmark_run_summary(report: &RunReport) -> BenchmarkRunSummary {
         recommendation_recall: report.summary.average_recommendation_recall,
         context_precision: report.summary.average_context_precision,
         edited_file_recall: report.summary.average_edited_file_recall,
+        average_time_to_first_relevant_file_millis: report
+            .summary
+            .average_time_to_first_relevant_file_millis,
         total_tool_calls: report.summary.total_tool_calls,
         total_token_estimate: report.summary.total_token_estimate,
         command_summary: report.summary.command_summary.clone(),
@@ -1370,13 +1374,13 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
     out.push('\n');
 
     out.push_str("## Runs\n\n");
-    out.push_str("| Run | Tasks | Success | 95% CI | Validation | 95% CI | Rec recall | Context precision | Edited recall | Irrelevant reads | Tools | Tokens |\n");
+    out.push_str("| Run | Tasks | Success | 95% CI | Validation | 95% CI | Rec recall | Context precision | Edited recall | Irrelevant reads | Avg first relevant | Tools | Tokens |\n");
     out.push_str(
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n",
     );
     for run in &report.runs {
         out.push_str(&format!(
-            "| {} / {:?} | {} | {:.1}% | {} | {:.1}% | {} | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {} | {} |\n",
+            "| {} / {:?} | {} | {:.1}% | {} | {:.1}% | {} | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {} | {} | {} |\n",
             run.agent,
             run.variant,
             run.task_count,
@@ -1388,6 +1392,7 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
             pct(run.context_precision),
             pct(run.edited_file_recall),
             pct(run.irrelevant_read_rate),
+            format_optional_millis(run.average_time_to_first_relevant_file_millis),
             run.total_tool_calls,
             run.total_token_estimate
         ));
@@ -2943,6 +2948,12 @@ fn format_interval(interval: &ProportionInterval) -> String {
     format!("{:.1}-{:.1}%", pct(interval.lower), pct(interval.upper))
 }
 
+fn format_optional_millis(value: Option<f32>) -> String {
+    value
+        .map(|value| format!("{value:.0} ms"))
+        .unwrap_or_else(|| "n/a".to_string())
+}
+
 fn stable_hash(value: &str) -> String {
     let mut hash = 0xcbf29ce484222325u64;
     for byte in value.as_bytes() {
@@ -3077,7 +3088,7 @@ mod tests {
                 tool_call_count: 8,
                 token_estimate: Some(4000),
                 elapsed_millis: Some(2000),
-                time_to_first_relevant_file_millis: None,
+                time_to_first_relevant_file_millis: Some(20),
                 privacy: PrivacyStatus::source_free(),
             }],
         )
@@ -3110,7 +3121,7 @@ mod tests {
                 tool_call_count: 5,
                 token_estimate: Some(2500),
                 elapsed_millis: Some(1000),
-                time_to_first_relevant_file_millis: None,
+                time_to_first_relevant_file_millis: Some(20),
                 privacy: PrivacyStatus::source_free(),
             }],
         )
@@ -3132,6 +3143,14 @@ mod tests {
         assert_eq!(summary.runs[0].success_count, 0);
         assert_eq!(summary.runs[1].success_count, 1);
         assert_eq!(summary.runs[1].validation_covered_count, 1);
+        assert_eq!(
+            summary.runs[0].average_time_to_first_relevant_file_millis,
+            Some(20.0)
+        );
+        assert_eq!(
+            summary.runs[1].average_time_to_first_relevant_file_millis,
+            Some(20.0)
+        );
         assert_eq!(summary.runs[0].command_summary.total_command_count, 0);
         assert_eq!(summary.runs[1].command_summary.total_command_count, 1);
         assert_eq!(summary.runs[1].command_summary.test_command_count, 1);
@@ -3161,6 +3180,8 @@ mod tests {
         assert!(markdown.contains("Confidence"));
         assert!(markdown.contains("Low sample warning"));
         assert!(markdown.contains("95% CI"));
+        assert!(markdown.contains("Avg first relevant"));
+        assert!(markdown.contains("20 ms"));
         assert!(markdown.contains("Command Mix"));
         assert!(markdown.contains("Failure Taxonomy"));
         assert!(markdown.contains("Validation gaps"));

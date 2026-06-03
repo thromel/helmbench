@@ -148,7 +148,8 @@ directional evidence. Each run summary also includes a source-free failure
 taxonomy for failed/skipped tasks, validation gaps, missing relevant reads,
 missing expected edits, recommendation misses, and irrelevant-read tasks.
 Run reports and benchmark summaries also include command mix counts for test,
-build, lint, typecheck, other, successful, and failed commands.
+build, lint, typecheck, other, successful, and failed commands plus average
+time to first relevant file when traces include timing metadata.
 
 Verify the bundle before publishing:
 
@@ -195,7 +196,8 @@ The command verifies every matrix first, loads each matrix's
 `reports/benchmark-summary.json`, requires matching suite and run names, and
 reports first-to-last deltas for success, validation coverage, recommendation
 recall, context precision, edited-file recall, irrelevant reads, tool calls,
-and token estimates.
+token estimates, and average time to first relevant file when timing is
+available.
 
 The history report is source-free in Markdown, JSON, and HTML forms. It does
 not include raw source, prompts, transcripts, terminal logs, MCP payloads, or
