@@ -70,4 +70,4 @@ For development checkouts:
 
 This runs formatting, tests, clippy, CLI help checks, demo benchmark generation,
 matrix verification, matrix history generation, evidence-bundle verification,
-and whitespace checks.
+release workflow/docs consistency checks, and whitespace checks.

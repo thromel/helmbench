@@ -89,8 +89,8 @@ Run the local verification contract:
 
 This runs formatting, tests, clippy, CLI help checks, the reproducible demo
 benchmark, dashboard generation, benchmark summary generation, evidence bundle
-generation and verification, and whitespace checks. GitHub Actions runs the
-same script.
+generation and verification, release workflow/docs consistency checks, and
+whitespace checks. GitHub Actions runs the same script.
 
 Check local prerequisites and optional agent integrations:
 

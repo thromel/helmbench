@@ -12,6 +12,24 @@ trap cleanup EXIT INT TERM
 
 mkdir -p "$TMP_DIR"
 
+test -f LICENSE
+grep -q '^license = "MIT"$' Cargo.toml
+grep -q 'push:' .github/workflows/release.yml
+grep -q 'tags:' .github/workflows/release.yml
+grep -q '"v\*"' .github/workflows/release.yml
+grep -q 'cp README.md LICENSE' .github/workflows/release.yml
+grep -q 'dist/\*.sha256' .github/workflows/release.yml
+grep -q 'actions/attest-build-provenance@v2' .github/workflows/release.yml
+grep -q 'gh release create' .github/workflows/release.yml
+for target in \
+  x86_64-unknown-linux-gnu \
+  aarch64-apple-darwin \
+  x86_64-apple-darwin
+do
+  grep -q "$target" .github/workflows/release.yml
+  grep -q "$target" docs/install.md
+done
+
 cargo fmt --check
 cargo test
 cargo clippy --all-targets -- -D warnings
