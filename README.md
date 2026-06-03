@@ -182,8 +182,8 @@ cargo run -- init-demo-repo \
 
 The generated demo repo is healthy at rest. Its suite uses task-level
 `setupCommands` to seed failing states inside isolated task clones, so
-`suite-health --check-success-commands` can prove outcome readiness before an
-agent run.
+`suite-health --check-success-commands --require-setup-commands` can prove
+outcome readiness before an agent run.
 
 Run the full deterministic demo pipeline:
 

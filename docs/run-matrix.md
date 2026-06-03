@@ -136,7 +136,9 @@ isolated clones after any task-level `setupCommands` and proves they fail
 before the agent changes the repo. If they already pass, treat the matrix as
 navigation/validation-behavior evidence, not outcome evidence. Add
 `--fail-fast-success-commands` for large suites when the first pre-agent pass
-is enough to disprove outcome readiness.
+is enough to disprove outcome readiness. Add `--require-setup-commands` when
+the suite is intended to use clean-at-rest fixtures with per-task seeded
+failures.
 
 Run specs use comma-separated `key=value` fields:
 

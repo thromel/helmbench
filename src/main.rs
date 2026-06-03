@@ -201,6 +201,8 @@ enum Command {
         check_success_commands: bool,
         #[arg(long)]
         fail_fast_success_commands: bool,
+        #[arg(long)]
+        require_setup_commands: bool,
     },
     /// Validate a HelmBench suite contract.
     ValidateSuite { suite: PathBuf },
@@ -858,6 +860,7 @@ fn main() -> Result<()> {
             allow_dirty,
             check_success_commands,
             fail_fast_success_commands,
+            require_setup_commands,
         } => {
             let suite = load_suite(&suite)?;
             let preset_name = preset.map(public_suite_preset_name);
@@ -869,6 +872,7 @@ fn main() -> Result<()> {
                 allow_dirty,
                 check_success_commands,
                 fail_fast_success_commands,
+                require_setup_commands,
                 &suite,
                 anchor_files,
             )?;
@@ -1829,6 +1833,12 @@ struct PublicSuiteHealth {
     missing_expected_files: Vec<String>,
     missing_expected_tests: Vec<String>,
     #[serde(default)]
+    setup_commands_required: bool,
+    #[serde(default)]
+    setup_command_ready: bool,
+    #[serde(default)]
+    tasks_missing_setup_command: Vec<String>,
+    #[serde(default)]
     tasks_failed_setup_command: Vec<String>,
     tasks_missing_success_command: Vec<String>,
     #[serde(default)]
@@ -2266,6 +2276,7 @@ fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
         options.allow_dirty_health,
         false,
         false,
+        false,
         &suite,
         public_suite_anchor_files(options.preset),
     )?;
@@ -2394,6 +2405,7 @@ fn public_suite_health(
         false,
         false,
         false,
+        false,
         suite,
         public_suite_anchor_files(preset),
     )
@@ -2407,6 +2419,7 @@ fn suite_health_report(
     allow_dirty: bool,
     check_success_commands: bool,
     fail_fast_success_commands: bool,
+    require_setup_commands: bool,
     suite: &helmbench::TaskSuite,
     anchor_files: &[&str],
 ) -> Result<PublicSuiteHealth> {
@@ -2449,6 +2462,16 @@ fn suite_health_report(
         })
         .map(|task| task.id.clone())
         .collect::<Vec<_>>();
+    let tasks_missing_setup_command = if require_setup_commands {
+        suite
+            .tasks
+            .iter()
+            .filter(|task| task.setup_commands.is_empty())
+            .map(|task| task.id.clone())
+            .collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
     let expected_file_count = suite
         .tasks
         .iter()
@@ -2460,6 +2483,7 @@ fn suite_health_report(
         .map(|task| task.expected_tests.len())
         .sum::<usize>();
     let validation_ready = tasks_missing_success_command.is_empty();
+    let setup_command_ready = !require_setup_commands || tasks_missing_setup_command.is_empty();
     let (baseline_success_commands, tasks_failed_setup_command) = if check_success_commands {
         success_command_baseline(repo, suite, fail_fast_success_commands)?
     } else {
@@ -2508,6 +2532,7 @@ fn suite_health_report(
         && (!dirty || allow_dirty)
         && fsck_ok
         && validation_ready
+        && setup_command_ready
         && tasks_failed_setup_command.is_empty()
         && (!check_success_commands || validation_baseline_ready)
         && missing_files.is_empty()
@@ -2533,6 +2558,9 @@ fn suite_health_report(
         missing_files,
         missing_expected_files,
         missing_expected_tests,
+        setup_commands_required: require_setup_commands,
+        setup_command_ready,
+        tasks_missing_setup_command,
         tasks_failed_setup_command,
         tasks_missing_success_command,
         success_command_check_requested: check_success_commands,
@@ -2754,6 +2782,14 @@ fn render_markdown_suite_health(health: &PublicSuiteHealth) -> String {
         yes_no(health.validation_ready)
     ));
     out.push_str(&format!(
+        "| Setup commands required | {} |\n",
+        yes_no(health.setup_commands_required)
+    ));
+    out.push_str(&format!(
+        "| Setup commands ready | {} |\n",
+        yes_no(health.setup_command_ready)
+    ));
+    out.push_str(&format!(
         "| Success commands checked | {} |\n",
         yes_no(health.success_command_check_requested)
     ));
@@ -2785,6 +2821,11 @@ fn render_markdown_suite_health(health: &PublicSuiteHealth) -> String {
         &mut out,
         "Missing expected tests",
         &health.missing_expected_tests,
+    );
+    append_markdown_list(
+        &mut out,
+        "Tasks missing setup commands",
+        &health.tasks_missing_setup_command,
     );
     append_markdown_list(
         &mut out,
@@ -4011,6 +4052,7 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         &request.repo,
         request.health_min_commits,
         request.allow_dirty_health,
+        false,
         false,
         false,
         &suite,
@@ -8621,7 +8663,7 @@ mod tests {
         init_demo_repo(&repo, &suite_path, false).expect("demo repo");
         let suite = load_suite(&suite_path).expect("suite");
 
-        let health = suite_health_report(None, &repo, 1, false, false, false, &suite, &[])
+        let health = suite_health_report(None, &repo, 1, false, false, false, false, &suite, &[])
             .expect("suite health");
 
         assert!(health.ok);
@@ -8631,6 +8673,9 @@ mod tests {
         assert_eq!(health.expected_file_count, 2);
         assert_eq!(health.expected_test_count, 2);
         assert!(health.validation_ready);
+        assert!(!health.setup_commands_required);
+        assert!(health.setup_command_ready);
+        assert!(health.tasks_missing_setup_command.is_empty());
         assert!(health.missing_expected_files.is_empty());
         assert!(health.missing_expected_tests.is_empty());
         assert!(health.tasks_missing_success_command.is_empty());
@@ -8666,7 +8711,7 @@ mod tests {
             }],
         };
 
-        let failing = suite_health_report(None, &repo, 1, false, true, false, &suite, &[])
+        let failing = suite_health_report(None, &repo, 1, false, true, false, false, &suite, &[])
             .expect("failing baseline health");
         assert!(failing.ok);
         assert!(failing.success_command_check_requested);
@@ -8679,18 +8724,33 @@ mod tests {
             .command_hash
             .starts_with("cmd:"));
 
+        let missing_setup =
+            suite_health_report(None, &repo, 1, false, true, false, true, &suite, &[])
+                .expect("missing setup health");
+        assert!(!missing_setup.ok);
+        assert!(missing_setup.setup_commands_required);
+        assert!(!missing_setup.setup_command_ready);
+        assert_eq!(
+            missing_setup.tasks_missing_setup_command,
+            vec!["needs-agent-change"]
+        );
+
         suite.tasks[0].success_command = Some("test -f src/target.txt".to_string());
         suite.tasks[0].setup_commands = vec!["rm src/target.txt".to_string()];
-        let seeded = suite_health_report(None, &repo, 1, false, true, false, &suite, &[])
+        let seeded = suite_health_report(None, &repo, 1, false, true, false, true, &suite, &[])
             .expect("seeded baseline health");
         assert!(seeded.ok);
+        assert!(seeded.setup_commands_required);
+        assert!(seeded.setup_command_ready);
+        assert!(seeded.tasks_missing_setup_command.is_empty());
         assert!(seeded.validation_baseline_ready);
         assert_eq!(seeded.baseline_success_command_fail_count, 1);
         assert!(seeded.tasks_failed_setup_command.is_empty());
 
         suite.tasks[0].setup_commands = vec!["exit 2".to_string()];
-        let setup_failed = suite_health_report(None, &repo, 1, false, true, false, &suite, &[])
-            .expect("setup failure health");
+        let setup_failed =
+            suite_health_report(None, &repo, 1, false, true, false, true, &suite, &[])
+                .expect("setup failure health");
         assert!(!setup_failed.ok);
         assert_eq!(
             setup_failed.tasks_failed_setup_command,
@@ -8710,14 +8770,14 @@ mod tests {
             tags: Vec::new(),
             timeout_seconds: Some(30),
         });
-        let passing = suite_health_report(None, &repo, 1, false, true, false, &suite, &[])
+        let passing = suite_health_report(None, &repo, 1, false, true, false, false, &suite, &[])
             .expect("passing baseline health");
         assert!(!passing.ok);
         assert!(!passing.validation_baseline_ready);
         assert_eq!(passing.baseline_success_command_pass_count, 1);
         assert_eq!(passing.baseline_success_commands.len(), 2);
 
-        let fail_fast = suite_health_report(None, &repo, 1, false, true, true, &suite, &[])
+        let fail_fast = suite_health_report(None, &repo, 1, false, true, true, false, &suite, &[])
             .expect("fail-fast baseline health");
         assert!(!fail_fast.ok);
         assert!(fail_fast.success_command_check_fail_fast);
@@ -8752,7 +8812,7 @@ mod tests {
             }],
         };
 
-        let health = suite_health_report(None, &repo, 1, false, false, false, &suite, &[])
+        let health = suite_health_report(None, &repo, 1, false, false, false, false, &suite, &[])
             .expect("suite health");
 
         assert!(!health.ok);
@@ -8837,6 +8897,9 @@ mod tests {
                 missing_files: Vec::new(),
                 missing_expected_files: Vec::new(),
                 missing_expected_tests: Vec::new(),
+                setup_commands_required: false,
+                setup_command_ready: true,
+                tasks_missing_setup_command: Vec::new(),
                 tasks_failed_setup_command: Vec::new(),
                 tasks_missing_success_command: Vec::new(),
                 success_command_check_requested: false,

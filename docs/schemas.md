@@ -31,8 +31,8 @@ Available schema kinds:
   one benchmark task.
 - `suite-health`: source-free preflight report proving a suite is usable
   against a local git repository before benchmark results are trusted,
-  optionally including validation-baseline command hashes, statuses, and task
-  ids whose setup commands failed.
+  optionally including validation-baseline command hashes, statuses, setup
+  command readiness, and task ids whose setup commands are missing or failed.
 - `evidence-bundle`: source-free manifest for publishable benchmark evidence,
   including artifact paths, byte counts, and content hashes.
 - `run-matrix-manifest`: top-level source-free identity and artifact index for

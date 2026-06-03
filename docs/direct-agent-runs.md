@@ -57,6 +57,7 @@ helmbench suite-health \
   --suite suites/local-run-smoke.json \
   --repo . \
   --check-success-commands \
+  --require-setup-commands \
   --allow-dirty \
   --out /tmp/local-run-smoke-health.json
 ```

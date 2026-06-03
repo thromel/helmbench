@@ -36,7 +36,8 @@ helmbench suite-health \
   --repo ~/work/example-repo \
   --out /tmp/example-health.json \
   --check-success-commands \
-  --fail-fast-success-commands
+  --fail-fast-success-commands \
+  --require-setup-commands
 ```
 
 With this flag, HelmBench runs each `successCommand` inside an isolated clone
@@ -50,6 +51,11 @@ not ready. `--fail-fast-success-commands` stops after the first pre-agent pass
 and records the remaining tasks as skipped, which is useful for large public
 suites. Use `--preset` for generated public suites so the report includes the
 preset label and preset-specific anchor-file checks.
+
+Use `--require-setup-commands` when an outcome suite should keep the fixture
+repo healthy at rest and seed each task's failing state inside the isolated
+clone. The report records only task ids in `tasksMissingSetupCommand` when a
+task lacks setup seeding.
 
 By default, HelmBench requires a clean checkout and at least one commit. For
 local exploratory runs, a dirty checkout can be allowed explicitly:
@@ -74,6 +80,8 @@ The report records only source-free metadata:
 - expected file/test counts;
 - missing expected files and tests;
 - tasks missing `successCommand`;
+- whether task-level setup commands were required;
+- tasks missing task-level setup commands when required;
 - tasks whose per-task setup command failed;
 - optional validation-baseline status for `successCommand`s, including whether
   the check ran in fail-fast mode;
@@ -93,6 +101,8 @@ A suite is healthy when:
 - git fsck passes;
 - every expected file and expected test exists;
 - every task has a non-empty `successCommand`.
+- if `--require-setup-commands` is set, every task has at least one
+  `setupCommands` entry.
 
 When `--check-success-commands` is enabled, the suite is additionally healthy
 only when every `successCommand` fails before the agent runs. This prevents

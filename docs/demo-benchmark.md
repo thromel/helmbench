@@ -66,6 +66,7 @@ helmbench suite-health \
   --suite /tmp/helmbench-demo-suite.json \
   --repo /tmp/helmbench-demo-repo \
   --check-success-commands \
+  --require-setup-commands \
   --out /tmp/helmbench-demo-health.json
 ```
 

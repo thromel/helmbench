@@ -121,6 +121,7 @@ grep -q '"title": "HelmBench Autopsy"' "$TMP_DIR/autopsy.schema.json"
 grep -q '"title": "HelmBench Diff Autopsy"' "$TMP_DIR/diff-autopsy.schema.json"
 grep -q '"title": "HelmBench Suite Health"' "$TMP_DIR/suite-health.schema.json"
 grep -q '"tasksFailedSetupCommand"' "$TMP_DIR/suite-health.schema.json"
+grep -q '"tasksMissingSetupCommand"' "$TMP_DIR/suite-health.schema.json"
 grep -q '"title": "HelmBench Evidence Bundle"' "$TMP_DIR/evidence-bundle.schema.json"
 grep -q '"title": "HelmBench Run Matrix Manifest"' "$TMP_DIR/run-matrix-manifest.schema.json"
 grep -q '"adapterPreset"' "$TMP_DIR/run-matrix-manifest.schema.json"
@@ -160,9 +161,13 @@ cargo run -- suite-health \
   --repo "$TMP_DIR/demo-repo" \
   --out "$TMP_DIR/suite-health-baseline.json" \
   --check-success-commands \
-  --fail-fast-success-commands
+  --fail-fast-success-commands \
+  --require-setup-commands
 grep -q '"successCommandCheckRequested": true' "$TMP_DIR/suite-health-baseline.json"
 grep -q '"successCommandCheckFailFast": true' "$TMP_DIR/suite-health-baseline.json"
+grep -q '"setupCommandsRequired": true' "$TMP_DIR/suite-health-baseline.json"
+grep -q '"setupCommandReady": true' "$TMP_DIR/suite-health-baseline.json"
+grep -q '"tasksMissingSetupCommand": \[\]' "$TMP_DIR/suite-health-baseline.json"
 grep -q '"validationBaselineReady": true' "$TMP_DIR/suite-health-baseline.json"
 grep -q '"baselineSuccessCommandFailCount": 2' "$TMP_DIR/suite-health-baseline.json"
 grep -q '"tasksFailedSetupCommand": \[\]' "$TMP_DIR/suite-health-baseline.json"
@@ -172,8 +177,12 @@ cargo run -- suite-health \
   --repo . \
   --out "$TMP_DIR/local-run-smoke-health-baseline.json" \
   --allow-dirty \
-  --check-success-commands
+  --check-success-commands \
+  --require-setup-commands
 grep -q '"successCommandCheckRequested": true' "$TMP_DIR/local-run-smoke-health-baseline.json"
+grep -q '"setupCommandsRequired": true' "$TMP_DIR/local-run-smoke-health-baseline.json"
+grep -q '"setupCommandReady": true' "$TMP_DIR/local-run-smoke-health-baseline.json"
+grep -q '"tasksMissingSetupCommand": \[\]' "$TMP_DIR/local-run-smoke-health-baseline.json"
 grep -q '"validationBaselineReady": true' "$TMP_DIR/local-run-smoke-health-baseline.json"
 grep -q '"baselineSuccessCommandFailCount": 1' "$TMP_DIR/local-run-smoke-health-baseline.json"
 grep -q '"tasksFailedSetupCommand": \[\]' "$TMP_DIR/local-run-smoke-health-baseline.json"
