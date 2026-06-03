@@ -239,7 +239,9 @@ repo, compares native, native-search, and ctxhelm-guided rows, and uses
 `scripts/demo-local-agent.sh` through the `claude-code` matrix preset plus
 `scripts/demo-ctxhelm.sh` as deterministic source-free shims. The smoke suite
 keeps the fixture healthy at rest and uses task-level `setupCommands` to seed
-the failing state inside isolated clones before each agent row runs.
+the failing state inside isolated clones before each agent row runs. Matrix
+configs can enforce that publishable preflight with
+`healthCheckSuccessCommands` and `healthRequireSetupCommands`.
 
 Generate a real-agent public matrix config after creating or checking out a
 public suite fixture:

@@ -115,6 +115,9 @@ grep -q '"title": "HelmBench Quality Gate"' "$TMP_DIR/quality-gate.schema.json"
 grep -q '"title": "HelmBench Run Matrix Config"' "$TMP_DIR/run-matrix-config.schema.json"
 grep -q '"adapterPreset"' "$TMP_DIR/run-matrix-config.schema.json"
 grep -q '"claude-code"' "$TMP_DIR/run-matrix-config.schema.json"
+grep -q '"healthCheckSuccessCommands"' "$TMP_DIR/run-matrix-config.schema.json"
+grep -q '"healthFailFastSuccessCommands"' "$TMP_DIR/run-matrix-config.schema.json"
+grep -q '"healthRequireSetupCommands"' "$TMP_DIR/run-matrix-config.schema.json"
 grep -q '"title": "HelmBench Matrix History"' "$TMP_DIR/matrix-history.schema.json"
 grep -q '"title": "HelmBench Doctor Report"' "$TMP_DIR/doctor-report.schema.json"
 grep -q '"title": "HelmBench Autopsy"' "$TMP_DIR/autopsy.schema.json"
@@ -276,6 +279,9 @@ HELMBENCH_BIN="$ROOT/target/debug/helmbench" cargo run -- run-matrix \
   --out-dir "$TMP_DIR/checked-in-matrix" \
   --force \
   --allow-dirty-health
+grep -q '"successCommandCheckRequested": true' "$TMP_DIR/checked-in-matrix/reports/suite-health.json"
+grep -q '"setupCommandsRequired": true' "$TMP_DIR/checked-in-matrix/reports/suite-health.json"
+grep -q '"validationBaselineReady": true' "$TMP_DIR/checked-in-matrix/reports/suite-health.json"
 
 cargo run -- run \
   --suite "$TMP_DIR/demo-suite.json" \

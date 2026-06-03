@@ -115,6 +115,12 @@ enum Command {
         health_min_commits: u64,
         #[arg(long)]
         allow_dirty_health: bool,
+        #[arg(long)]
+        health_check_success_commands: bool,
+        #[arg(long)]
+        health_fail_fast_success_commands: bool,
+        #[arg(long)]
+        health_require_setup_commands: bool,
     },
     /// Compare verified run-matrix outputs across time.
     MatrixHistory {
@@ -714,6 +720,9 @@ fn main() -> Result<()> {
                 false,
                 1,
                 false,
+                false,
+                false,
+                false,
                 None,
                 None,
                 None,
@@ -750,6 +759,9 @@ fn main() -> Result<()> {
             max_token_estimate_per_success_delta,
             health_min_commits,
             allow_dirty_health,
+            health_check_success_commands,
+            health_fail_fast_success_commands,
+            health_require_setup_commands,
         } => {
             let request = build_run_matrix_request(
                 config.as_deref(),
@@ -764,6 +776,9 @@ fn main() -> Result<()> {
                 fail_on_regression,
                 health_min_commits,
                 allow_dirty_health,
+                health_check_success_commands,
+                health_fail_fast_success_commands,
+                health_require_setup_commands,
                 min_task_count,
                 max_average_time_to_first_relevant_file_millis_delta,
                 max_total_tool_calls_delta,
@@ -2338,6 +2353,9 @@ fn init_public_matrix_config(options: InitPublicMatrixOptions) -> Result<()> {
         }),
         health_min_commits: Some(options.health_min_commits),
         allow_dirty_health: Some(options.allow_dirty_health),
+        health_check_success_commands: None,
+        health_fail_fast_success_commands: None,
+        health_require_setup_commands: None,
     };
 
     write_json(&config, &options.out)?;
@@ -3641,6 +3659,9 @@ struct RunMatrixRequest {
     quality_gate_config: QualityGateConfig,
     health_min_commits: u64,
     allow_dirty_health: bool,
+    health_check_success_commands: bool,
+    health_fail_fast_success_commands: bool,
+    health_require_setup_commands: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3667,6 +3688,12 @@ struct RunMatrixConfig {
     health_min_commits: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     allow_dirty_health: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    health_check_success_commands: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    health_fail_fast_success_commands: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    health_require_setup_commands: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -3764,6 +3791,9 @@ fn build_run_matrix_request(
     fail_on_regression: bool,
     health_min_commits: u64,
     allow_dirty_health: bool,
+    health_check_success_commands: bool,
+    health_fail_fast_success_commands: bool,
+    health_require_setup_commands: bool,
     min_task_count: Option<usize>,
     max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
     max_total_tool_calls_delta: Option<i64>,
@@ -3841,6 +3871,21 @@ fn build_run_matrix_request(
             .as_ref()
             .and_then(|config| config.allow_dirty_health)
             .unwrap_or(false);
+    let health_check_success_commands = health_check_success_commands
+        || config
+            .as_ref()
+            .and_then(|config| config.health_check_success_commands)
+            .unwrap_or(false);
+    let health_fail_fast_success_commands = health_fail_fast_success_commands
+        || config
+            .as_ref()
+            .and_then(|config| config.health_fail_fast_success_commands)
+            .unwrap_or(false);
+    let health_require_setup_commands = health_require_setup_commands
+        || config
+            .as_ref()
+            .and_then(|config| config.health_require_setup_commands)
+            .unwrap_or(false);
     let quality_gate_config = run_matrix_quality_gate_config(
         config
             .as_ref()
@@ -3867,6 +3912,9 @@ fn build_run_matrix_request(
         quality_gate_config,
         health_min_commits,
         allow_dirty_health,
+        health_check_success_commands,
+        health_fail_fast_success_commands,
+        health_require_setup_commands,
     })
 }
 
@@ -4052,9 +4100,9 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         &request.repo,
         request.health_min_commits,
         request.allow_dirty_health,
-        false,
-        false,
-        false,
+        request.health_check_success_commands,
+        request.health_fail_fast_success_commands,
+        request.health_require_setup_commands,
         &suite,
         &[],
     )?;
@@ -7585,6 +7633,9 @@ mod tests {
             true,
             1,
             false,
+            false,
+            false,
+            false,
             None,
             None,
             None,
@@ -7959,6 +8010,9 @@ mod tests {
                 "failOnRegression": true,
                 "healthMinCommits": 2,
                 "allowDirtyHealth": true,
+                "healthCheckSuccessCommands": true,
+                "healthFailFastSuccessCommands": true,
+                "healthRequireSetupCommands": true,
                 "qualityGate": {
                     "minTaskCount": 10,
                     "maxAverageTimeToFirstRelevantFileMillisDelta": 0.0,
@@ -8006,6 +8060,9 @@ mod tests {
             false,
             1,
             false,
+            false,
+            false,
+            false,
             None,
             None,
             None,
@@ -8047,6 +8104,9 @@ mod tests {
         );
         assert_eq!(request.health_min_commits, 2);
         assert!(request.allow_dirty_health);
+        assert!(request.health_check_success_commands);
+        assert!(request.health_fail_fast_success_commands);
+        assert!(request.health_require_setup_commands);
         assert_eq!(request.setup_commands, vec!["printf setup >/dev/null"]);
         assert_eq!(request.baseline.safe_name, "native");
         assert_eq!(request.heads[0].safe_name, "ctxhelm");
@@ -8106,6 +8166,9 @@ mod tests {
             true,
             3,
             false,
+            true,
+            true,
+            true,
             Some(20),
             Some(-10.0),
             Some(5),
@@ -8164,6 +8227,9 @@ mod tests {
         );
         assert_eq!(override_request.health_min_commits, 3);
         assert!(override_request.allow_dirty_health);
+        assert!(override_request.health_check_success_commands);
+        assert!(override_request.health_fail_fast_success_commands);
+        assert!(override_request.health_require_setup_commands);
     }
 
     #[test]
@@ -8379,6 +8445,9 @@ mod tests {
             false,
             1,
             false,
+            false,
+            false,
+            false,
             None,
             None,
             None,
@@ -8441,6 +8510,9 @@ mod tests {
             false,
             false,
             1,
+            false,
+            false,
+            false,
             false,
             None,
             None,

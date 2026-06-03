@@ -3,6 +3,8 @@
   "repo": ".",
   "outDir": ".helmbench/matrix-demo",
   "failOnRegression": true,
+  "healthCheckSuccessCommands": true,
+  "healthRequireSetupCommands": true,
   "baseline": {
     "name": "native",
     "agent": "demo-baseline",

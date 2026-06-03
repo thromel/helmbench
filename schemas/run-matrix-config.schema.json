@@ -51,6 +51,15 @@
     },
     "allowDirtyHealth": {
       "type": "boolean"
+    },
+    "healthCheckSuccessCommands": {
+      "type": "boolean"
+    },
+    "healthFailFastSuccessCommands": {
+      "type": "boolean"
+    },
+    "healthRequireSetupCommands": {
+      "type": "boolean"
     }
   },
   "$defs": {

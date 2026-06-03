@@ -49,6 +49,9 @@ Config format:
   },
   "healthMinCommits": 1,
   "allowDirtyHealth": false,
+  "healthCheckSuccessCommands": true,
+  "healthFailFastSuccessCommands": false,
+  "healthRequireSetupCommands": true,
   "baseline": {
     "name": "native",
     "agent": "demo-baseline",
@@ -116,8 +119,9 @@ provided. `qualityGate` configures the source-free quality gate written to
 `--max-total-tool-calls-delta`, `--max-total-token-estimate-delta`,
 `--max-tool-calls-per-success-delta`, and
 `--max-token-estimate-per-success-delta` CLI flags override those optional
-thresholds for one run. `healthMinCommits` and `allowDirtyHealth` control the
-matrix suite-health gate. `setupCommands` from the config run before
+thresholds for one run. `healthMinCommits`, `allowDirtyHealth`,
+`healthCheckSuccessCommands`, `healthFailFastSuccessCommands`, and
+`healthRequireSetupCommands` control the matrix suite-health gate. `setupCommands` from the config run before
 additional `--setup-command` values; both are global setup commands that run in
 every task clone before task-level `setupCommands`. Config paths are resolved
 from the current working directory. The checked-in `suites/demo-matrix.json`
@@ -128,7 +132,8 @@ install.
 Before any agent row executes, `run-matrix` writes `reports/suite-health.json`
 and fails if the suite/repo preflight is unhealthy. This keeps publishable
 matrix evidence tied to a checked git repo, expected file/test existence,
-success-command coverage, and source-free privacy flags.
+optional success-command outcome readiness, optional seeded setup readiness,
+and source-free privacy flags.
 
 For task-success claims, run `suite-health --check-success-commands` before
 publishing a real-agent matrix. That explicit gate runs validation commands in
