@@ -214,7 +214,9 @@ if any check fails.
 
 Default thresholds require no regression in success rate, validation coverage,
 recommendation recall, context precision, edited-file recall, or irrelevant read
-rate. Optional thresholds can also cap tool-call and token deltas.
+rate. Optional thresholds can also cap tool-call, token, and average time to
+first relevant file deltas. Timing checks are skipped with a warning when either
+side of a comparison lacks timing metadata.
 Quality-gate reports preserve benchmark-summary confidence warnings; a gate can
 pass while still warning that the suite is too small for strong claims.
 

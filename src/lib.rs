@@ -9,7 +9,7 @@ pub const TRACE_SCHEMA_VERSION: u32 = 1;
 pub const REPORT_SCHEMA_VERSION: u32 = 2;
 pub const AUTOPSY_SCHEMA_VERSION: u32 = 1;
 pub const DIFF_AUTOPSY_SCHEMA_VERSION: u32 = 1;
-pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 5;
+pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 6;
 pub const QUALITY_GATE_SCHEMA_VERSION: u32 = 1;
 pub const CONFIDENCE_LEVEL_95: f32 = 0.95;
 pub const MIN_RECOMMENDED_BENCHMARK_TASKS: usize = 10;
@@ -324,6 +324,7 @@ pub struct BenchmarkComparison {
     pub recommendation_recall_delta: f32,
     pub context_precision_delta: f32,
     pub edited_file_recall_delta: f32,
+    pub average_time_to_first_relevant_file_millis_delta: Option<f32>,
     pub total_tool_calls_delta: i64,
     pub total_token_estimate_delta: i64,
     pub verdict: BenchmarkVerdict,
@@ -387,6 +388,7 @@ pub struct QualityGateConfig {
     pub min_recommendation_recall_delta: f32,
     pub min_context_precision_delta: f32,
     pub min_edited_file_recall_delta: f32,
+    pub max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
     pub max_total_tool_calls_delta: Option<i64>,
     pub max_total_token_estimate_delta: Option<i64>,
 }
@@ -400,6 +402,7 @@ impl Default for QualityGateConfig {
             min_recommendation_recall_delta: 0.0,
             min_context_precision_delta: 0.0,
             min_edited_file_recall_delta: 0.0,
+            max_average_time_to_first_relevant_file_millis_delta: None,
             max_total_tool_calls_delta: None,
             max_total_token_estimate_delta: None,
         }
@@ -1015,6 +1018,10 @@ fn benchmark_comparison(baseline: &RunReport, head: &RunReport) -> BenchmarkComp
         head.summary.average_context_precision - baseline.summary.average_context_precision;
     let edited_file_recall_delta =
         head.summary.average_edited_file_recall - baseline.summary.average_edited_file_recall;
+    let average_time_to_first_relevant_file_millis_delta = optional_f32_delta(
+        head.summary.average_time_to_first_relevant_file_millis,
+        baseline.summary.average_time_to_first_relevant_file_millis,
+    );
     let total_tool_calls_delta =
         head.summary.total_tool_calls as i64 - baseline.summary.total_tool_calls as i64;
     let total_token_estimate_delta =
@@ -1029,6 +1036,7 @@ fn benchmark_comparison(baseline: &RunReport, head: &RunReport) -> BenchmarkComp
         recommendation_recall_delta,
         context_precision_delta,
         edited_file_recall_delta,
+        average_time_to_first_relevant_file_millis_delta,
         total_tool_calls_delta,
         total_token_estimate_delta,
         verdict: benchmark_verdict(
@@ -1040,6 +1048,10 @@ fn benchmark_comparison(baseline: &RunReport, head: &RunReport) -> BenchmarkComp
             total_token_estimate_delta,
         ),
     }
+}
+
+fn optional_f32_delta(head: Option<f32>, baseline: Option<f32>) -> Option<f32> {
+    Some(head? - baseline?)
 }
 
 fn benchmark_verdict(
@@ -1439,11 +1451,11 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
     }
 
     out.push_str("\n## Deltas From Baseline\n\n");
-    out.push_str("| Variant | Verdict | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | Tools | Tokens |\n");
-    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    out.push_str("| Variant | Verdict | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens |\n");
+    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
     for comparison in &report.comparisons {
         out.push_str(&format!(
-            "| {} / {:?} | {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+} | {:+} |\n",
+            "| {} / {:?} | {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {} | {:+} | {:+} |\n",
             comparison.head_agent,
             comparison.head_variant,
             comparison.verdict,
@@ -1453,6 +1465,9 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
             pct(comparison.context_precision_delta),
             pct(comparison.edited_file_recall_delta),
             pct(comparison.irrelevant_read_rate_delta),
+            format_optional_millis_delta(
+                comparison.average_time_to_first_relevant_file_millis_delta
+            ),
             comparison.total_tool_calls_delta,
             comparison.total_token_estimate_delta
         ));
@@ -1481,6 +1496,7 @@ pub fn evaluate_quality_gate(
     }
 
     let mut checks = Vec::new();
+    let mut warnings = quality_gate_warnings(summary);
     for comparison in &summary.comparisons {
         push_min_check(
             &mut checks,
@@ -1524,6 +1540,22 @@ pub fn evaluate_quality_gate(
             comparison.edited_file_recall_delta,
             config.min_edited_file_recall_delta,
         );
+        if let Some(threshold) = config.max_average_time_to_first_relevant_file_millis_delta {
+            if let Some(actual) = comparison.average_time_to_first_relevant_file_millis_delta {
+                push_max_check(
+                    &mut checks,
+                    comparison,
+                    "average_time_to_first_relevant_file_millis_delta",
+                    actual,
+                    threshold,
+                );
+            } else {
+                warnings.push(format!(
+                    "Skipped average_time_to_first_relevant_file_millis_delta for {} / {:?}: missing timing in baseline or head run.",
+                    comparison.head_agent, comparison.head_variant
+                ));
+            }
+        }
         if let Some(threshold) = config.max_total_tool_calls_delta {
             push_i64_max_check(
                 &mut checks,
@@ -1548,7 +1580,7 @@ pub fn evaluate_quality_gate(
         schema_version: QUALITY_GATE_SCHEMA_VERSION,
         suite_name: summary.suite_name.clone(),
         passed: checks.iter().all(|check| check.passed),
-        warnings: quality_gate_warnings(summary),
+        warnings,
         checks,
         privacy: PrivacyStatus::source_free(),
     })
@@ -2954,6 +2986,12 @@ fn format_optional_millis(value: Option<f32>) -> String {
         .unwrap_or_else(|| "n/a".to_string())
 }
 
+fn format_optional_millis_delta(value: Option<f32>) -> String {
+    value
+        .map(|value| format!("{value:+.0} ms"))
+        .unwrap_or_else(|| "n/a".to_string())
+}
+
 fn stable_hash(value: &str) -> String {
     let mut hash = 0xcbf29ce484222325u64;
     for byte in value.as_bytes() {
@@ -3088,7 +3126,7 @@ mod tests {
                 tool_call_count: 8,
                 token_estimate: Some(4000),
                 elapsed_millis: Some(2000),
-                time_to_first_relevant_file_millis: Some(20),
+                time_to_first_relevant_file_millis: Some(50),
                 privacy: PrivacyStatus::source_free(),
             }],
         )
@@ -3145,7 +3183,7 @@ mod tests {
         assert_eq!(summary.runs[1].validation_covered_count, 1);
         assert_eq!(
             summary.runs[0].average_time_to_first_relevant_file_millis,
-            Some(20.0)
+            Some(50.0)
         );
         assert_eq!(
             summary.runs[1].average_time_to_first_relevant_file_millis,
@@ -3171,6 +3209,10 @@ mod tests {
         assert!(summary.runs[1].success_rate_interval.lower >= 0.0);
         assert!(summary.runs[1].success_rate_interval.upper <= 1.0);
         assert_eq!(summary.comparisons[0].success_rate_delta, 1.0);
+        assert_eq!(
+            summary.comparisons[0].average_time_to_first_relevant_file_millis_delta,
+            Some(-30.0)
+        );
         assert_eq!(summary.comparisons[0].total_tool_calls_delta, -3);
         assert_eq!(summary.comparisons[0].total_token_estimate_delta, -1500);
         assert_eq!(summary.comparisons[0].verdict, BenchmarkVerdict::Improved);
@@ -3182,6 +3224,7 @@ mod tests {
         assert!(markdown.contains("95% CI"));
         assert!(markdown.contains("Avg first relevant"));
         assert!(markdown.contains("20 ms"));
+        assert!(markdown.contains("-30 ms"));
         assert!(markdown.contains("Command Mix"));
         assert!(markdown.contains("Failure Taxonomy"));
         assert!(markdown.contains("Validation gaps"));
@@ -3253,7 +3296,7 @@ mod tests {
                 tool_call_count: 10,
                 token_estimate: Some(5000),
                 elapsed_millis: Some(1000),
-                time_to_first_relevant_file_millis: None,
+                time_to_first_relevant_file_millis: Some(80),
                 privacy: PrivacyStatus::source_free(),
             }],
         )
@@ -3273,7 +3316,7 @@ mod tests {
                 tool_call_count: 7,
                 token_estimate: Some(3000),
                 elapsed_millis: Some(900),
-                time_to_first_relevant_file_millis: None,
+                time_to_first_relevant_file_millis: Some(30),
                 privacy: PrivacyStatus::source_free(),
             }],
         )
@@ -3283,6 +3326,7 @@ mod tests {
         let pass = evaluate_quality_gate(
             &summary,
             &QualityGateConfig {
+                max_average_time_to_first_relevant_file_millis_delta: Some(0.0),
                 max_total_tool_calls_delta: Some(0),
                 max_total_token_estimate_delta: Some(0),
                 ..QualityGateConfig::default()
@@ -3292,6 +3336,9 @@ mod tests {
         assert!(pass.passed);
         assert!(!pass.warnings.is_empty());
         assert!(pass.warnings[0].contains("Low sample size"));
+        assert!(pass.checks.iter().any(|check| {
+            check.metric == "average_time_to_first_relevant_file_millis_delta" && check.passed
+        }));
         assert!(render_markdown_quality_gate(&pass).contains("Status: **passed**"));
         assert!(render_markdown_quality_gate(&pass).contains("Warnings"));
 
@@ -3308,6 +3355,37 @@ mod tests {
             .checks
             .iter()
             .any(|check| check.metric == "success_rate_delta" && !check.passed));
+
+        let latency_fail = evaluate_quality_gate(
+            &summary,
+            &QualityGateConfig {
+                max_average_time_to_first_relevant_file_millis_delta: Some(-100.0),
+                ..QualityGateConfig::default()
+            },
+        )
+        .expect("latency gate");
+        assert!(!latency_fail.passed);
+        assert!(latency_fail.checks.iter().any(|check| {
+            check.metric == "average_time_to_first_relevant_file_millis_delta" && !check.passed
+        }));
+
+        let mut missing_latency_summary = summary.clone();
+        missing_latency_summary.comparisons[0].average_time_to_first_relevant_file_millis_delta =
+            None;
+        let missing_latency_gate = evaluate_quality_gate(
+            &missing_latency_summary,
+            &QualityGateConfig {
+                max_average_time_to_first_relevant_file_millis_delta: Some(0.0),
+                ..QualityGateConfig::default()
+            },
+        )
+        .expect("missing latency gate");
+        assert!(missing_latency_gate.passed);
+        assert!(missing_latency_gate
+            .warnings
+            .iter()
+            .any(|warning| warning
+                .contains("Skipped average_time_to_first_relevant_file_millis_delta")));
     }
 
     #[test]

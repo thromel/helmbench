@@ -390,6 +390,8 @@ enum Command {
         #[arg(long, default_value_t = 0.0)]
         min_edited_file_recall_delta: f32,
         #[arg(long)]
+        max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
+        #[arg(long)]
         max_total_tool_calls_delta: Option<i64>,
         #[arg(long)]
         max_total_token_estimate_delta: Option<i64>,
@@ -1070,6 +1072,7 @@ fn main() -> Result<()> {
             min_recommendation_recall_delta,
             min_context_precision_delta,
             min_edited_file_recall_delta,
+            max_average_time_to_first_relevant_file_millis_delta,
             max_total_tool_calls_delta,
             max_total_token_estimate_delta,
         } => {
@@ -1083,6 +1086,7 @@ fn main() -> Result<()> {
                     min_recommendation_recall_delta,
                     min_context_precision_delta,
                     min_edited_file_recall_delta,
+                    max_average_time_to_first_relevant_file_millis_delta,
                     max_total_tool_calls_delta,
                     max_total_token_estimate_delta,
                 },
