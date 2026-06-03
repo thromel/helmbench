@@ -13,6 +13,8 @@ is too small to prove navigation quality. Current presets:
   templating, and CLI task areas.
 - `ripgrep`: Rust CLI/workspace codebase with ignore traversal, pattern
   parsing, printer, and searcher task areas.
+- `express`: JavaScript/Node.js web framework with routing, request,
+  response, static middleware, and body parser task areas.
 
 ## RefactoringMiner
 
@@ -48,6 +50,8 @@ preset-specific defaults:
 - `.helmbench/flask-public-suite-health.json`
 - `suites/ripgrep-public.json`
 - `.helmbench/ripgrep-public-suite-health.json`
+- `suites/express-public.json`
+- `.helmbench/express-public-suite-health.json`
 
 ## RefactoringMiner Tasks
 
@@ -114,6 +118,30 @@ Each task contains Rust source paths, integration or crate test paths, tags,
 timeout metadata, and a targeted `cargo test ...` `successCommand`. This gives
 HelmBench a Rust public-suite lane that pairs naturally with ctxhelm and with
 HelmBench's own implementation language.
+
+## Express
+
+```bash
+helmbench init-public-suite \
+  --preset express \
+  --repo ../express \
+  --suite-out /tmp/express-suite.json \
+  --health-out /tmp/express-health.json \
+  --force
+```
+
+The Express preset emits four source-free tasks:
+
+- `express-router-stack-001`
+- `express-response-json-001`
+- `express-request-negotiation-001`
+- `express-static-and-body-001`
+
+Each task contains JavaScript source paths, focused Mocha test files, tags,
+timeout metadata, and a targeted
+`npx mocha --require test/support/env --check-leaks ...` `successCommand`.
+This gives HelmBench a Node.js public-suite lane for comparing coding-agent
+navigation outside Rust, Java, and Python repositories.
 
 ## Run Pattern
 

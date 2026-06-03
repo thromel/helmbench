@@ -526,6 +526,7 @@ enum PublicSuitePreset {
     RefactoringMiner,
     Flask,
     Ripgrep,
+    Express,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -2201,6 +2202,7 @@ fn public_suite_for_preset(preset: PublicSuitePreset) -> helmbench::TaskSuite {
         PublicSuitePreset::RefactoringMiner => refactoring_miner_suite(),
         PublicSuitePreset::Flask => flask_suite(),
         PublicSuitePreset::Ripgrep => ripgrep_suite(),
+        PublicSuitePreset::Express => express_suite(),
     }
 }
 
@@ -2209,6 +2211,7 @@ fn public_suite_preset_name(preset: PublicSuitePreset) -> &'static str {
         PublicSuitePreset::RefactoringMiner => "refactoring-miner",
         PublicSuitePreset::Flask => "flask",
         PublicSuitePreset::Ripgrep => "ripgrep",
+        PublicSuitePreset::Express => "express",
     }
 }
 
@@ -2231,6 +2234,7 @@ fn public_suite_anchor_files(preset: PublicSuitePreset) -> &'static [&'static st
         PublicSuitePreset::RefactoringMiner => &["README.md", "build.gradle", "gradlew"],
         PublicSuitePreset::Flask => &["README.md", "pyproject.toml", "src/flask/__init__.py"],
         PublicSuitePreset::Ripgrep => &["README.md", "Cargo.toml", "crates/cli/Cargo.toml"],
+        PublicSuitePreset::Express => &["README.md", "package.json", "index.js"],
     }
 }
 
@@ -2703,6 +2707,117 @@ fn ripgrep_suite() -> helmbench::TaskSuite {
                     "rust".to_string(),
                     "searcher".to_string(),
                     "bug_fix".to_string(),
+                ],
+                timeout_seconds: Some(900),
+            },
+        ],
+    }
+}
+
+fn express_suite() -> helmbench::TaskSuite {
+    helmbench::TaskSuite {
+        schema_version: helmbench::SUITE_SCHEMA_VERSION,
+        name: "express-public".to_string(),
+        description:
+            "Source-free public-repo suite for Express Node.js routing, request, response, and middleware behavior."
+                .to_string(),
+        tasks: vec![
+            helmbench::BenchTask {
+                id: "express-router-stack-001".to_string(),
+                prompt: "Fix routing or middleware dispatch behavior while preserving app router and Router coverage.".to_string(),
+                expected_files: vec![
+                    "lib/application.js".to_string(),
+                    "lib/express.js".to_string(),
+                ],
+                expected_tests: vec![
+                    "test/app.router.js".to_string(),
+                    "test/Router.js".to_string(),
+                ],
+                success_command: Some(
+                    "npx mocha --require test/support/env --check-leaks test/app.router.js test/Router.js"
+                        .to_string(),
+                ),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "javascript".to_string(),
+                    "node".to_string(),
+                    "routing".to_string(),
+                    "bug_fix".to_string(),
+                ],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "express-response-json-001".to_string(),
+                prompt: "Improve JSON or JSONP response behavior without changing unrelated response helpers.".to_string(),
+                expected_files: vec![
+                    "lib/response.js".to_string(),
+                    "lib/utils.js".to_string(),
+                ],
+                expected_tests: vec![
+                    "test/res.json.js".to_string(),
+                    "test/res.jsonp.js".to_string(),
+                ],
+                success_command: Some(
+                    "npx mocha --require test/support/env --check-leaks test/res.json.js test/res.jsonp.js"
+                        .to_string(),
+                ),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "javascript".to_string(),
+                    "node".to_string(),
+                    "response".to_string(),
+                    "regression".to_string(),
+                ],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "express-request-negotiation-001".to_string(),
+                prompt: "Fix request negotiation, type, or range handling while keeping request helper behavior targeted.".to_string(),
+                expected_files: vec![
+                    "lib/request.js".to_string(),
+                    "lib/utils.js".to_string(),
+                ],
+                expected_tests: vec![
+                    "test/req.accepts.js".to_string(),
+                    "test/req.is.js".to_string(),
+                    "test/req.range.js".to_string(),
+                ],
+                success_command: Some(
+                    "npx mocha --require test/support/env --check-leaks test/req.accepts.js test/req.is.js test/req.range.js"
+                        .to_string(),
+                ),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "javascript".to_string(),
+                    "node".to_string(),
+                    "request".to_string(),
+                    "bug_fix".to_string(),
+                ],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "express-static-and-body-001".to_string(),
+                prompt: "Adjust static middleware or body parser integration while preserving Express factory behavior.".to_string(),
+                expected_files: vec![
+                    "lib/express.js".to_string(),
+                    "lib/application.js".to_string(),
+                ],
+                expected_tests: vec![
+                    "test/express.static.js".to_string(),
+                    "test/express.json.js".to_string(),
+                    "test/express.urlencoded.js".to_string(),
+                    "test/middleware.basic.js".to_string(),
+                ],
+                success_command: Some(
+                    "npx mocha --require test/support/env --check-leaks test/express.static.js test/express.json.js test/express.urlencoded.js test/middleware.basic.js"
+                        .to_string(),
+                ),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "javascript".to_string(),
+                    "node".to_string(),
+                    "middleware".to_string(),
+                    "feature".to_string(),
                 ],
                 timeout_seconds: Some(900),
             },
@@ -7446,6 +7561,41 @@ mod tests {
     }
 
     #[test]
+    fn express_public_suite_uses_javascript_paths_and_health_anchors() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        create_public_suite_fixture_repo(PublicSuitePreset::Express, &repo).expect("fixture repo");
+        let suite = express_suite();
+
+        validate_suite(&suite).expect("suite");
+        assert_eq!(suite.name, "express-public");
+        assert_eq!(suite.tasks.len(), 4);
+        assert!(suite
+            .tasks
+            .iter()
+            .all(|task| task.tags.contains(&"javascript".to_string())));
+        assert!(suite.tasks.iter().any(|task| task
+            .expected_files
+            .contains(&"lib/application.js".to_string())));
+        assert!(suite.tasks.iter().any(|task| task
+            .expected_tests
+            .contains(&"test/res.jsonp.js".to_string())));
+
+        let checked = checked_files_for_suite(PublicSuitePreset::Express, &suite);
+        assert!(checked.contains(&"package.json".to_string()));
+        assert!(checked.contains(&"index.js".to_string()));
+        assert!(checked.contains(&"test/middleware.basic.js".to_string()));
+        assert!(!checked.contains(&"Cargo.toml".to_string()));
+
+        let health =
+            public_suite_health(PublicSuitePreset::Express, &repo, 1, &suite).expect("health");
+        assert!(health.ok);
+        assert_eq!(health.preset, "express");
+        assert!(health.missing_files.is_empty());
+        assert!(health.privacy.source_free);
+    }
+
+    #[test]
     fn suite_health_accepts_generic_demo_suite() {
         let temp = tempfile::tempdir().expect("tempdir");
         let repo = temp.path().join("repo");
@@ -7532,6 +7682,14 @@ mod tests {
         assert_eq!(
             default_public_health_out(PublicSuitePreset::Ripgrep),
             PathBuf::from(".helmbench/ripgrep-public-suite-health.json")
+        );
+        assert_eq!(
+            default_public_suite_out(PublicSuitePreset::Express),
+            PathBuf::from("suites/express-public.json")
+        );
+        assert_eq!(
+            default_public_health_out(PublicSuitePreset::Express),
+            PathBuf::from(".helmbench/express-public-suite-health.json")
         );
     }
 

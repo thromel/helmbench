@@ -42,8 +42,8 @@ This repository currently implements the core HelmBench workflow:
   matrix runs that parses structured stdout in memory and persists only
   source-free events
 - `init-public-suite` generator for verified public-repo benchmark suites,
-  currently including a 10-task RefactoringMiner suite plus Flask and ripgrep
-  presets
+  currently including a 10-task RefactoringMiner suite plus Flask, ripgrep,
+  and Express presets
 - `suite-health` checks any source-free suite against a local git repo before
   benchmark results are trusted
 - `demo-run` one-command deterministic demo pipeline with reports, dashboard,
@@ -211,7 +211,7 @@ Add `ctxhelm=true` to a `--head` spec when the row should call
 recommendation and token metadata.
 
 Generate a source-free public benchmark suite after checking fixture health.
-Supported presets are `refactoring-miner`, `flask`, and `ripgrep`. The
+Supported presets are `refactoring-miner`, `flask`, `ripgrep`, and `express`. The
 RefactoringMiner preset emits 10 tasks, enough to clear HelmBench's recommended
 minimum benchmark size without a low-sample warning:
 
@@ -236,13 +236,22 @@ cargo run -- init-public-suite \
   --suite-out /tmp/ripgrep-suite.json \
   --health-out /tmp/ripgrep-health.json \
   --force
+
+cargo run -- init-public-suite \
+  --preset express \
+  --repo ../express \
+  --suite-out /tmp/express-suite.json \
+  --health-out /tmp/express-health.json \
+  --force
 ```
 
 When `--suite-out` or `--health-out` are omitted, HelmBench writes
 preset-specific defaults such as `suites/flask-public.json` and
 `.helmbench/flask-public-suite-health.json`, or the matching ripgrep defaults
 under `suites/ripgrep-public.json` and
-`.helmbench/ripgrep-public-suite-health.json`.
+`.helmbench/ripgrep-public-suite-health.json`; Express uses
+`suites/express-public.json` and
+`.helmbench/express-public-suite-health.json`.
 
 Validate a suite:
 
