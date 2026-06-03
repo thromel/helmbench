@@ -235,8 +235,8 @@ path for real Claude/Codex matrices because they inject the source-free
 suite path, repo path, baseline/head run labels, relative report, trace,
 autopsy, and comparison paths, suite-health artifact, key artifact paths,
 artifact byte counts/content hashes, quality-gate status, evidence-bundle
-verification status, source-free privacy-report paths, privacy flags, and
-reproducibility provenance.
+verification status, `suiteEvidenceUse`, source-free privacy-report paths,
+privacy flags, and reproducibility provenance.
 
 The provenance block includes the HelmBench version, suite content hash, repo
 HEAD, dirty-checkout flag, setup-command count, and setup-command hashes. Each
@@ -281,7 +281,8 @@ helmbench verify-bundle \
 report, trace directory, suite-health artifact, reproduction guide,
 Markdown/HTML artifact, and evidence manifest exists, recomputes source-free
 artifact hashes for matrix-owned files and trace JSON, and then verifies the
-nested evidence bundle hashes.
+nested evidence bundle hashes. It also checks that `suiteEvidenceUse` matches
+the suite-health report.
 
 Use `--fail-on-regression` when this command runs in CI and should exit
 non-zero if the configured quality gate fails.

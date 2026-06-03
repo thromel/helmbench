@@ -1937,6 +1937,8 @@ struct EvidenceBundleManifest {
     suite_name: String,
     baseline_agent: String,
     baseline_variant: AgentVariant,
+    #[serde(default = "default_suite_evidence_use")]
+    evidence_use: SuiteEvidenceUse,
     artifacts: Vec<EvidenceBundleArtifact>,
     privacy: PrivacyStatus,
 }
@@ -1985,6 +1987,7 @@ fn verify_evidence_bundle(bundle: &Path) -> Result<()> {
     }
 
     let mut seen_paths = BTreeSet::new();
+    let mut health_artifact_path = None;
     for artifact in &manifest.artifacts {
         if artifact.kind.trim().is_empty() {
             anyhow::bail!("evidence bundle artifact kind must not be empty");
@@ -2017,6 +2020,9 @@ fn verify_evidence_bundle(bundle: &Path) -> Result<()> {
                 artifact.content_hash
             );
         }
+        if artifact.kind == "health" {
+            health_artifact_path = Some(artifact.path.clone());
+        }
 
         let artifact_path = bundle.join(&artifact.path);
         let bytes = std::fs::read(&artifact_path)
@@ -2037,6 +2043,17 @@ fn verify_evidence_bundle(bundle: &Path) -> Result<()> {
                 artifact.path,
                 artifact.content_hash,
                 actual_hash
+            );
+        }
+    }
+    if let Some(health_artifact_path) = health_artifact_path {
+        let health = read_public_suite_health(&bundle.join(&health_artifact_path))?;
+        validate_public_suite_health_report(&health)?;
+        if health.evidence_use != manifest.evidence_use {
+            anyhow::bail!(
+                "evidence bundle evidenceUse `{}` does not match health evidenceUse `{}`",
+                manifest.evidence_use,
+                health.evidence_use
             );
         }
     }
@@ -2089,6 +2106,7 @@ fn write_evidence_bundle(
         }
     }
 
+    let mut evidence_use = SuiteEvidenceUse::NavigationOnly;
     let mut artifacts = Vec::new();
     artifacts.push(copy_bundle_artifact(
         "suite",
@@ -2098,7 +2116,9 @@ fn write_evidence_bundle(
         true,
     )?);
     if let Some(health_path) = health_path {
-        validate_public_suite_health(health_path)?;
+        let health = read_public_suite_health(health_path)?;
+        validate_public_suite_health_report(&health)?;
+        evidence_use = health.evidence_use;
         artifacts.push(copy_bundle_artifact(
             "health",
             health_path,
@@ -2149,6 +2169,7 @@ fn write_evidence_bundle(
         suite_name: suite.name,
         baseline_agent: base_report.agent,
         baseline_variant: base_report.variant,
+        evidence_use,
         artifacts,
         privacy: PrivacyStatus::source_free(),
     };
@@ -2156,10 +2177,13 @@ fn write_evidence_bundle(
     Ok(())
 }
 
-fn validate_public_suite_health(path: &Path) -> Result<()> {
+fn read_public_suite_health(path: &Path) -> Result<PublicSuiteHealth> {
     let raw = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
-    let health = serde_json::from_str::<PublicSuiteHealth>(&raw)
-        .with_context(|| format!("parse health {}", path.display()))?;
+    serde_json::from_str::<PublicSuiteHealth>(&raw)
+        .with_context(|| format!("parse health {}", path.display()))
+}
+
+fn validate_public_suite_health_report(health: &PublicSuiteHealth) -> Result<()> {
     if health.schema_version != SUITE_HEALTH_SCHEMA_VERSION {
         anyhow::bail!(
             "unsupported health schema version {}; expected {}",
@@ -3536,6 +3560,8 @@ struct RunMatrixManifest {
     repo_path: String,
     out_dir: String,
     provenance: RunMatrixProvenance,
+    #[serde(default = "default_suite_evidence_use")]
+    suite_evidence_use: SuiteEvidenceUse,
     baseline: RunMatrixManifestRun,
     heads: Vec<RunMatrixManifestRun>,
     artifacts: RunMatrixManifestArtifacts,
@@ -4509,12 +4535,21 @@ fn build_run_matrix_manifest(
     evidence_bundle_verified: bool,
 ) -> Result<RunMatrixManifest> {
     let provenance = run_matrix_provenance(request)?;
+    let suite_health = read_public_suite_health(suite_health_json)
+        .with_context(|| format!("read matrix suite health {}", suite_health_json.display()))?;
+    validate_public_suite_health_report(&suite_health).with_context(|| {
+        format!(
+            "validate matrix suite health {}",
+            suite_health_json.display()
+        )
+    })?;
     Ok(RunMatrixManifest {
         schema_version: RUN_MATRIX_MANIFEST_SCHEMA_VERSION,
         suite_path: request.suite_path.display().to_string(),
         repo_path: request.repo.display().to_string(),
         out_dir: request.out_dir.display().to_string(),
         provenance,
+        suite_evidence_use: suite_health.evidence_use,
         baseline: run_matrix_manifest_run(
             &request.out_dir,
             baseline,
@@ -4892,8 +4927,17 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
         require_matrix_file(matrix_dir, path)?;
     }
     let suite_health_path = matrix_path(matrix_dir, &manifest.artifacts.suite_health_json)?;
-    validate_public_suite_health(&suite_health_path)
+    let suite_health = read_public_suite_health(&suite_health_path)
+        .with_context(|| format!("read suite health {}", suite_health_path.display()))?;
+    validate_public_suite_health_report(&suite_health)
         .with_context(|| format!("validate suite health {}", suite_health_path.display()))?;
+    if suite_health.evidence_use != manifest.suite_evidence_use {
+        anyhow::bail!(
+            "matrix manifest suiteEvidenceUse `{}` does not match suite-health evidenceUse `{}`",
+            manifest.suite_evidence_use,
+            suite_health.evidence_use
+        );
+    }
     let privacy_report_path = matrix_path(matrix_dir, &manifest.artifacts.privacy_report_json)?;
     validate_run_matrix_privacy_report(&privacy_report_path)
         .with_context(|| format!("validate privacy report {}", privacy_report_path.display()))?;
@@ -7779,6 +7823,7 @@ mod tests {
         let health = serde_json::from_str::<serde_json::Value>(&health).expect("json");
         assert_eq!(health["ok"], true);
         assert_eq!(health["privacy"]["sourceFree"], true);
+        assert_eq!(health["evidenceUse"], "navigation_only");
 
         let traces = load_traces(&out.join("traces/guided")).expect("guided traces");
         assert!(traces.iter().all(|trace| trace.token_estimate == Some(321)));
@@ -7799,6 +7844,7 @@ mod tests {
             manifest["schemaVersion"],
             serde_json::json!(RUN_MATRIX_MANIFEST_SCHEMA_VERSION)
         );
+        assert_eq!(manifest["suiteEvidenceUse"], "navigation_only");
         assert_eq!(
             manifest["provenance"]["helmbenchVersion"],
             serde_json::json!(env!("CARGO_PKG_VERSION"))
@@ -7970,7 +8016,27 @@ mod tests {
 
         let verified = verify_run_matrix(&out).expect("verify matrix");
         assert_eq!(verified.heads.len(), 2);
+        assert_eq!(
+            verified.suite_evidence_use,
+            SuiteEvidenceUse::NavigationOnly
+        );
         assert!(verified.evidence_bundle_verified);
+        let manifest_path = out.join("matrix-manifest.json");
+        let manifest_raw = std::fs::read_to_string(&manifest_path).expect("manifest raw");
+        let mut mismatched_manifest: RunMatrixManifest =
+            serde_json::from_str(&manifest_raw).expect("manifest struct");
+        mismatched_manifest.suite_evidence_use = SuiteEvidenceUse::OutcomeReady;
+        write_json(&mismatched_manifest, &manifest_path).expect("write mismatched manifest");
+        refresh_matrix_manifest_digests(&out);
+        let error = verify_run_matrix(&out).expect_err("reject mismatched evidence use");
+        assert!(
+            error
+                .to_string()
+                .contains("suiteEvidenceUse `outcome_ready`"),
+            "{error}"
+        );
+        std::fs::write(&manifest_path, manifest_raw).expect("restore manifest");
+        refresh_matrix_manifest_digests(&out);
         let first_summary_path = out.join("reports/benchmark-summary.json");
         let original_summary =
             read_benchmark_summary(&first_summary_path).expect("original benchmark summary");
@@ -9209,6 +9275,7 @@ mod tests {
         let manifest = std::fs::read_to_string(out_dir.join("manifest.json")).expect("manifest");
         let manifest = serde_json::from_str::<serde_json::Value>(&manifest).expect("json");
         assert_eq!(manifest["suiteName"], "example-auth-bugs");
+        assert_eq!(manifest["evidenceUse"], "navigation_only");
         assert_eq!(manifest["privacy"]["sourceFree"], true);
         let artifacts = manifest["artifacts"].as_array().expect("artifacts");
         assert_eq!(artifacts.len(), 6);
@@ -9222,6 +9289,19 @@ mod tests {
             .is_some_and(|hash| hash.starts_with("fnv64:"))));
 
         verify_evidence_bundle(&out_dir).expect("verify bundle");
+        let manifest_path = out_dir.join("manifest.json");
+        let manifest_raw = std::fs::read_to_string(&manifest_path).expect("manifest raw");
+        let mut mismatched_manifest: EvidenceBundleManifest =
+            serde_json::from_str(&manifest_raw).expect("manifest struct");
+        mismatched_manifest.evidence_use = SuiteEvidenceUse::OutcomeReady;
+        write_json(&mismatched_manifest, &manifest_path).expect("write mismatched manifest");
+        let err = verify_evidence_bundle(&out_dir).expect_err("mismatched evidence use");
+        assert!(
+            err.to_string()
+                .contains("evidenceUse `outcome_ready` does not match"),
+            "{err}"
+        );
+        std::fs::write(&manifest_path, manifest_raw).expect("restore manifest");
 
         std::fs::write(out_dir.join("reports/head-1.json"), b"tampered").expect("tamper");
         let err = verify_evidence_bundle(&out_dir).expect_err("tampered bundle should fail");

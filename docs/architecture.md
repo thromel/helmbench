@@ -44,7 +44,9 @@ outcome evidence.
 `run-matrix` runs the same suite-health check before launching any row. The
 health JSON is saved under `reports/suite-health.json`, referenced from
 `matrix-manifest.json`, and copied into the evidence bundle as `health.json` so
-published matrix artifacts carry their own source-free preflight proof.
+published matrix artifacts carry their own source-free preflight proof. The
+top-level matrix and evidence manifests also carry the suite-health
+`evidenceUse` classification.
 
 The matrix manifest also carries reproducibility provenance: HelmBench version,
 suite hash, repo HEAD, dirty-checkout flag, setup-command hashes, and per-row

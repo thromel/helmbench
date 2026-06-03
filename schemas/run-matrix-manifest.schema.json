@@ -11,6 +11,7 @@
     "repoPath",
     "outDir",
     "provenance",
+    "suiteEvidenceUse",
     "baseline",
     "heads",
     "artifacts",
@@ -37,6 +38,9 @@
     },
     "provenance": {
       "$ref": "#/$defs/provenance"
+    },
+    "suiteEvidenceUse": {
+      "$ref": "#/$defs/evidenceUse"
     },
     "baseline": {
       "$ref": "#/$defs/run"
@@ -95,6 +99,9 @@
     },
     "adapterPreset": {
       "enum": ["claude-code", "codex"]
+    },
+    "evidenceUse": {
+      "enum": ["outcome_ready", "navigation_only", "unhealthy"]
     },
     "provenance": {
       "type": "object",

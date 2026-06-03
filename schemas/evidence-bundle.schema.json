@@ -10,6 +10,7 @@
     "suiteName",
     "baselineAgent",
     "baselineVariant",
+    "evidenceUse",
     "artifacts",
     "privacy"
   ],
@@ -28,6 +29,9 @@
     "baselineVariant": {
       "$ref": "#/$defs/agentVariant"
     },
+    "evidenceUse": {
+      "$ref": "#/$defs/evidenceUse"
+    },
     "artifacts": {
       "type": "array",
       "minItems": 1,
@@ -42,6 +46,9 @@
   "$defs": {
     "agentVariant": {
       "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "evidenceUse": {
+      "enum": ["outcome_ready", "navigation_only", "unhealthy"]
     },
     "safeRelativePath": {
       "type": "string",
