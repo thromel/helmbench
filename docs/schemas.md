@@ -11,6 +11,8 @@ Available schema kinds:
   from structured streams.
 - `agent-trace`: per-task source-free agent behavior traces.
 - `run-report`: aggregate report for one agent and variant.
+- `compare-report`: source-free pairwise comparison report for one baseline and
+  one head run.
 - `benchmark-summary`: source-free baseline-vs-variant summary consumed by
   `quality-gate`, `run-matrix`, and `matrix-history`.
 - `quality-gate`: source-free CI decision report generated from a benchmark

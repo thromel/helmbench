@@ -494,6 +494,7 @@ enum SchemaKind {
     AgentTrace,
     AgentEvent,
     RunReport,
+    CompareReport,
     BenchmarkSummary,
     QualityGate,
     MatrixHistory,
@@ -1289,6 +1290,7 @@ fn schema_contract(kind: SchemaKind) -> &'static str {
         SchemaKind::AgentTrace => include_str!("../schemas/agent-trace.schema.json"),
         SchemaKind::AgentEvent => include_str!("../schemas/agent-event.schema.json"),
         SchemaKind::RunReport => include_str!("../schemas/run-report.schema.json"),
+        SchemaKind::CompareReport => include_str!("../schemas/compare-report.schema.json"),
         SchemaKind::BenchmarkSummary => include_str!("../schemas/benchmark-summary.schema.json"),
         SchemaKind::QualityGate => include_str!("../schemas/quality-gate.schema.json"),
         SchemaKind::MatrixHistory => include_str!("../schemas/matrix-history.schema.json"),
@@ -7057,6 +7059,7 @@ mod tests {
             (SchemaKind::AgentTrace, "HelmBench Agent Trace"),
             (SchemaKind::AgentEvent, "HelmBench Agent Event"),
             (SchemaKind::RunReport, "HelmBench Run Report"),
+            (SchemaKind::CompareReport, "HelmBench Compare Report"),
             (SchemaKind::BenchmarkSummary, "HelmBench Benchmark Summary"),
             (SchemaKind::QualityGate, "HelmBench Quality Gate"),
             (SchemaKind::MatrixHistory, "HelmBench Matrix History"),
@@ -7086,6 +7089,12 @@ mod tests {
                 .as_str()
                 .expect("schema id")
                 .starts_with("https://github.com/thromel/helmbench/schemas/"));
+            if matches!(kind, SchemaKind::RunReport | SchemaKind::CompareReport) {
+                assert_eq!(
+                    value["properties"]["schemaVersion"]["const"],
+                    helmbench::REPORT_SCHEMA_VERSION
+                );
+            }
             if matches!(kind, SchemaKind::BenchmarkSummary) {
                 assert_eq!(
                     value["properties"]["schemaVersion"]["const"],

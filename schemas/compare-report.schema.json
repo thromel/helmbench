@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/compare-report.schema.json",
+  "title": "HelmBench Compare Report",
+  "description": "Source-free pairwise comparison report for one baseline and one head run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "baseAgent",
+    "baseVariant",
+    "headAgent",
+    "headVariant",
+    "taskCountDelta",
+    "successRateDelta",
+    "irrelevantReadRateDelta",
+    "averageRecommendationPrecisionDelta",
+    "averageRecommendationRecallDelta",
+    "averageContextPrecisionDelta",
+    "averageEditedFileRecallDelta",
+    "validationCoverageRateDelta",
+    "totalToolCallsDelta",
+    "totalTokenEstimateDelta",
+    "toolCallsPerSuccessDelta",
+    "tokenEstimatePerSuccessDelta"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 2
+    },
+    "baseAgent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseVariant": {
+      "$ref": "#/$defs/agentVariant"
+    },
+    "headAgent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "headVariant": {
+      "$ref": "#/$defs/agentVariant"
+    },
+    "taskCountDelta": {
+      "type": "integer"
+    },
+    "successRateDelta": {
+      "$ref": "#/$defs/delta"
+    },
+    "irrelevantReadRateDelta": {
+      "$ref": "#/$defs/delta"
+    },
+    "averageRecommendationPrecisionDelta": {
+      "$ref": "#/$defs/delta"
+    },
+    "averageRecommendationRecallDelta": {
+      "$ref": "#/$defs/delta"
+    },
+    "averageContextPrecisionDelta": {
+      "$ref": "#/$defs/delta"
+    },
+    "averageEditedFileRecallDelta": {
+      "$ref": "#/$defs/delta"
+    },
+    "validationCoverageRateDelta": {
+      "$ref": "#/$defs/delta"
+    },
+    "totalToolCallsDelta": {
+      "type": "integer"
+    },
+    "totalTokenEstimateDelta": {
+      "type": "integer"
+    },
+    "toolCallsPerSuccessDelta": {
+      "$ref": "#/$defs/optionalNumber"
+    },
+    "tokenEstimatePerSuccessDelta": {
+      "$ref": "#/$defs/optionalNumber"
+    }
+  },
+  "$defs": {
+    "agentVariant": {
+      "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "delta": {
+      "type": "number"
+    },
+    "optionalNumber": {
+      "type": ["number", "null"]
+    }
+  }
+}
