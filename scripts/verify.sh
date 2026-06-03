@@ -91,6 +91,7 @@ cargo run -- run-matrix \
   --repo "$TMP_DIR/demo-repo" \
   --out-dir "$TMP_DIR/matrix" \
   --baseline "name=native,agent=demo-baseline,variant=native" \
+  --head "name=native-search,agent=demo-native-search,variant=native_search,command=HELMBENCH_BIN=$ROOT/target/debug/helmbench sh scripts/demo-agent.sh" \
   --head "name=guided,agent=demo-guided,variant=ctxhelm_mcp,command=HELMBENCH_BIN=$ROOT/target/debug/helmbench sh scripts/demo-agent.sh" \
   --force
 
@@ -106,6 +107,12 @@ cat > "$TMP_DIR/matrix-config.json" <<EOF
     "variant": "native"
   },
   "heads": [
+    {
+      "name": "native-search",
+      "agent": "demo-native-search",
+      "variant": "native_search",
+      "command": "HELMBENCH_BIN=\${HELMBENCH_BIN:?set HELMBENCH_BIN} sh scripts/demo-agent.sh"
+    },
     {
       "name": "guided",
       "agent": "demo-guided",
@@ -250,9 +257,13 @@ test -f "$TMP_DIR/full-demo/evidence/manifest.json"
 test -f "$TMP_DIR/full-demo/docs/dashboard.html"
 test -f "$TMP_DIR/matrix/reports/benchmark-summary.json"
 test -f "$TMP_DIR/matrix/reports/suite-health.json"
+test -f "$TMP_DIR/matrix/reports/native-search.json"
+test -f "$TMP_DIR/matrix/reports/compare-native-search.json"
 test -f "$TMP_DIR/matrix/reports/quality-gate.json"
 test -f "$TMP_DIR/matrix/reports/privacy-report.json"
 test -f "$TMP_DIR/matrix/docs/dashboard.html"
+test -f "$TMP_DIR/matrix/docs/compare-native-search.md"
+test -f "$TMP_DIR/matrix/docs/native-search-autopsy.md"
 test -f "$TMP_DIR/matrix/docs/privacy-report.md"
 test -f "$TMP_DIR/matrix/docs/guided-autopsy.md"
 test -f "$TMP_DIR/matrix/docs/reproduction.md"
@@ -261,8 +272,12 @@ test -f "$TMP_DIR/matrix/evidence/manifest.json"
 test -f "$TMP_DIR/matrix/matrix-manifest.json"
 test -f "$TMP_DIR/matrix-config/reports/benchmark-summary.json"
 test -f "$TMP_DIR/matrix-config/reports/suite-health.json"
+test -f "$TMP_DIR/matrix-config/reports/native-search.json"
+test -f "$TMP_DIR/matrix-config/reports/compare-native-search.json"
 test -f "$TMP_DIR/matrix-config/reports/quality-gate.json"
 test -f "$TMP_DIR/matrix-config/reports/privacy-report.json"
+test -f "$TMP_DIR/matrix-config/docs/compare-native-search.md"
+test -f "$TMP_DIR/matrix-config/docs/native-search-autopsy.md"
 test -f "$TMP_DIR/matrix-config/docs/privacy-report.md"
 test -f "$TMP_DIR/matrix-config/docs/guided-autopsy.md"
 test -f "$TMP_DIR/matrix-config/docs/reproduction.md"
