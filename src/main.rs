@@ -46,9 +46,13 @@ enum Command {
     /// Write a published JSON Schema contract.
     Schema {
         #[arg(long, value_enum)]
-        kind: SchemaKind,
+        kind: Option<SchemaKind>,
         #[arg(long)]
         out: Option<PathBuf>,
+        #[arg(long)]
+        all: bool,
+        #[arg(long)]
+        out_dir: Option<PathBuf>,
     },
     /// Create a tiny reproducible benchmark repo and matching suite.
     InitDemoRepo {
@@ -605,14 +609,32 @@ fn main() -> Result<()> {
             write_json(&suite, &out)?;
             println!("wrote {}", out.display());
         }
-        Command::Schema { kind, out } => {
-            let schema = schema_contract(kind);
-            match out {
-                Some(path) => {
-                    write_text(schema, &path)?;
-                    println!("wrote {}", path.display());
+        Command::Schema {
+            kind,
+            out,
+            all,
+            out_dir,
+        } => {
+            if all {
+                if kind.is_some() || out.is_some() {
+                    anyhow::bail!("schema --all cannot be combined with --kind or --out");
                 }
-                None => println!("{schema}"),
+                let out_dir = out_dir.context("schema --all requires --out-dir")?;
+                write_all_schema_contracts(&out_dir)?;
+                println!("wrote {}", out_dir.display());
+            } else {
+                if out_dir.is_some() {
+                    anyhow::bail!("schema --out-dir requires --all");
+                }
+                let kind = kind.context("schema requires --kind or --all")?;
+                let schema = schema_contract(kind);
+                match out {
+                    Some(path) => {
+                        write_text(schema, &path)?;
+                        println!("wrote {}", path.display());
+                    }
+                    None => println!("{schema}"),
+                }
             }
         }
         Command::InitDemoRepo {
@@ -1310,6 +1332,57 @@ fn schema_contract(kind: SchemaKind) -> &'static str {
             include_str!("../schemas/run-matrix-privacy-report.schema.json")
         }
     }
+}
+
+fn all_schema_kinds() -> &'static [SchemaKind] {
+    &[
+        SchemaKind::TaskSuite,
+        SchemaKind::AgentTrace,
+        SchemaKind::AgentEvent,
+        SchemaKind::RunReport,
+        SchemaKind::CompareReport,
+        SchemaKind::BenchmarkSummary,
+        SchemaKind::QualityGate,
+        SchemaKind::RunMatrixConfig,
+        SchemaKind::MatrixHistory,
+        SchemaKind::DoctorReport,
+        SchemaKind::Autopsy,
+        SchemaKind::DiffAutopsy,
+        SchemaKind::SuiteHealth,
+        SchemaKind::EvidenceBundle,
+        SchemaKind::RunMatrixManifest,
+        SchemaKind::RunMatrixPrivacyReport,
+    ]
+}
+
+fn schema_contract_filename(kind: SchemaKind) -> &'static str {
+    match kind {
+        SchemaKind::TaskSuite => "task-suite.schema.json",
+        SchemaKind::AgentTrace => "agent-trace.schema.json",
+        SchemaKind::AgentEvent => "agent-event.schema.json",
+        SchemaKind::RunReport => "run-report.schema.json",
+        SchemaKind::CompareReport => "compare-report.schema.json",
+        SchemaKind::BenchmarkSummary => "benchmark-summary.schema.json",
+        SchemaKind::QualityGate => "quality-gate.schema.json",
+        SchemaKind::RunMatrixConfig => "run-matrix-config.schema.json",
+        SchemaKind::MatrixHistory => "matrix-history.schema.json",
+        SchemaKind::DoctorReport => "doctor-report.schema.json",
+        SchemaKind::Autopsy => "autopsy.schema.json",
+        SchemaKind::DiffAutopsy => "diff-autopsy.schema.json",
+        SchemaKind::SuiteHealth => "suite-health.schema.json",
+        SchemaKind::EvidenceBundle => "evidence-bundle.schema.json",
+        SchemaKind::RunMatrixManifest => "run-matrix-manifest.schema.json",
+        SchemaKind::RunMatrixPrivacyReport => "run-matrix-privacy-report.schema.json",
+    }
+}
+
+fn write_all_schema_contracts(out_dir: &Path) -> Result<()> {
+    std::fs::create_dir_all(out_dir).with_context(|| format!("create {}", out_dir.display()))?;
+    for kind in all_schema_kinds() {
+        let path = out_dir.join(schema_contract_filename(*kind));
+        write_text(schema_contract(*kind), &path)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -7156,6 +7229,29 @@ mod tests {
                     RUN_MATRIX_MANIFEST_SCHEMA_VERSION
                 );
             }
+        }
+    }
+
+    #[test]
+    fn all_schema_contracts_write_checked_in_filenames() {
+        let temp = tempfile::tempdir().expect("tempdir");
+
+        write_all_schema_contracts(temp.path()).expect("write all schemas");
+
+        let actual_count = std::fs::read_dir(temp.path())
+            .expect("read schema dir")
+            .count();
+        assert_eq!(actual_count, all_schema_kinds().len());
+
+        for kind in all_schema_kinds() {
+            let path = temp.path().join(schema_contract_filename(*kind));
+            assert!(path.exists(), "missing {}", path.display());
+            let raw = std::fs::read_to_string(path).expect("schema file");
+            let value = serde_json::from_str::<serde_json::Value>(&raw).expect("schema json");
+            assert_eq!(
+                value["$schema"],
+                "https://json-schema.org/draft/2020-12/schema"
+            );
         }
     }
 

@@ -80,10 +80,11 @@ A trace records only evaluation-safe metadata:
 
 It does not record raw code or model transcripts.
 
-Published JSON Schema contracts live under `schemas/` and can be emitted with
-`helmbench schema --kind <kind>`. These schemas cover suites, traces, events,
-run reports, pairwise compare reports, benchmark summaries, quality gates,
-run-matrix configs, matrix history, matrix manifests, doctor reports,
+Published JSON Schema contracts live under `schemas/` and can be emitted one at
+a time with `helmbench schema --kind <kind>` or as a full directory with
+`helmbench schema --all --out-dir <dir>`. These schemas cover suites, traces,
+events, run reports, pairwise compare reports, benchmark summaries, quality
+gates, run-matrix configs, matrix history, matrix manifests, doctor reports,
 trace/diff autopsies, suite-health reports, evidence bundles, and matrix
 privacy reports. They are intended for adapters, CI checks, and downstream
 dashboards that need to validate HelmBench artifacts without depending on Rust

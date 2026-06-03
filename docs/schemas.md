@@ -49,6 +49,15 @@ Print one to stdout:
 helmbench schema --kind task-suite
 ```
 
+Write every published schema contract to a directory:
+
+```bash
+helmbench schema --all --out-dir /tmp/helmbench-schemas
+```
+
+The bulk export writes the same `*.schema.json` filenames used by the checked-in
+contracts under `schemas/`.
+
 The checked-in schemas live in `schemas/`. They describe metadata, paths,
 hashes, counts, statuses, timing, and privacy flags. They do not define fields
 for raw source, raw prompts, raw transcripts, raw terminal logs, raw MCP

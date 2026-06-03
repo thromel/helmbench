@@ -128,6 +128,12 @@ Write a JSON Schema contract:
 cargo run -- schema --kind agent-trace --out /tmp/agent-trace.schema.json
 ```
 
+Write every published JSON Schema contract:
+
+```bash
+cargo run -- schema --all --out-dir /tmp/helmbench-schemas
+```
+
 Create a reproducible demo benchmark repo plus matching suite:
 
 ```bash
