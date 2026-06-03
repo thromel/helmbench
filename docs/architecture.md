@@ -46,7 +46,8 @@ published matrix artifacts carry their own source-free preflight proof.
 The matrix manifest also carries reproducibility provenance: HelmBench version,
 suite hash, repo HEAD, dirty-checkout flag, setup-command hashes, and per-row
 adapter/ctxhelm configuration hashes. It also records source-free artifact
-digests for matrix-owned reports, traces, docs, and evidence manifests. This
+digests for matrix-owned reports, pairwise comparisons, traces, docs, and
+evidence manifests. This
 lets reviewers compare, rerun, and tamper-check a benchmark without storing raw
 commands, prompts, terminal logs, transcripts, ctxhelm pack sections, or source
 content.

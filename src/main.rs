@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command as ProcessCommand, Stdio};
 use std::time::{Duration, Instant};
 
-const RUN_MATRIX_MANIFEST_SCHEMA_VERSION: u32 = 4;
+const RUN_MATRIX_MANIFEST_SCHEMA_VERSION: u32 = 5;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -2146,6 +2146,8 @@ struct RunMatrixManifestRun {
     report_path: String,
     trace_dir: String,
     autopsy_markdown: String,
+    comparison_json: Option<String>,
+    comparison_markdown: Option<String>,
     ctxhelm_enabled: bool,
     pack_enabled: bool,
     stream_capture_enabled: bool,
@@ -2635,17 +2637,18 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         })
         .collect::<Result<Vec<_>>>()?;
 
+    let mut comparison_paths = BTreeMap::new();
     for head in &head_results {
         validate_comparable_reports(&baseline_result.report, &head.report)?;
         let compare = compare_reports(&baseline_result.report, &head.report);
-        write_json(
-            &compare,
-            &reports_dir.join(format!("compare-{}.json", head.spec.safe_name)),
-        )?;
-        write_text(
-            &render_markdown_compare(&compare),
-            &docs_dir.join(format!("compare-{}.md", head.spec.safe_name)),
-        )?;
+        let compare_json_path = reports_dir.join(format!("compare-{}.json", head.spec.safe_name));
+        let compare_markdown_path = docs_dir.join(format!("compare-{}.md", head.spec.safe_name));
+        write_json(&compare, &compare_json_path)?;
+        write_text(&render_markdown_compare(&compare), &compare_markdown_path)?;
+        comparison_paths.insert(
+            head.spec.safe_name.clone(),
+            (compare_json_path, compare_markdown_path),
+        );
     }
 
     let head_reports = head_results
@@ -2715,6 +2718,7 @@ fn run_matrix(request: &RunMatrixRequest) -> Result<()> {
         &quality_gate_markdown_path,
         &dashboard_path,
         &autopsy_paths,
+        &comparison_paths,
         &baseline_autopsy_path,
         &reproduction_markdown_path,
         &evidence_dir.join("manifest.json"),
@@ -2760,6 +2764,7 @@ fn build_run_matrix_manifest(
     quality_gate_markdown: &Path,
     dashboard_html: &Path,
     autopsy_paths: &BTreeMap<String, PathBuf>,
+    comparison_paths: &BTreeMap<String, (PathBuf, PathBuf)>,
     baseline_autopsy_markdown: &Path,
     reproduction_markdown: &Path,
     evidence_manifest: &Path,
@@ -2773,10 +2778,17 @@ fn build_run_matrix_manifest(
         repo_path: request.repo.display().to_string(),
         out_dir: request.out_dir.display().to_string(),
         provenance,
-        baseline: run_matrix_manifest_run(&request.out_dir, baseline, autopsy_paths)?,
+        baseline: run_matrix_manifest_run(
+            &request.out_dir,
+            baseline,
+            autopsy_paths,
+            comparison_paths,
+        )?,
         heads: heads
             .iter()
-            .map(|head| run_matrix_manifest_run(&request.out_dir, head, autopsy_paths))
+            .map(|head| {
+                run_matrix_manifest_run(&request.out_dir, head, autopsy_paths, comparison_paths)
+            })
             .collect::<Result<Vec<_>>>()?,
         artifacts: RunMatrixManifestArtifacts {
             suite_health_json: manifest_path(&request.out_dir, suite_health_json),
@@ -2822,10 +2834,12 @@ fn run_matrix_manifest_run(
     out_dir: &Path,
     result: &RunMatrixResult,
     autopsy_paths: &BTreeMap<String, PathBuf>,
+    comparison_paths: &BTreeMap<String, (PathBuf, PathBuf)>,
 ) -> Result<RunMatrixManifestRun> {
     let autopsy_path = autopsy_paths
         .get(&result.spec.safe_name)
         .with_context(|| format!("missing autopsy path for matrix run `{}`", result.spec.name))?;
+    let comparison_paths = comparison_paths.get(&result.spec.safe_name);
     Ok(RunMatrixManifestRun {
         name: result.spec.name.clone(),
         agent: result.spec.agent.clone(),
@@ -2833,6 +2847,8 @@ fn run_matrix_manifest_run(
         report_path: manifest_path(out_dir, &result.report_path),
         trace_dir: manifest_path(out_dir, &result.trace_dir),
         autopsy_markdown: manifest_path(out_dir, autopsy_path),
+        comparison_json: comparison_paths.map(|(json, _)| manifest_path(out_dir, json)),
+        comparison_markdown: comparison_paths.map(|(_, markdown)| manifest_path(out_dir, markdown)),
         ctxhelm_enabled: result.spec.ctxhelm.is_some(),
         pack_enabled: result
             .spec
@@ -2876,6 +2892,12 @@ fn insert_matrix_artifact_paths(manifest: &RunMatrixManifest, paths: &mut BTreeS
     for run in std::iter::once(&manifest.baseline).chain(manifest.heads.iter()) {
         paths.insert(run.report_path.clone());
         paths.insert(run.autopsy_markdown.clone());
+        if let Some(path) = &run.comparison_json {
+            paths.insert(path.clone());
+        }
+        if let Some(path) = &run.comparison_markdown {
+            paths.insert(path.clone());
+        }
     }
     paths.insert(manifest.artifacts.suite_health_json.clone());
     paths.insert(manifest.artifacts.benchmark_summary_json.clone());
@@ -2976,11 +2998,13 @@ fn render_markdown_matrix_reproduction(manifest: &RunMatrixManifest) -> String {
     }
 
     out.push_str("## Runs\n\n");
-    out.push_str("| Run | Agent | Variant | ctxhelm | Pack | Stream | Report | Trace Dir | Autopsy | Adapter Hash | ctxhelm Hash |\n");
-    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n");
+    out.push_str("| Run | Agent | Variant | ctxhelm | Pack | Stream | Report | Trace Dir | Autopsy | Comparison JSON | Comparison Markdown | Adapter Hash | ctxhelm Hash |\n");
+    out.push_str(
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n",
+    );
     for run in std::iter::once(&manifest.baseline).chain(manifest.heads.iter()) {
         out.push_str(&format!(
-            "| `{}` | `{}` | `{:?}` | {} | {} | {} | `{}` | `{}` | `{}` | `{}` | `{}` |\n",
+            "| `{}` | `{}` | `{:?}` | {} | {} | {} | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` |\n",
             run.name,
             run.agent,
             run.variant,
@@ -2990,6 +3014,8 @@ fn render_markdown_matrix_reproduction(manifest: &RunMatrixManifest) -> String {
             run.report_path,
             run.trace_dir,
             run.autopsy_markdown,
+            run.comparison_json.as_deref().unwrap_or("none"),
+            run.comparison_markdown.as_deref().unwrap_or("none"),
             run.adapter_command_hash.as_deref().unwrap_or("none"),
             run.ctxhelm_config_hash.as_deref().unwrap_or("none")
         ));
@@ -3820,6 +3846,14 @@ fn verify_matrix_run(matrix_dir: &Path, run: &RunMatrixManifestRun) -> Result<()
         .with_context(|| format!("verify trace dir for run `{}`", run.name))?;
     require_matrix_file(matrix_dir, &run.autopsy_markdown)
         .with_context(|| format!("verify autopsy for run `{}`", run.name))?;
+    if let Some(path) = &run.comparison_json {
+        require_matrix_file(matrix_dir, path)
+            .with_context(|| format!("verify comparison JSON for run `{}`", run.name))?;
+    }
+    if let Some(path) = &run.comparison_markdown {
+        require_matrix_file(matrix_dir, path)
+            .with_context(|| format!("verify comparison Markdown for run `{}`", run.name))?;
+    }
     Ok(())
 }
 
@@ -5482,6 +5516,14 @@ mod tests {
             "docs/native-autopsy.md"
         );
         assert_eq!(
+            manifest["baseline"]["comparisonJson"],
+            serde_json::Value::Null
+        );
+        assert_eq!(
+            manifest["baseline"]["comparisonMarkdown"],
+            serde_json::Value::Null
+        );
+        assert_eq!(
             manifest["baseline"]["adapterCommandHash"],
             serde_json::Value::Null
         );
@@ -5489,6 +5531,14 @@ mod tests {
         assert_eq!(
             manifest["heads"][0]["autopsyMarkdown"],
             "docs/guided-autopsy.md"
+        );
+        assert_eq!(
+            manifest["heads"][0]["comparisonJson"],
+            "reports/compare-guided.json"
+        );
+        assert_eq!(
+            manifest["heads"][0]["comparisonMarkdown"],
+            "docs/compare-guided.md"
         );
         assert_eq!(manifest["heads"][0]["ctxhelmEnabled"], true);
         assert_eq!(manifest["heads"][0]["packEnabled"], true);
@@ -5534,6 +5584,12 @@ mod tests {
         }));
         assert!(artifact_digests
             .iter()
+            .any(|digest| digest["path"] == "reports/compare-guided.json"));
+        assert!(artifact_digests
+            .iter()
+            .any(|digest| digest["path"] == "docs/compare-guided.md"));
+        assert!(artifact_digests
+            .iter()
             .any(|digest| { digest["path"] == "traces/guided/demo-auth-redirect-001.json" }));
         assert!(artifact_digests
             .iter()
@@ -5546,6 +5602,8 @@ mod tests {
         assert!(reproduction.contains("helmbench verify-matrix --matrix <matrix-dir>"));
         assert!(reproduction.contains("Suite hash"));
         assert!(reproduction.contains("docs/guided-autopsy.md"));
+        assert!(reproduction.contains("reports/compare-guided.json"));
+        assert!(reproduction.contains("docs/compare-guided.md"));
         assert!(reproduction.contains(&command_hash(&adapter_command)));
         assert!(!reproduction.contains(adapter.to_string_lossy().as_ref()));
 

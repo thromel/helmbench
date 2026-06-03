@@ -134,10 +134,10 @@ source-free baseline trace.
 ```
 
 `matrix-manifest.json` is the top-level source-free run identity. It records the
-suite path, repo path, baseline/head run labels, relative report, trace, and
-autopsy paths, suite-health artifact, key artifact paths, artifact byte
-counts/content hashes, quality-gate status, evidence-bundle verification
-status, source-free privacy flags, and reproducibility provenance.
+suite path, repo path, baseline/head run labels, relative report, trace,
+autopsy, and comparison paths, suite-health artifact, key artifact paths,
+artifact byte counts/content hashes, quality-gate status, evidence-bundle
+verification status, source-free privacy flags, and reproducibility provenance.
 
 The provenance block includes the HelmBench version, suite content hash, repo
 HEAD, dirty-checkout flag, setup-command count, and setup-command hashes. Each
