@@ -10,6 +10,7 @@ suite task
   -> git clone target repo into .helmbench/workdirs/<task-id>
   -> run optional global setup commands
   -> run optional task setupCommands
+  -> snapshot the post-setup clone as the edit baseline
   -> run adapter command with HELMBENCH_* environment
   -> adapter appends source-free events
   -> infer edited paths from git status
@@ -60,7 +61,10 @@ Suite-level `setupCommands` run in every task clone before the adapter starts.
 Each task can also define `setupCommands`; those run after the global setup and
 before ctxhelm or the agent. Use task setup commands for seeded benchmark
 tasks, such as deleting a generated file or applying a fixture mutation that
-the agent must repair.
+the agent must repair. After setup succeeds, HelmBench creates an internal git
+snapshot in the isolated clone. Edited-file inference is measured against that
+post-setup state, so setup mutations are not counted as agent edits and a
+repair back to the clean fixture still appears as an edit.
 
 ## Privacy Boundary
 

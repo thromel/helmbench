@@ -6361,6 +6361,8 @@ fn run_local_suite(
         if !run_task_setup_commands(task, &task_dir, false)? {
             anyhow::bail!("task setup command failed for `{}`", task.id);
         }
+        commit_setup_baseline_if_changed(&task_dir)
+            .with_context(|| format!("snapshot setup baseline for `{}`", task.id))?;
 
         if let Some(ctxhelm) = ctxhelm {
             append_ctxhelm_events(ctxhelm, task, &task_dir, &events, task_started)?;
@@ -7013,6 +7015,46 @@ fn git_changed_paths(repo: &Path) -> Result<Vec<String>> {
     Ok(paths)
 }
 
+fn commit_setup_baseline_if_changed(repo: &Path) -> Result<()> {
+    if git_changed_paths(repo)?.is_empty() {
+        return Ok(());
+    }
+    run_git(repo, &["add", "-A", "--", "."])?;
+    run_git(
+        repo,
+        &[
+            "-c",
+            "user.name=HelmBench",
+            "-c",
+            "user.email=helmbench@example.invalid",
+            "commit",
+            "--quiet",
+            "--no-gpg-sign",
+            "--no-verify",
+            "-m",
+            "helmbench setup baseline",
+        ],
+    )?;
+    Ok(())
+}
+
+fn run_git(repo: &Path, args: &[&str]) -> Result<()> {
+    let output = ProcessCommand::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(args)
+        .output()
+        .with_context(|| format!("git {} {}", args.join(" "), repo.display()))?;
+    if !output.status.success() {
+        anyhow::bail!(
+            "git {} failed with status {:?}",
+            args.join(" "),
+            output.status.code()
+        );
+    }
+    Ok(())
+}
+
 fn git_diff_paths(repo: &Path, base_ref: &str, head_ref: &str) -> Result<Vec<String>> {
     if base_ref.trim().is_empty() {
         anyhow::bail!("base ref must not be empty");
@@ -7334,6 +7376,82 @@ mod tests {
             .files_read
             .iter()
             .any(|path| path.path == "src/auth/session.txt")));
+    }
+
+    #[test]
+    fn local_run_infers_edits_against_post_setup_baseline() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        std::fs::create_dir_all(&repo).expect("repo");
+        write_demo_file(&repo, "app.txt", "fixed\n").expect("app");
+        write_demo_file(&repo, "app.test", "expected validation target\n").expect("test");
+        init_git_repo(&repo).expect("git repo");
+        let suite = helmbench::TaskSuite {
+            schema_version: helmbench::SUITE_SCHEMA_VERSION,
+            name: "seeded-edit-suite".to_string(),
+            description: "Seeded edit inference regression.".to_string(),
+            tasks: vec![helmbench::BenchTask {
+                id: "seeded-edit-001".to_string(),
+                prompt: "Repair app.txt.".to_string(),
+                expected_files: vec!["app.txt".to_string()],
+                expected_tests: vec!["app.test".to_string()],
+                success_command: Some("grep -q fixed app.txt".to_string()),
+                setup_commands: vec!["printf 'broken\\n' > app.txt".to_string()],
+                tags: Vec::new(),
+                timeout_seconds: Some(60),
+            }],
+        };
+
+        let baseline_out = temp.path().join("baseline-traces");
+        run_local_suite(
+            &suite,
+            &repo,
+            &temp.path().join("baseline-workdirs"),
+            &baseline_out,
+            "baseline",
+            AgentVariant::Native,
+            &[],
+            None,
+            None,
+            false,
+            false,
+        )
+        .expect("baseline local run");
+        let baseline_traces = load_traces(&baseline_out).expect("baseline traces");
+        assert_eq!(baseline_traces[0].status, TaskStatus::Failure);
+        assert!(
+            baseline_traces[0].files_edited.is_empty(),
+            "setup changes should not be counted as agent edits"
+        );
+
+        let adapter = temp.path().join("repair-agent.sh");
+        std::fs::write(
+            &adapter,
+            "#!/usr/bin/env sh\nset -eu\nprintf 'fixed\\n' > app.txt\n",
+        )
+        .expect("adapter");
+        set_executable(&adapter).expect("chmod adapter");
+        let repair_out = temp.path().join("repair-traces");
+        run_local_suite(
+            &suite,
+            &repo,
+            &temp.path().join("repair-workdirs"),
+            &repair_out,
+            "repair-agent",
+            AgentVariant::Native,
+            &[],
+            None,
+            Some(&format!("sh {}", shell_escape(&adapter.to_string_lossy()))),
+            false,
+            false,
+        )
+        .expect("repair local run");
+        let repair_traces = load_traces(&repair_out).expect("repair traces");
+        assert_eq!(repair_traces[0].status, TaskStatus::Success);
+        assert!(repair_traces[0]
+            .files_edited
+            .iter()
+            .any(|path| path.path == "app.txt"));
     }
 
     #[test]
