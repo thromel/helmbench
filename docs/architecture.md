@@ -160,6 +160,7 @@ The core report computes:
 - time to first relevant file
 - tool call count
 - token estimate
+- tool/token cost per successful task
 
 ## Benchmark Summary
 
@@ -186,8 +187,8 @@ The summary artifact includes:
   plus successful and failed command counts;
 - average time to first relevant file when traces include timing metadata;
 - deltas from baseline for success, validation, recommendation recall, context
-  precision, edited-file recall, irrelevant reads, tool calls, and token
-  estimate;
+  precision, edited-file recall, irrelevant reads, total tool/token cost, and
+  tool/token cost per successful task;
 - a simple verdict per variant: `improved`, `regressed`, `mixed`, or
   `no_change`.
 
@@ -218,8 +219,10 @@ if any check fails.
 Default thresholds require no regression in success rate, validation coverage,
 recommendation recall, context precision, edited-file recall, or irrelevant read
 rate. Optional thresholds can require a minimum task count and cap tool-call,
-token, and average time to first relevant file deltas. Timing checks are skipped
-with a warning when either side of a comparison lacks timing metadata.
+token, tool/token-per-success, and average time to first relevant file deltas.
+Timing checks are skipped with a warning when either side of a comparison lacks
+timing metadata. Per-success cost checks are skipped with a warning when either
+side has zero successful tasks.
 Quality-gate reports preserve benchmark-summary confidence warnings; a gate can
 pass while still warning that the suite is too small for strong claims unless
 `minTaskCount` or `--min-task-count` turns that confidence floor into a failing

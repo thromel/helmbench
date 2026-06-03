@@ -9,7 +9,7 @@ pub const TRACE_SCHEMA_VERSION: u32 = 1;
 pub const REPORT_SCHEMA_VERSION: u32 = 2;
 pub const AUTOPSY_SCHEMA_VERSION: u32 = 1;
 pub const DIFF_AUTOPSY_SCHEMA_VERSION: u32 = 1;
-pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 6;
+pub const BENCHMARK_SUMMARY_SCHEMA_VERSION: u32 = 7;
 pub const QUALITY_GATE_SCHEMA_VERSION: u32 = 1;
 pub const CONFIDENCE_LEVEL_95: f32 = 0.95;
 pub const MIN_RECOMMENDED_BENCHMARK_TASKS: usize = 10;
@@ -262,6 +262,10 @@ pub struct CompareReport {
     pub validation_coverage_rate_delta: f32,
     pub total_tool_calls_delta: i64,
     pub total_token_estimate_delta: i64,
+    #[serde(default)]
+    pub tool_calls_per_success_delta: Option<f32>,
+    #[serde(default)]
+    pub token_estimate_per_success_delta: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -297,6 +301,10 @@ pub struct BenchmarkRunSummary {
     pub total_tool_calls: u32,
     pub total_token_estimate: u64,
     #[serde(default)]
+    pub tool_calls_per_success: Option<f32>,
+    #[serde(default)]
+    pub token_estimate_per_success: Option<f32>,
+    #[serde(default)]
     pub command_summary: CommandSummary,
     pub failure_taxonomy: BenchmarkFailureTaxonomy,
 }
@@ -327,6 +335,10 @@ pub struct BenchmarkComparison {
     pub average_time_to_first_relevant_file_millis_delta: Option<f32>,
     pub total_tool_calls_delta: i64,
     pub total_token_estimate_delta: i64,
+    #[serde(default)]
+    pub tool_calls_per_success_delta: Option<f32>,
+    #[serde(default)]
+    pub token_estimate_per_success_delta: Option<f32>,
     pub verdict: BenchmarkVerdict,
 }
 
@@ -392,6 +404,8 @@ pub struct QualityGateConfig {
     pub max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
     pub max_total_tool_calls_delta: Option<i64>,
     pub max_total_token_estimate_delta: Option<i64>,
+    pub max_tool_calls_per_success_delta: Option<f32>,
+    pub max_token_estimate_per_success_delta: Option<f32>,
 }
 
 impl Default for QualityGateConfig {
@@ -407,6 +421,8 @@ impl Default for QualityGateConfig {
             max_average_time_to_first_relevant_file_millis_delta: None,
             max_total_tool_calls_delta: None,
             max_total_token_estimate_delta: None,
+            max_tool_calls_per_success_delta: None,
+            max_token_estimate_per_success_delta: None,
         }
     }
 }
@@ -755,6 +771,18 @@ pub fn build_report(suite: &TaskSuite, traces: &[AgentTrace]) -> Result<RunRepor
 }
 
 pub fn compare_reports(base: &RunReport, head: &RunReport) -> CompareReport {
+    let base_tool_calls_per_success =
+        per_success_u32(base.summary.total_tool_calls, base.summary.success_count);
+    let head_tool_calls_per_success =
+        per_success_u32(head.summary.total_tool_calls, head.summary.success_count);
+    let base_tokens_per_success = per_success_u64(
+        base.summary.total_token_estimate,
+        base.summary.success_count,
+    );
+    let head_tokens_per_success = per_success_u64(
+        head.summary.total_token_estimate,
+        head.summary.success_count,
+    );
     CompareReport {
         schema_version: REPORT_SCHEMA_VERSION,
         base_agent: base.agent.clone(),
@@ -779,6 +807,14 @@ pub fn compare_reports(base: &RunReport, head: &RunReport) -> CompareReport {
             - base.summary.total_tool_calls as i64,
         total_token_estimate_delta: head.summary.total_token_estimate as i64
             - base.summary.total_token_estimate as i64,
+        tool_calls_per_success_delta: optional_f32_delta(
+            head_tool_calls_per_success,
+            base_tool_calls_per_success,
+        ),
+        token_estimate_per_success_delta: optional_f32_delta(
+            head_tokens_per_success,
+            base_tokens_per_success,
+        ),
     }
 }
 
@@ -904,6 +940,14 @@ fn benchmark_run_summary(report: &RunReport) -> BenchmarkRunSummary {
             .average_time_to_first_relevant_file_millis,
         total_tool_calls: report.summary.total_tool_calls,
         total_token_estimate: report.summary.total_token_estimate,
+        tool_calls_per_success: per_success_u32(
+            report.summary.total_tool_calls,
+            report.summary.success_count,
+        ),
+        token_estimate_per_success: per_success_u64(
+            report.summary.total_token_estimate,
+            report.summary.success_count,
+        ),
         command_summary: report.summary.command_summary.clone(),
         failure_taxonomy,
     }
@@ -1028,6 +1072,23 @@ fn benchmark_comparison(baseline: &RunReport, head: &RunReport) -> BenchmarkComp
         head.summary.total_tool_calls as i64 - baseline.summary.total_tool_calls as i64;
     let total_token_estimate_delta =
         head.summary.total_token_estimate as i64 - baseline.summary.total_token_estimate as i64;
+    let tool_calls_per_success_delta = optional_f32_delta(
+        per_success_u32(head.summary.total_tool_calls, head.summary.success_count),
+        per_success_u32(
+            baseline.summary.total_tool_calls,
+            baseline.summary.success_count,
+        ),
+    );
+    let token_estimate_per_success_delta = optional_f32_delta(
+        per_success_u64(
+            head.summary.total_token_estimate,
+            head.summary.success_count,
+        ),
+        per_success_u64(
+            baseline.summary.total_token_estimate,
+            baseline.summary.success_count,
+        ),
+    );
 
     BenchmarkComparison {
         head_agent: head.agent.clone(),
@@ -1041,6 +1102,8 @@ fn benchmark_comparison(baseline: &RunReport, head: &RunReport) -> BenchmarkComp
         average_time_to_first_relevant_file_millis_delta,
         total_tool_calls_delta,
         total_token_estimate_delta,
+        tool_calls_per_success_delta,
+        token_estimate_per_success_delta,
         verdict: benchmark_verdict(
             success_rate_delta,
             validation_coverage_rate_delta,
@@ -1054,6 +1117,14 @@ fn benchmark_comparison(baseline: &RunReport, head: &RunReport) -> BenchmarkComp
 
 fn optional_f32_delta(head: Option<f32>, baseline: Option<f32>) -> Option<f32> {
     Some(head? - baseline?)
+}
+
+fn per_success_u32(total: u32, success_count: usize) -> Option<f32> {
+    (success_count > 0).then_some(total as f32 / success_count as f32)
+}
+
+fn per_success_u64(total: u64, success_count: usize) -> Option<f32> {
+    (success_count > 0).then_some(total as f32 / success_count as f32)
 }
 
 fn benchmark_verdict(
@@ -1361,6 +1432,14 @@ pub fn render_markdown_compare(compare: &CompareReport) -> String {
         "| Token estimate | {:+} |\n",
         compare.total_token_estimate_delta
     ));
+    out.push_str(&format!(
+        "| Tool calls per success | {} |\n",
+        format_optional_number_delta(compare.tool_calls_per_success_delta)
+    ));
+    out.push_str(&format!(
+        "| Token estimate per success | {} |\n",
+        format_optional_number_delta(compare.token_estimate_per_success_delta)
+    ));
     out
 }
 
@@ -1388,13 +1467,13 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
     out.push('\n');
 
     out.push_str("## Runs\n\n");
-    out.push_str("| Run | Tasks | Success | 95% CI | Validation | 95% CI | Rec recall | Context precision | Edited recall | Irrelevant reads | Avg first relevant | Tools | Tokens |\n");
+    out.push_str("| Run | Tasks | Success | 95% CI | Validation | 95% CI | Rec recall | Context precision | Edited recall | Irrelevant reads | Avg first relevant | Tools | Tokens | Tools/success | Tokens/success |\n");
     out.push_str(
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n",
     );
     for run in &report.runs {
         out.push_str(&format!(
-            "| {} / {:?} | {} | {:.1}% | {} | {:.1}% | {} | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {} | {} | {} |\n",
+            "| {} / {:?} | {} | {:.1}% | {} | {:.1}% | {} | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {} | {} | {} | {} | {} |\n",
             run.agent,
             run.variant,
             run.task_count,
@@ -1408,7 +1487,9 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
             pct(run.irrelevant_read_rate),
             format_optional_millis(run.average_time_to_first_relevant_file_millis),
             run.total_tool_calls,
-            run.total_token_estimate
+            run.total_token_estimate,
+            format_optional_number(run.tool_calls_per_success),
+            format_optional_number(run.token_estimate_per_success)
         ));
     }
 
@@ -1453,11 +1534,11 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
     }
 
     out.push_str("\n## Deltas From Baseline\n\n");
-    out.push_str("| Variant | Verdict | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens |\n");
-    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    out.push_str("| Variant | Verdict | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens | Tools/success | Tokens/success |\n");
+    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
     for comparison in &report.comparisons {
         out.push_str(&format!(
-            "| {} / {:?} | {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {} | {:+} | {:+} |\n",
+            "| {} / {:?} | {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {} | {:+} | {:+} | {} | {} |\n",
             comparison.head_agent,
             comparison.head_variant,
             comparison.verdict,
@@ -1471,7 +1552,9 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
                 comparison.average_time_to_first_relevant_file_millis_delta
             ),
             comparison.total_tool_calls_delta,
-            comparison.total_token_estimate_delta
+            comparison.total_token_estimate_delta,
+            format_optional_number_delta(comparison.tool_calls_per_success_delta),
+            format_optional_number_delta(comparison.token_estimate_per_success_delta)
         ));
     }
 
@@ -1586,6 +1669,38 @@ pub fn evaluate_quality_gate(
                 comparison.total_token_estimate_delta,
                 threshold,
             );
+        }
+        if let Some(threshold) = config.max_tool_calls_per_success_delta {
+            if let Some(actual) = comparison.tool_calls_per_success_delta {
+                push_max_check(
+                    &mut checks,
+                    comparison,
+                    "tool_calls_per_success_delta",
+                    actual,
+                    threshold,
+                );
+            } else {
+                warnings.push(format!(
+                    "Skipped tool_calls_per_success_delta for {} / {:?}: baseline or head run has zero successful tasks.",
+                    comparison.head_agent, comparison.head_variant
+                ));
+            }
+        }
+        if let Some(threshold) = config.max_token_estimate_per_success_delta {
+            if let Some(actual) = comparison.token_estimate_per_success_delta {
+                push_max_check(
+                    &mut checks,
+                    comparison,
+                    "token_estimate_per_success_delta",
+                    actual,
+                    threshold,
+                );
+            } else {
+                warnings.push(format!(
+                    "Skipped token_estimate_per_success_delta for {} / {:?}: baseline or head run has zero successful tasks.",
+                    comparison.head_agent, comparison.head_variant
+                ));
+            }
         }
     }
 
@@ -3005,6 +3120,18 @@ fn format_optional_millis_delta(value: Option<f32>) -> String {
         .unwrap_or_else(|| "n/a".to_string())
 }
 
+fn format_optional_number(value: Option<f32>) -> String {
+    value
+        .map(|value| format!("{value:.1}"))
+        .unwrap_or_else(|| "n/a".to_string())
+}
+
+fn format_optional_number_delta(value: Option<f32>) -> String {
+    value
+        .map(|value| format!("{value:+.1}"))
+        .unwrap_or_else(|| "n/a".to_string())
+}
+
 fn stable_hash(value: &str) -> String {
     let mut hash = 0xcbf29ce484222325u64;
     for byte in value.as_bytes() {
@@ -3193,6 +3320,10 @@ mod tests {
         );
         assert_eq!(summary.runs[0].success_count, 0);
         assert_eq!(summary.runs[1].success_count, 1);
+        assert_eq!(summary.runs[0].tool_calls_per_success, None);
+        assert_eq!(summary.runs[0].token_estimate_per_success, None);
+        assert_eq!(summary.runs[1].tool_calls_per_success, Some(5.0));
+        assert_eq!(summary.runs[1].token_estimate_per_success, Some(2500.0));
         assert_eq!(summary.runs[1].validation_covered_count, 1);
         assert_eq!(
             summary.runs[0].average_time_to_first_relevant_file_millis,
@@ -3228,6 +3359,11 @@ mod tests {
         );
         assert_eq!(summary.comparisons[0].total_tool_calls_delta, -3);
         assert_eq!(summary.comparisons[0].total_token_estimate_delta, -1500);
+        assert_eq!(summary.comparisons[0].tool_calls_per_success_delta, None);
+        assert_eq!(
+            summary.comparisons[0].token_estimate_per_success_delta,
+            None
+        );
         assert_eq!(summary.comparisons[0].verdict, BenchmarkVerdict::Improved);
 
         let markdown = render_markdown_benchmark_summary(&summary);
@@ -3236,6 +3372,8 @@ mod tests {
         assert!(markdown.contains("Low sample warning"));
         assert!(markdown.contains("95% CI"));
         assert!(markdown.contains("Avg first relevant"));
+        assert!(markdown.contains("Tools/success"));
+        assert!(markdown.contains("Tokens/success"));
         assert!(markdown.contains("20 ms"));
         assert!(markdown.contains("-30 ms"));
         assert!(markdown.contains("Command Mix"));
@@ -3401,6 +3539,21 @@ mod tests {
             check.metric == "average_time_to_first_relevant_file_millis_delta" && !check.passed
         }));
 
+        let missing_per_success_gate = evaluate_quality_gate(
+            &summary,
+            &QualityGateConfig {
+                max_tool_calls_per_success_delta: Some(0.0),
+                max_token_estimate_per_success_delta: Some(0.0),
+                ..QualityGateConfig::default()
+            },
+        )
+        .expect("missing per-success gate");
+        assert!(missing_per_success_gate.passed);
+        assert!(missing_per_success_gate
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("Skipped tool_calls_per_success_delta")));
+
         let mut missing_latency_summary = summary.clone();
         missing_latency_summary.comparisons[0].average_time_to_first_relevant_file_millis_delta =
             None;
@@ -3418,6 +3571,66 @@ mod tests {
             .iter()
             .any(|warning| warning
                 .contains("Skipped average_time_to_first_relevant_file_millis_delta")));
+
+        let cost_base = build_report(
+            &suite,
+            &[AgentTrace {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                agent: "claude-code".to_string(),
+                variant: AgentVariant::Native,
+                status: TaskStatus::Success,
+                recommended_files: Vec::new(),
+                files_read: vec![timed_path("src/auth/session.ts", 20)],
+                files_edited: vec![path("src/auth/session.ts")],
+                commands: Vec::new(),
+                tool_call_count: 4,
+                token_estimate: Some(1000),
+                elapsed_millis: Some(1000),
+                time_to_first_relevant_file_millis: Some(20),
+                privacy: PrivacyStatus::source_free(),
+            }],
+        )
+        .expect("cost base");
+        let cost_head = build_report(
+            &suite,
+            &[AgentTrace {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                agent: "claude-code".to_string(),
+                variant: AgentVariant::CtxhelmMcp,
+                status: TaskStatus::Success,
+                recommended_files: vec![path("src/auth/session.ts")],
+                files_read: vec![timed_path("src/auth/session.ts", 20)],
+                files_edited: vec![path("src/auth/session.ts")],
+                commands: Vec::new(),
+                tool_call_count: 6,
+                token_estimate: Some(1300),
+                elapsed_millis: Some(900),
+                time_to_first_relevant_file_millis: Some(20),
+                privacy: PrivacyStatus::source_free(),
+            }],
+        )
+        .expect("cost head");
+        let cost_summary = build_benchmark_summary(&cost_base, &[cost_head]).expect("cost summary");
+        let cost_gate = evaluate_quality_gate(
+            &cost_summary,
+            &QualityGateConfig {
+                max_tool_calls_per_success_delta: Some(1.0),
+                max_token_estimate_per_success_delta: Some(100.0),
+                ..QualityGateConfig::default()
+            },
+        )
+        .expect("cost gate");
+        assert!(!cost_gate.passed);
+        assert!(cost_gate
+            .checks
+            .iter()
+            .any(|check| check.metric == "tool_calls_per_success_delta" && !check.passed));
+        assert!(cost_gate
+            .checks
+            .iter()
+            .any(|check| check.metric == "token_estimate_per_success_delta" && !check.passed));
     }
 
     #[test]
@@ -3680,7 +3893,42 @@ mod tests {
         let compare = compare_reports(&base, &head);
         assert!(compare.success_rate_delta > 0.0);
         assert!(compare.irrelevant_read_rate_delta < 0.0);
+        assert_eq!(compare.tool_calls_per_success_delta, None);
         assert!(render_markdown_compare(&compare).contains("Task success rate"));
+        assert!(render_markdown_compare(&compare).contains("Tool calls per success"));
+
+        let base_success = build_report(
+            &suite,
+            &[AgentTrace {
+                tool_call_count: 4,
+                token_estimate: Some(400),
+                ..trace_with_reads(
+                    AgentVariant::Native,
+                    TaskStatus::Success,
+                    vec!["src/auth/session.ts"],
+                )
+            }],
+        )
+        .expect("base success report");
+        let head_success = build_report(
+            &suite,
+            &[AgentTrace {
+                tool_call_count: 2,
+                token_estimate: Some(250),
+                ..trace_with_reads(
+                    AgentVariant::CtxhelmMcp,
+                    TaskStatus::Success,
+                    vec!["src/auth/session.ts"],
+                )
+            }],
+        )
+        .expect("head success report");
+        let success_compare = compare_reports(&base_success, &head_success);
+        assert_eq!(success_compare.tool_calls_per_success_delta, Some(-2.0));
+        assert_eq!(
+            success_compare.token_estimate_per_success_delta,
+            Some(-150.0)
+        );
     }
 
     #[test]

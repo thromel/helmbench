@@ -64,6 +64,8 @@ This repository currently implements the core HelmBench workflow:
 - recommendation precision and recall metrics for context-plan evaluation
 - source-free command-class summaries for test/build/lint/typecheck/other
   validation behavior
+- source-free tool/token cost-per-success metrics for practical efficiency
+  comparisons
 
 It does **not** yet parse raw Claude Code, Codex, Cursor, or other agent
 transcripts. The current runner ingests source-free traces, can generate ctxhelm
@@ -269,7 +271,9 @@ cargo run -- quality-gate \
   --summary reports/example-benchmark-summary.json \
   --max-average-time-to-first-relevant-file-millis-delta 0 \
   --max-total-tool-calls-delta 0 \
-  --max-total-token-estimate-delta 0
+  --max-total-token-estimate-delta 0 \
+  --max-tool-calls-per-success-delta 0 \
+  --max-token-estimate-per-success-delta 0
 ```
 
 Package a source-free evidence bundle:
@@ -480,7 +484,7 @@ pollute ctxhelm recommendation quality.
 | Edited-file recall | Expected target files edited divided by expected files. |
 | Validation coverage | Whether expected tests or validation command classes were run successfully. |
 | Time to first relevant file | How quickly the agent reached a target file; benchmark summaries, matrix history, and optional quality gates report average latency when traces provide timing. |
-| Tool/token cost | Source-free cost proxies from trace metadata. |
+| Tool/token cost | Source-free cost proxies from trace metadata, including total cost and cost per successful task. |
 
 ## Source-Free Claude Event JSONL
 

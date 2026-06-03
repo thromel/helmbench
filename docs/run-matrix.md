@@ -42,7 +42,9 @@ Config format:
     "minTaskCount": 10,
     "maxAverageTimeToFirstRelevantFileMillisDelta": 0,
     "maxTotalToolCallsDelta": 0,
-    "maxTotalTokenEstimateDelta": 0
+    "maxTotalTokenEstimateDelta": 0,
+    "maxToolCallsPerSuccessDelta": 0,
+    "maxTokenEstimatePerSuccessDelta": 0
   },
   "healthMinCommits": 1,
   "allowDirtyHealth": false,
@@ -70,11 +72,13 @@ CLI values override `suite`, `repo`, `outDir`, `baseline`, and `heads` when
 provided. `qualityGate` configures the source-free quality gate written to
 `reports/quality-gate.json`; the `--min-task-count`,
 `--max-average-time-to-first-relevant-file-millis-delta`,
-`--max-total-tool-calls-delta`, and `--max-total-token-estimate-delta` CLI flags
-override those optional thresholds for one run. `healthMinCommits` and
-`allowDirtyHealth` control the matrix suite-health gate. `setupCommands` from
-the config run before additional `--setup-command` values. Config paths are
-resolved from the current working directory.
+`--max-total-tool-calls-delta`, `--max-total-token-estimate-delta`,
+`--max-tool-calls-per-success-delta`, and
+`--max-token-estimate-per-success-delta` CLI flags override those optional
+thresholds for one run. `healthMinCommits` and `allowDirtyHealth` control the
+matrix suite-health gate. `setupCommands` from the config run before
+additional `--setup-command` values. Config paths are resolved from the current
+working directory.
 
 Before any agent row executes, `run-matrix` writes `reports/suite-health.json`
 and fails if the suite/repo preflight is unhealthy. This keeps publishable
@@ -209,9 +213,9 @@ helmbench matrix-history \
 The command verifies every matrix first, loads each matrix's
 `reports/benchmark-summary.json`, requires matching suite and run names, and
 reports first-to-last deltas for success, validation coverage, recommendation
-recall, context precision, edited-file recall, irrelevant reads, tool calls,
-token estimates, and average time to first relevant file when timing is
-available.
+recall, context precision, edited-file recall, irrelevant reads, total
+tool/token cost, tool/token cost per success, and average time to first relevant
+file when timing is available.
 
 The history report is source-free in Markdown, JSON, and HTML forms. It does
 not include raw source, prompts, transcripts, terminal logs, MCP payloads, or

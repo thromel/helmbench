@@ -146,7 +146,9 @@ cargo run -- quality-gate \
   --summary "$TMP_DIR/benchmark-summary.json" \
   --out "$TMP_DIR/quality-gate.md" \
   --max-total-tool-calls-delta 0 \
-  --max-total-token-estimate-delta 0
+  --max-total-token-estimate-delta 0 \
+  --max-tool-calls-per-success-delta 0 \
+  --max-token-estimate-per-success-delta 0
 
 cargo run -- evidence-bundle \
   --suite suites/example-auth-bugs.json \

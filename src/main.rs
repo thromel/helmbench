@@ -91,6 +91,10 @@ enum Command {
         max_total_tool_calls_delta: Option<i64>,
         #[arg(long)]
         max_total_token_estimate_delta: Option<i64>,
+        #[arg(long)]
+        max_tool_calls_per_success_delta: Option<f32>,
+        #[arg(long)]
+        max_token_estimate_per_success_delta: Option<f32>,
         #[arg(long, default_value_t = 1)]
         health_min_commits: u64,
         #[arg(long)]
@@ -405,6 +409,10 @@ enum Command {
         max_total_tool_calls_delta: Option<i64>,
         #[arg(long)]
         max_total_token_estimate_delta: Option<i64>,
+        #[arg(long)]
+        max_tool_calls_per_success_delta: Option<f32>,
+        #[arg(long)]
+        max_token_estimate_per_success_delta: Option<f32>,
     },
     /// Diagnose source-free agent behavior from task traces.
     Autopsy {
@@ -586,6 +594,8 @@ fn main() -> Result<()> {
                 None,
                 None,
                 None,
+                None,
+                None,
             )?;
             let suite = validate_run_matrix_request(&request)?;
             println!(
@@ -612,6 +622,8 @@ fn main() -> Result<()> {
             max_average_time_to_first_relevant_file_millis_delta,
             max_total_tool_calls_delta,
             max_total_token_estimate_delta,
+            max_tool_calls_per_success_delta,
+            max_token_estimate_per_success_delta,
             health_min_commits,
             allow_dirty_health,
         } => {
@@ -632,6 +644,8 @@ fn main() -> Result<()> {
                 max_average_time_to_first_relevant_file_millis_delta,
                 max_total_tool_calls_delta,
                 max_total_token_estimate_delta,
+                max_tool_calls_per_success_delta,
+                max_token_estimate_per_success_delta,
             )?;
             run_matrix(&request)?;
             println!("wrote {}", request.out_dir.display());
@@ -1099,6 +1113,8 @@ fn main() -> Result<()> {
             max_average_time_to_first_relevant_file_millis_delta,
             max_total_tool_calls_delta,
             max_total_token_estimate_delta,
+            max_tool_calls_per_success_delta,
+            max_token_estimate_per_success_delta,
         } => {
             let summary = read_benchmark_summary(&summary)?;
             let gate = evaluate_quality_gate(
@@ -1114,6 +1130,8 @@ fn main() -> Result<()> {
                     max_average_time_to_first_relevant_file_millis_delta,
                     max_total_tool_calls_delta,
                     max_total_token_estimate_delta,
+                    max_tool_calls_per_success_delta,
+                    max_token_estimate_per_success_delta,
                 },
             )?;
             let rendered = match format {
@@ -2322,6 +2340,8 @@ struct MatrixHistoryRun {
     average_time_to_first_relevant_file_millis: Option<f32>,
     total_tool_calls: u32,
     total_token_estimate: u64,
+    tool_calls_per_success: Option<f32>,
+    token_estimate_per_success: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2353,6 +2373,12 @@ struct MatrixRunTrend {
     average_time_to_first_relevant_file_millis_delta: Option<f32>,
     total_tool_calls_delta: i64,
     total_token_estimate_delta: i64,
+    first_tool_calls_per_success: Option<f32>,
+    last_tool_calls_per_success: Option<f32>,
+    tool_calls_per_success_delta: Option<f32>,
+    first_token_estimate_per_success: Option<f32>,
+    last_token_estimate_per_success: Option<f32>,
+    token_estimate_per_success_delta: Option<f32>,
 }
 
 #[derive(Debug, Clone)]
@@ -2449,6 +2475,10 @@ struct RunMatrixQualityGateConfig {
     max_total_tool_calls_delta: Option<i64>,
     #[serde(default)]
     max_total_token_estimate_delta: Option<i64>,
+    #[serde(default)]
+    max_tool_calls_per_success_delta: Option<f32>,
+    #[serde(default)]
+    max_token_estimate_per_success_delta: Option<f32>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2469,6 +2499,8 @@ fn build_run_matrix_request(
     max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
     max_total_tool_calls_delta: Option<i64>,
     max_total_token_estimate_delta: Option<i64>,
+    max_tool_calls_per_success_delta: Option<f32>,
+    max_token_estimate_per_success_delta: Option<f32>,
 ) -> Result<RunMatrixRequest> {
     let config = config_path
         .map(load_run_matrix_config)
@@ -2548,6 +2580,8 @@ fn build_run_matrix_request(
         max_average_time_to_first_relevant_file_millis_delta,
         max_total_tool_calls_delta,
         max_total_token_estimate_delta,
+        max_tool_calls_per_success_delta,
+        max_token_estimate_per_success_delta,
     );
 
     validate_run_matrix_specs(&baseline, &heads)?;
@@ -2573,6 +2607,8 @@ fn run_matrix_quality_gate_config(
     max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
     max_total_tool_calls_delta: Option<i64>,
     max_total_token_estimate_delta: Option<i64>,
+    max_tool_calls_per_success_delta: Option<f32>,
+    max_token_estimate_per_success_delta: Option<f32>,
 ) -> QualityGateConfig {
     let mut gate = QualityGateConfig::default();
     if let Some(config) = config {
@@ -2606,6 +2642,12 @@ fn run_matrix_quality_gate_config(
         if let Some(value) = config.max_total_token_estimate_delta {
             gate.max_total_token_estimate_delta = Some(value);
         }
+        if let Some(value) = config.max_tool_calls_per_success_delta {
+            gate.max_tool_calls_per_success_delta = Some(value);
+        }
+        if let Some(value) = config.max_token_estimate_per_success_delta {
+            gate.max_token_estimate_per_success_delta = Some(value);
+        }
     }
     if min_task_count.is_some() {
         gate.min_task_count = min_task_count;
@@ -2619,6 +2661,12 @@ fn run_matrix_quality_gate_config(
     }
     if max_total_token_estimate_delta.is_some() {
         gate.max_total_token_estimate_delta = max_total_token_estimate_delta;
+    }
+    if max_tool_calls_per_success_delta.is_some() {
+        gate.max_tool_calls_per_success_delta = max_tool_calls_per_success_delta;
+    }
+    if max_token_estimate_per_success_delta.is_some() {
+        gate.max_token_estimate_per_success_delta = max_token_estimate_per_success_delta;
     }
     gate
 }
@@ -3358,7 +3406,7 @@ fn build_matrix_history_report(matrix_dirs: &[PathBuf]) -> Result<MatrixHistoryR
 
     let trends = matrix_history_trends(&entries)?;
     Ok(MatrixHistoryReport {
-        schema_version: 1,
+        schema_version: 2,
         suite_name: suite_name.unwrap_or_default(),
         matrices: entries,
         trends,
@@ -3435,6 +3483,8 @@ fn matrix_history_run(
             .average_time_to_first_relevant_file_millis,
         total_tool_calls: summary_run.total_tool_calls,
         total_token_estimate: summary_run.total_token_estimate,
+        tool_calls_per_success: summary_run.tool_calls_per_success,
+        token_estimate_per_success: summary_run.token_estimate_per_success,
     })
 }
 
@@ -3496,6 +3546,18 @@ fn matrix_history_trends(entries: &[MatrixHistoryEntry]) -> Result<Vec<MatrixRun
                     - first_run.total_tool_calls as i64,
                 total_token_estimate_delta: last_run.total_token_estimate as i64
                     - first_run.total_token_estimate as i64,
+                first_tool_calls_per_success: first_run.tool_calls_per_success,
+                last_tool_calls_per_success: last_run.tool_calls_per_success,
+                tool_calls_per_success_delta: optional_delta(
+                    first_run.tool_calls_per_success,
+                    last_run.tool_calls_per_success,
+                ),
+                first_token_estimate_per_success: first_run.token_estimate_per_success,
+                last_token_estimate_per_success: last_run.token_estimate_per_success,
+                token_estimate_per_success_delta: optional_delta(
+                    first_run.token_estimate_per_success,
+                    last_run.token_estimate_per_success,
+                ),
             })
         })
         .collect()
@@ -3535,11 +3597,11 @@ fn render_markdown_matrix_history(report: &MatrixHistoryReport) -> String {
     }
 
     out.push_str("\n## First-To-Last Trends\n\n");
-    out.push_str("| Run | Variant | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens |\n");
-    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    out.push_str("| Run | Variant | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens | Tools/success | Tokens/success |\n");
+    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
     for trend in &report.trends {
         out.push_str(&format!(
-            "| `{}` | {} / {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {} | {:+} | {:+} |\n",
+            "| `{}` | {} / {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {} | {:+} | {:+} | {} | {} |\n",
             trend.name,
             trend.agent,
             trend.variant,
@@ -3551,7 +3613,9 @@ fn render_markdown_matrix_history(report: &MatrixHistoryReport) -> String {
             matrix_pct(trend.irrelevant_read_rate_delta),
             markdown_optional_millis_delta(trend.average_time_to_first_relevant_file_millis_delta),
             trend.total_tool_calls_delta,
-            trend.total_token_estimate_delta
+            trend.total_token_estimate_delta,
+            markdown_optional_number_delta(trend.tool_calls_per_success_delta),
+            markdown_optional_number_delta(trend.token_estimate_per_success_delta)
         ));
     }
 
@@ -3621,6 +3685,16 @@ fn render_html_matrix_history(report: &MatrixHistoryReport) -> String {
             html_optional_millis(trend.last_average_time_to_first_relevant_file_millis),
             html_optional_millis_delta(trend.average_time_to_first_relevant_file_millis_delta),
         ));
+        out.push_str(&history_metric_tile_text(
+            "Tools/success",
+            html_optional_number(trend.last_tool_calls_per_success),
+            html_optional_number_delta(trend.tool_calls_per_success_delta, false),
+        ));
+        out.push_str(&history_metric_tile_text(
+            "Tokens/success",
+            html_optional_number(trend.last_token_estimate_per_success),
+            html_optional_number_delta(trend.token_estimate_per_success_delta, false),
+        ));
         out.push_str("</div>\n</article>\n");
     }
     out.push_str("</section>\n");
@@ -3628,10 +3702,10 @@ fn render_html_matrix_history(report: &MatrixHistoryReport) -> String {
     out.push_str("<section class=\"panel\">\n");
     out.push_str("<h2>First-To-Last Trends</h2>\n");
     out.push_str("<div class=\"table-wrap\"><table>\n");
-    out.push_str("<thead><tr><th>Run</th><th>Variant</th><th>Success</th><th>Validation</th><th>Recommendation recall</th><th>Context precision</th><th>Edited recall</th><th>Irrelevant reads</th><th>First relevant</th><th>Tools</th><th>Tokens</th></tr></thead>\n<tbody>\n");
+    out.push_str("<thead><tr><th>Run</th><th>Variant</th><th>Success</th><th>Validation</th><th>Recommendation recall</th><th>Context precision</th><th>Edited recall</th><th>Irrelevant reads</th><th>First relevant</th><th>Tools</th><th>Tokens</th><th>Tools/success</th><th>Tokens/success</th></tr></thead>\n<tbody>\n");
     for trend in &report.trends {
         out.push_str(&format!(
-            "<tr><td><strong>{}</strong><br>{}</td><td><code>{:?}</code></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{:+}</td><td>{:+}</td></tr>\n",
+            "<tr><td><strong>{}</strong><br>{}</td><td><code>{:?}</code></td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{:+}</td><td>{:+}</td><td>{}</td><td>{}</td></tr>\n",
             matrix_html_escape(&trend.name),
             matrix_html_escape(&trend.agent),
             trend.variant,
@@ -3643,7 +3717,9 @@ fn render_html_matrix_history(report: &MatrixHistoryReport) -> String {
             history_delta(trend.irrelevant_read_rate_delta, false),
             html_optional_millis_delta(trend.average_time_to_first_relevant_file_millis_delta),
             trend.total_tool_calls_delta,
-            trend.total_token_estimate_delta
+            trend.total_token_estimate_delta,
+            html_optional_number_delta(trend.tool_calls_per_success_delta, false),
+            html_optional_number_delta(trend.token_estimate_per_success_delta, false)
         ));
     }
     out.push_str("</tbody></table></div>\n</section>\n");
@@ -3732,6 +3808,12 @@ fn markdown_optional_millis_delta(value: Option<f32>) -> String {
         .unwrap_or_else(|| "n/a".to_string())
 }
 
+fn markdown_optional_number_delta(value: Option<f32>) -> String {
+    value
+        .map(|value| format!("{value:+.1}"))
+        .unwrap_or_else(|| "n/a".to_string())
+}
+
 fn html_optional_millis(value: Option<f32>) -> String {
     markdown_optional_millis(value)
 }
@@ -3747,6 +3829,28 @@ fn html_optional_millis_delta(value: Option<f32>) -> String {
                 "bad"
             };
             format!("<span class=\"delta {class}\">{value:+.0} ms</span>")
+        }
+        None => "<span class=\"delta flat\">n/a</span>".to_string(),
+    }
+}
+
+fn html_optional_number(value: Option<f32>) -> String {
+    value
+        .map(|value| format!("{value:.1}"))
+        .unwrap_or_else(|| "n/a".to_string())
+}
+
+fn html_optional_number_delta(value: Option<f32>, higher_is_better: bool) -> String {
+    match value {
+        Some(value) => {
+            let class = if value.abs() < f32::EPSILON {
+                "flat"
+            } else if (value > 0.0 && higher_is_better) || (value < 0.0 && !higher_is_better) {
+                "good"
+            } else {
+                "bad"
+            };
+            format!("<span class=\"delta {class}\">{value:+.1}</span>")
         }
         None => "<span class=\"delta flat\">n/a</span>".to_string(),
     }
@@ -5552,6 +5656,8 @@ mod tests {
             None,
             None,
             None,
+            None,
+            None,
         )
         .expect("matrix request");
         run_matrix(&request).expect("run matrix");
@@ -5735,6 +5841,8 @@ mod tests {
         let mut first_summary =
             read_benchmark_summary(&first_summary_path).expect("first benchmark summary");
         first_summary.runs[1].average_time_to_first_relevant_file_millis = Some(150.0);
+        first_summary.runs[1].tool_calls_per_success = Some(4.0);
+        first_summary.runs[1].token_estimate_per_success = Some(900.0);
         write_json(&first_summary, &first_summary_path).expect("mutated first summary");
         refresh_matrix_manifest_digests(&out);
 
@@ -5754,6 +5862,8 @@ mod tests {
         second_summary.runs[1].average_time_to_first_relevant_file_millis = Some(75.0);
         second_summary.runs[1].total_tool_calls += 3;
         second_summary.runs[1].total_token_estimate += 100;
+        second_summary.runs[1].tool_calls_per_success = Some(6.5);
+        second_summary.runs[1].token_estimate_per_success = Some(1050.0);
         write_json(&second_summary, &summary_path).expect("mutated second summary");
         refresh_matrix_manifest_digests(&out2);
 
@@ -5769,11 +5879,17 @@ mod tests {
             Some(-75.0)
         );
         assert_eq!(history.trends[1].total_tool_calls_delta, 3);
+        assert_eq!(history.trends[1].tool_calls_per_success_delta, Some(2.5));
+        assert_eq!(
+            history.trends[1].token_estimate_per_success_delta,
+            Some(150.0)
+        );
         assert!(history.privacy.source_free);
         let rendered = render_markdown_matrix_history(&history);
         assert!(rendered.contains("First-To-Last Trends"));
         assert!(rendered.contains("`guided`"));
         assert!(rendered.contains("-75 ms"));
+        assert!(rendered.contains("Tools/success"));
         assert!(!rendered.contains(temp.path().to_string_lossy().as_ref()));
         let html = render_html_matrix_history(&history);
         assert!(html.contains("<title>HelmBench Matrix History</title>"));
@@ -5781,6 +5897,7 @@ mod tests {
         assert!(html.contains("Source-free"));
         assert!(html.contains("guided"));
         assert!(html.contains("-75 ms"));
+        assert!(html.contains("Tools/success"));
         assert!(!html.contains(temp.path().to_string_lossy().as_ref()));
 
         std::fs::write(out.join("docs/guided-autopsy.md"), "tampered").expect("tamper autopsy");
@@ -5815,7 +5932,9 @@ mod tests {
                     "minTaskCount": 10,
                     "maxAverageTimeToFirstRelevantFileMillisDelta": 0.0,
                     "maxTotalToolCallsDelta": 0,
-                    "maxTotalTokenEstimateDelta": 0
+                    "maxTotalTokenEstimateDelta": 0,
+                    "maxToolCallsPerSuccessDelta": 0.0,
+                    "maxTokenEstimatePerSuccessDelta": 0.0
                 },
                 "baseline": {
                     "name": "native",
@@ -5856,6 +5975,8 @@ mod tests {
             None,
             None,
             None,
+            None,
+            None,
         )
         .expect("request");
 
@@ -5878,6 +5999,16 @@ mod tests {
         assert_eq!(
             request.quality_gate_config.max_total_token_estimate_delta,
             Some(0)
+        );
+        assert_eq!(
+            request.quality_gate_config.max_tool_calls_per_success_delta,
+            Some(0.0)
+        );
+        assert_eq!(
+            request
+                .quality_gate_config
+                .max_token_estimate_per_success_delta,
+            Some(0.0)
         );
         assert_eq!(request.health_min_commits, 2);
         assert!(request.allow_dirty_health);
@@ -5918,6 +6049,8 @@ mod tests {
             Some(-10.0),
             Some(5),
             Some(100),
+            Some(1.5),
+            Some(250.0),
         )
         .expect("override request");
         assert_eq!(
@@ -5955,6 +6088,18 @@ mod tests {
                 .quality_gate_config
                 .max_total_token_estimate_delta,
             Some(100)
+        );
+        assert_eq!(
+            override_request
+                .quality_gate_config
+                .max_tool_calls_per_success_delta,
+            Some(1.5)
+        );
+        assert_eq!(
+            override_request
+                .quality_gate_config
+                .max_token_estimate_per_success_delta,
+            Some(250.0)
         );
         assert_eq!(override_request.health_min_commits, 3);
         assert!(override_request.allow_dirty_health);
@@ -6002,6 +6147,8 @@ mod tests {
             false,
             1,
             false,
+            None,
+            None,
             None,
             None,
             None,
