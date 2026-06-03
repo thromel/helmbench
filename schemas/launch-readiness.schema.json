@@ -62,6 +62,7 @@
         "taskCount",
         "runCount",
         "realAgentRunCount",
+        "realAgentReportCount",
         "lowSampleWarning",
         "bestSuccessRate",
         "bestValidationCoverageRate",
@@ -79,6 +80,10 @@
           "minimum": 0
         },
         "realAgentRunCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "realAgentReportCount": {
           "type": "integer",
           "minimum": 0
         },

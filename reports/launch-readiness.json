@@ -8,6 +8,7 @@
     "taskCount": 1,
     "runCount": 3,
     "realAgentRunCount": 0,
+    "realAgentReportCount": 1,
     "lowSampleWarning": true,
     "bestSuccessRate": 1.0,
     "bestValidationCoverageRate": 1.0,
@@ -34,6 +35,11 @@
     {
       "kind": "head_report",
       "label": "head_report:79bc53e09722fd5b",
+      "sourceFree": true
+    },
+    {
+      "kind": "real_agent_report",
+      "label": "real_agent_report:3270fb3ab1f8d24e",
       "sourceFree": true
     },
     {
@@ -72,10 +78,10 @@
       "detail": "1 task(s) observed; launch target is 10"
     },
     {
-      "name": "real-agent rows",
-      "status": "warn",
-      "evidence": "benchmark_summary",
-      "detail": "0 real-agent row(s) observed; launch target is 1"
+      "name": "real-agent evidence",
+      "status": "pass",
+      "evidence": "real_agent_reports",
+      "detail": "0 matching real-agent matrix row(s), 1 matching real-agent report(s), 0 suite mismatch(es), 0 non-real-agent report(s); launch target is 1"
     },
     {
       "name": "outcome-health evidence",

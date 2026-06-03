@@ -51,6 +51,8 @@ grep -q 'HelmBench Launch Proof' docs/launch-proof.md
 grep -q 'Status: \*\*smoke_proof\*\*' docs/launch-readiness.md
 grep -q '"status": "smoke_proof"' reports/launch-readiness.json
 grep -q '"lowSampleWarning": true' reports/launch-readiness.json
+grep -q '"realAgentReportCount": 1' reports/launch-readiness.json
+grep -q 'real-agent evidence | `pass`' docs/launch-readiness.md
 grep -q 'outcome-health evidence | `pass`' docs/launch-readiness.md
 grep -q 'verified run matrix | `pass`' docs/launch-readiness.md
 grep -q '"suiteEvidenceUse": "outcome_ready"' docs/local-smoke-matrix/matrix-manifest.json
@@ -131,6 +133,7 @@ grep -q '"title": "HelmBench Compare Report"' "$TMP_DIR/compare-report.schema.js
 grep -q '"title": "HelmBench Benchmark Summary"' "$TMP_DIR/benchmark-summary.schema.json"
 grep -q '"title": "HelmBench Launch Readiness"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"smoke_proof"' "$TMP_DIR/launch-readiness.schema.json"
+grep -q '"realAgentReportCount"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"title": "HelmBench Quality Gate"' "$TMP_DIR/quality-gate.schema.json"
 grep -q '"title": "HelmBench Run Matrix Config"' "$TMP_DIR/run-matrix-config.schema.json"
 grep -q '"adapterPreset"' "$TMP_DIR/run-matrix-config.schema.json"
@@ -349,6 +352,7 @@ cargo run -- launch-readiness \
   --head-report docs/local-smoke-matrix/reports/guided.json \
   --health docs/local-smoke-matrix/reports/suite-health.json \
   --matrix docs/local-smoke-matrix \
+  --real-agent-report reports/claude-real-smoke.json \
   --out "$TMP_DIR/launch-readiness.md" \
   --format markdown
 
@@ -359,12 +363,15 @@ cargo run -- launch-readiness \
   --head-report docs/local-smoke-matrix/reports/guided.json \
   --health docs/local-smoke-matrix/reports/suite-health.json \
   --matrix docs/local-smoke-matrix \
+  --real-agent-report reports/claude-real-smoke.json \
   --out "$TMP_DIR/launch-readiness.json" \
   --format json
 grep -q 'Status: \*\*smoke_proof\*\*' "$TMP_DIR/launch-readiness.md"
+grep -q 'real-agent evidence | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'outcome-health evidence | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'verified run matrix | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q '"status": "smoke_proof"' "$TMP_DIR/launch-readiness.json"
+grep -q '"realAgentReportCount": 1' "$TMP_DIR/launch-readiness.json"
 grep -q '"sourceFree": true' "$TMP_DIR/launch-readiness.json"
 
 cargo run -- quality-gate \

@@ -448,6 +448,8 @@ enum Command {
         health: Vec<PathBuf>,
         #[arg(long)]
         matrix: Vec<PathBuf>,
+        #[arg(long)]
+        real_agent_report: Vec<PathBuf>,
         #[arg(long, default_value_t = helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS)]
         min_task_count: usize,
         #[arg(long, default_value_t = 1)]
@@ -1309,20 +1311,22 @@ fn main() -> Result<()> {
             head_report,
             health,
             matrix,
+            real_agent_report,
             min_task_count,
             min_real_agent_rows,
             out,
             format,
         } => {
-            let report = build_launch_readiness_report(
-                &suite,
-                &base_report,
-                &head_report,
-                &health,
-                &matrix,
+            let report = build_launch_readiness_report(LaunchReadinessInputs {
+                suite_path: &suite,
+                base_report_path: &base_report,
+                head_report_paths: &head_report,
+                health_paths: &health,
+                matrix_paths: &matrix,
+                real_agent_report_paths: &real_agent_report,
                 min_task_count,
                 min_real_agent_rows,
-            )?;
+            })?;
             match format {
                 OutputFormat::Json => write_json(&report, &out)?,
                 OutputFormat::Markdown => {
@@ -1927,6 +1931,7 @@ struct LaunchReadinessBenchmark {
     task_count: usize,
     run_count: usize,
     real_agent_run_count: usize,
+    real_agent_report_count: usize,
     low_sample_warning: bool,
     best_success_rate: f32,
     best_validation_coverage_rate: f32,
@@ -1935,29 +1940,36 @@ struct LaunchReadinessBenchmark {
     best_edited_file_recall: f32,
 }
 
-fn build_launch_readiness_report(
-    suite_path: &Path,
-    base_report_path: &Path,
-    head_report_paths: &[PathBuf],
-    health_paths: &[PathBuf],
-    matrix_paths: &[PathBuf],
+struct LaunchReadinessInputs<'a> {
+    suite_path: &'a Path,
+    base_report_path: &'a Path,
+    head_report_paths: &'a [PathBuf],
+    health_paths: &'a [PathBuf],
+    matrix_paths: &'a [PathBuf],
+    real_agent_report_paths: &'a [PathBuf],
     min_task_count: usize,
     min_real_agent_rows: usize,
+}
+
+fn build_launch_readiness_report(
+    inputs: LaunchReadinessInputs<'_>,
 ) -> Result<LaunchReadinessReport> {
-    let suite = load_suite(suite_path)?;
+    let suite = load_suite(inputs.suite_path)?;
     validate_suite(&suite)?;
 
-    let base_report = read_report(base_report_path)?;
-    let head_reports = head_report_paths
+    let base_report = read_report(inputs.base_report_path)?;
+    let head_reports = inputs
+        .head_report_paths
         .iter()
         .map(|path| read_report(path))
         .collect::<Result<Vec<_>>>()?;
     let summary = build_benchmark_summary(&base_report, &head_reports)?;
 
-    let mut artifacts = vec![launch_artifact("suite", suite_path)];
-    artifacts.push(launch_artifact("base_report", base_report_path));
+    let mut artifacts = vec![launch_artifact("suite", inputs.suite_path)];
+    artifacts.push(launch_artifact("base_report", inputs.base_report_path));
     artifacts.extend(
-        head_report_paths
+        inputs
+            .head_report_paths
             .iter()
             .map(|path| launch_artifact("head_report", path)),
     );
@@ -1988,6 +2000,21 @@ fn build_launch_readiness_report(
         .iter()
         .filter(|run| launch_agent_label_is_real(&run.agent))
         .count();
+    let mut real_agent_report_count = 0usize;
+    let mut real_agent_report_mismatch_count = 0usize;
+    let mut non_real_agent_report_count = 0usize;
+    for path in inputs.real_agent_report_paths {
+        let report = read_report(path)?;
+        artifacts.push(launch_artifact("real_agent_report", path));
+        if report.suite_name != suite.name {
+            real_agent_report_mismatch_count += 1;
+        } else if launch_agent_label_is_real(&report.agent) {
+            real_agent_report_count += 1;
+        } else {
+            non_real_agent_report_count += 1;
+        }
+    }
+    let real_agent_evidence_count = real_agent_run_count + real_agent_report_count;
     let best = summary
         .runs
         .iter()
@@ -2005,7 +2032,7 @@ fn build_launch_readiness_report(
 
     checks.push(launch_check(
         "recommended task count",
-        if summary.confidence.task_count >= min_task_count {
+        if summary.confidence.task_count >= inputs.min_task_count {
             LaunchReadinessCheckStatus::Pass
         } else {
             LaunchReadinessCheckStatus::Warn
@@ -2013,25 +2040,31 @@ fn build_launch_readiness_report(
         "benchmark_summary".to_string(),
         format!(
             "{} task(s) observed; launch target is {}",
-            summary.confidence.task_count, min_task_count
+            summary.confidence.task_count, inputs.min_task_count
         ),
     ));
     checks.push(launch_check(
-        "real-agent rows",
-        if real_agent_run_count >= min_real_agent_rows {
+        "real-agent evidence",
+        if real_agent_report_mismatch_count > 0 || non_real_agent_report_count > 0 {
+            LaunchReadinessCheckStatus::Fail
+        } else if real_agent_evidence_count >= inputs.min_real_agent_rows {
             LaunchReadinessCheckStatus::Pass
         } else {
             LaunchReadinessCheckStatus::Warn
         },
-        "benchmark_summary".to_string(),
+        "real_agent_reports".to_string(),
         format!(
-            "{} real-agent row(s) observed; launch target is {}",
-            real_agent_run_count, min_real_agent_rows
+            "{} matching real-agent matrix row(s), {} matching real-agent report(s), {} suite mismatch(es), {} non-real-agent report(s); launch target is {}",
+            real_agent_run_count,
+            real_agent_report_count,
+            real_agent_report_mismatch_count,
+            non_real_agent_report_count,
+            inputs.min_real_agent_rows
         ),
     ));
 
     let mut matching_health = Vec::new();
-    for path in health_paths {
+    for path in inputs.health_paths {
         let health = read_public_suite_health(path)?;
         validate_public_suite_health_report(&health)?;
         if !privacy_status_is_source_free(&health.privacy) {
@@ -2080,7 +2113,7 @@ fn build_launch_readiness_report(
     let mut verified_matching_matrices = 0usize;
     let mut matrix_suite_mismatches = 0usize;
     let mut matrix_failures = 0usize;
-    for path in matrix_paths {
+    for path in inputs.matrix_paths {
         match verify_run_matrix(path) {
             Ok(manifest) => {
                 verified_matrices += 1;
@@ -2149,12 +2182,13 @@ fn build_launch_readiness_report(
         schema_version: LAUNCH_READINESS_SCHEMA_VERSION,
         suite_name: suite.name,
         status,
-        min_task_count,
-        min_real_agent_rows,
+        min_task_count: inputs.min_task_count,
+        min_real_agent_rows: inputs.min_real_agent_rows,
         benchmark: LaunchReadinessBenchmark {
             task_count: summary.confidence.task_count,
             run_count: summary.runs.len(),
             real_agent_run_count,
+            real_agent_report_count,
             low_sample_warning: summary.confidence.low_sample_warning,
             best_success_rate: best.success_rate,
             best_validation_coverage_rate: best.validation_coverage_rate,
@@ -2182,6 +2216,10 @@ fn render_markdown_launch_readiness(report: &LaunchReadinessReport) -> String {
     out.push_str(&format!(
         "| Real-agent rows | {} |\n",
         report.benchmark.real_agent_run_count
+    ));
+    out.push_str(&format!(
+        "| Real-agent reports | {} |\n",
+        report.benchmark.real_agent_report_count
     ));
     out.push_str(&format!(
         "| Best success rate | {} |\n",
@@ -9828,15 +9866,16 @@ mod tests {
     #[test]
     fn launch_readiness_report_classifies_checked_in_smoke_proof_source_free() {
         let root = Path::new(env!("CARGO_MANIFEST_DIR"));
-        let report = build_launch_readiness_report(
-            &root.join("suites/example-auth-bugs.json"),
-            &root.join("reports/example-native.json"),
-            &[root.join("reports/example-ctxhelm.json")],
-            &[],
-            &[],
-            helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS,
-            2,
-        )
+        let report = build_launch_readiness_report(LaunchReadinessInputs {
+            suite_path: &root.join("suites/example-auth-bugs.json"),
+            base_report_path: &root.join("reports/example-native.json"),
+            head_report_paths: &[root.join("reports/example-ctxhelm.json")],
+            health_paths: &[],
+            matrix_paths: &[],
+            real_agent_report_paths: &[],
+            min_task_count: helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS,
+            min_real_agent_rows: 2,
+        })
         .expect("launch readiness");
 
         assert_eq!(report.schema_version, LAUNCH_READINESS_SCHEMA_VERSION);
@@ -9844,6 +9883,7 @@ mod tests {
         assert_eq!(report.status, LaunchReadinessStatus::SmokeProof);
         assert_eq!(report.benchmark.task_count, 1);
         assert_eq!(report.benchmark.real_agent_run_count, 2);
+        assert_eq!(report.benchmark.real_agent_report_count, 0);
         assert!(report.benchmark.low_sample_warning);
         assert!(report.privacy.source_free);
         assert!(report.checks.iter().any(|check| {
@@ -9862,6 +9902,43 @@ mod tests {
         assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));
         assert!(!json.contains("rawSourceLogged\":true"));
         assert!(json.contains("\"sourceFree\":true"));
+    }
+
+    #[test]
+    fn launch_readiness_counts_matching_real_agent_smoke_report() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let report = build_launch_readiness_report(LaunchReadinessInputs {
+            suite_path: &root.join("suites/local-run-smoke.json"),
+            base_report_path: &root.join("docs/local-smoke-matrix/reports/native.json"),
+            head_report_paths: &[
+                root.join("docs/local-smoke-matrix/reports/native-search.json"),
+                root.join("docs/local-smoke-matrix/reports/guided.json"),
+            ],
+            health_paths: &[root.join("docs/local-smoke-matrix/reports/suite-health.json")],
+            matrix_paths: &[root.join("docs/local-smoke-matrix")],
+            real_agent_report_paths: &[root.join("reports/claude-real-smoke.json")],
+            min_task_count: helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS,
+            min_real_agent_rows: 1,
+        })
+        .expect("launch readiness");
+
+        assert_eq!(report.status, LaunchReadinessStatus::SmokeProof);
+        assert_eq!(report.benchmark.real_agent_run_count, 0);
+        assert_eq!(report.benchmark.real_agent_report_count, 1);
+        assert!(report.checks.iter().any(|check| {
+            check.name == "real-agent evidence" && check.status == LaunchReadinessCheckStatus::Pass
+        }));
+        assert!(report.checks.iter().any(|check| {
+            check.name == "verified run matrix" && check.status == LaunchReadinessCheckStatus::Pass
+        }));
+        assert!(report.checks.iter().any(|check| {
+            check.name == "recommended task count"
+                && check.status == LaunchReadinessCheckStatus::Warn
+        }));
+
+        let json = serde_json::to_string(&report).expect("json");
+        assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));
+        assert!(json.contains("\"realAgentReportCount\":1"));
     }
 
     #[test]

@@ -22,10 +22,10 @@ See [HelmBench Launch Proof](docs/launch-proof.md) and the generated
 [Launch Readiness](docs/launch-readiness.md) report for the artifact-backed
 summary, dashboard, privacy contract, and regeneration commands. The current
 readiness status is `smoke_proof`: it now includes a verified, source-free
-local smoke matrix with outcome-ready suite health, but still warns that the
-launch-grade proof needs a 10-task real-agent public matrix. Larger
-public-suite proofs should use `run-matrix` on the RefactoringMiner, Flask,
-ripgrep, or Express presets.
+local smoke matrix with outcome-ready suite health and a real Claude Code smoke
+report, but still warns that launch-grade proof needs a 10-task real-agent
+public matrix. Larger public-suite proofs should use `run-matrix` on the
+RefactoringMiner, Flask, ripgrep, or Express presets.
 
 The checked-in [RefactoringMiner public recommendation proof](docs/refactoringminer-public-proof.md)
 runs `ctxhelm prepare-task` over a healthy 10-task public suite and records
