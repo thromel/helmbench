@@ -491,6 +491,7 @@ enum SchemaKind {
     AgentTrace,
     AgentEvent,
     RunReport,
+    BenchmarkSummary,
     RunMatrixManifest,
     RunMatrixPrivacyReport,
 }
@@ -1279,6 +1280,7 @@ fn schema_contract(kind: SchemaKind) -> &'static str {
         SchemaKind::AgentTrace => include_str!("../schemas/agent-trace.schema.json"),
         SchemaKind::AgentEvent => include_str!("../schemas/agent-event.schema.json"),
         SchemaKind::RunReport => include_str!("../schemas/run-report.schema.json"),
+        SchemaKind::BenchmarkSummary => include_str!("../schemas/benchmark-summary.schema.json"),
         SchemaKind::RunMatrixManifest => {
             include_str!("../schemas/run-matrix-manifest.schema.json")
         }
@@ -7038,6 +7040,7 @@ mod tests {
             (SchemaKind::AgentTrace, "HelmBench Agent Trace"),
             (SchemaKind::AgentEvent, "HelmBench Agent Event"),
             (SchemaKind::RunReport, "HelmBench Run Report"),
+            (SchemaKind::BenchmarkSummary, "HelmBench Benchmark Summary"),
             (
                 SchemaKind::RunMatrixManifest,
                 "HelmBench Run Matrix Manifest",
@@ -7060,6 +7063,12 @@ mod tests {
                 .as_str()
                 .expect("schema id")
                 .starts_with("https://github.com/thromel/helmbench/schemas/"));
+            if matches!(kind, SchemaKind::BenchmarkSummary) {
+                assert_eq!(
+                    value["properties"]["schemaVersion"]["const"],
+                    helmbench::BENCHMARK_SUMMARY_SCHEMA_VERSION
+                );
+            }
             if matches!(kind, SchemaKind::RunMatrixManifest) {
                 assert_eq!(
                     value["properties"]["schemaVersion"]["const"],

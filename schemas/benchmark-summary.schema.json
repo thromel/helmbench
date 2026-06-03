@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/benchmark-summary.schema.json",
+  "title": "HelmBench Benchmark Summary",
+  "description": "Source-free benchmark summary comparing one baseline against one or more head runs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteName",
+    "baseline",
+    "runs",
+    "comparisons",
+    "confidence",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 7
+    },
+    "suiteName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseline": {
+      "$ref": "#/$defs/runSummary"
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/runSummary"
+      }
+    },
+    "comparisons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/comparison"
+      }
+    },
+    "confidence": {
+      "$ref": "#/$defs/confidence"
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "agentVariant": {
+      "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "verdict": {
+      "enum": ["improved", "regressed", "mixed", "no_change"]
+    },
+    "rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "delta": {
+      "type": "number"
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "optionalNonNegativeNumber": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "optionalNumber": {
+      "type": ["number", "null"]
+    },
+    "commandSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "totalCommandCount",
+        "testCommandCount",
+        "buildCommandCount",
+        "lintCommandCount",
+        "typecheckCommandCount",
+        "otherCommandCount",
+        "successfulCommandCount",
+        "failedCommandCount"
+      ],
+      "properties": {
+        "totalCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "testCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "buildCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "lintCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "typecheckCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "otherCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "successfulCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "failedCommandCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["confidenceLevel", "lower", "upper"],
+      "properties": {
+        "confidenceLevel": {
+          "$ref": "#/$defs/rate"
+        },
+        "lower": {
+          "$ref": "#/$defs/rate"
+        },
+        "upper": {
+          "$ref": "#/$defs/rate"
+        }
+      }
+    },
+    "failureTaxonomy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "failedTaskCount",
+        "skippedTaskCount",
+        "validationGapCount",
+        "noRelevantFileReadCount",
+        "noExpectedEditCount",
+        "recommendationMissCount",
+        "irrelevantReadTaskCount"
+      ],
+      "properties": {
+        "failedTaskCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "skippedTaskCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "validationGapCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "noRelevantFileReadCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "noExpectedEditCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "recommendationMissCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "irrelevantReadTaskCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "runSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent",
+        "variant",
+        "taskCount",
+        "successCount",
+        "successRate",
+        "successRateInterval",
+        "validationCoveredCount",
+        "validationCoverageRate",
+        "validationCoverageRateInterval",
+        "irrelevantReadRate",
+        "recommendationPrecision",
+        "recommendationRecall",
+        "contextPrecision",
+        "editedFileRecall",
+        "averageTimeToFirstRelevantFileMillis",
+        "totalToolCalls",
+        "totalTokenEstimate",
+        "toolCallsPerSuccess",
+        "tokenEstimatePerSuccess",
+        "commandSummary",
+        "failureTaxonomy"
+      ],
+      "properties": {
+        "agent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "variant": {
+          "$ref": "#/$defs/agentVariant"
+        },
+        "taskCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "successCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "successRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "successRateInterval": {
+          "$ref": "#/$defs/interval"
+        },
+        "validationCoveredCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "validationCoverageRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "validationCoverageRateInterval": {
+          "$ref": "#/$defs/interval"
+        },
+        "irrelevantReadRate": {
+          "$ref": "#/$defs/rate"
+        },
+        "recommendationPrecision": {
+          "$ref": "#/$defs/rate"
+        },
+        "recommendationRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "contextPrecision": {
+          "$ref": "#/$defs/rate"
+        },
+        "editedFileRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "averageTimeToFirstRelevantFileMillis": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "totalToolCalls": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "totalTokenEstimate": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "toolCallsPerSuccess": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "tokenEstimatePerSuccess": {
+          "$ref": "#/$defs/optionalNonNegativeNumber"
+        },
+        "commandSummary": {
+          "$ref": "#/$defs/commandSummary"
+        },
+        "failureTaxonomy": {
+          "$ref": "#/$defs/failureTaxonomy"
+        }
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "headAgent",
+        "headVariant",
+        "successRateDelta",
+        "validationCoverageRateDelta",
+        "irrelevantReadRateDelta",
+        "recommendationRecallDelta",
+        "contextPrecisionDelta",
+        "editedFileRecallDelta",
+        "averageTimeToFirstRelevantFileMillisDelta",
+        "totalToolCallsDelta",
+        "totalTokenEstimateDelta",
+        "toolCallsPerSuccessDelta",
+        "tokenEstimatePerSuccessDelta",
+        "verdict"
+      ],
+      "properties": {
+        "headAgent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "headVariant": {
+          "$ref": "#/$defs/agentVariant"
+        },
+        "successRateDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "validationCoverageRateDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "irrelevantReadRateDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "recommendationRecallDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "contextPrecisionDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "editedFileRecallDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "averageTimeToFirstRelevantFileMillisDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "totalToolCallsDelta": {
+          "type": "integer"
+        },
+        "totalTokenEstimateDelta": {
+          "type": "integer"
+        },
+        "toolCallsPerSuccessDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "tokenEstimatePerSuccessDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "verdict": {
+          "$ref": "#/$defs/verdict"
+        }
+      }
+    },
+    "confidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confidenceLevel",
+        "minRecommendedTaskCount",
+        "taskCount",
+        "lowSampleWarning",
+        "notes"
+      ],
+      "properties": {
+        "confidenceLevel": {
+          "$ref": "#/$defs/rate"
+        },
+        "minRecommendedTaskCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "taskCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "lowSampleWarning": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}
