@@ -3918,6 +3918,7 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     let privacy_report_path = matrix_path(matrix_dir, &manifest.artifacts.privacy_report_json)?;
     validate_run_matrix_privacy_report(&privacy_report_path)
         .with_context(|| format!("validate privacy report {}", privacy_report_path.display()))?;
+    verify_matrix_benchmark_summary(matrix_dir, &manifest)?;
 
     let evidence_manifest = matrix_path(matrix_dir, &manifest.artifacts.evidence_manifest)?;
     let evidence_dir = evidence_manifest
@@ -3927,6 +3928,66 @@ fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     verify_matrix_artifact_digests(matrix_dir, &manifest)?;
 
     Ok(manifest)
+}
+
+fn verify_matrix_benchmark_summary(matrix_dir: &Path, manifest: &RunMatrixManifest) -> Result<()> {
+    let summary_path = matrix_path(matrix_dir, &manifest.artifacts.benchmark_summary_json)?;
+    let summary = read_benchmark_summary(&summary_path)
+        .with_context(|| format!("read matrix summary {}", summary_path.display()))?;
+    let expected_run_count = manifest.heads.len() + 1;
+    if summary.runs.len() != expected_run_count {
+        anyhow::bail!(
+            "matrix benchmark summary has {} run(s) but manifest expects {}",
+            summary.runs.len(),
+            expected_run_count
+        );
+    }
+    if summary.comparisons.len() != manifest.heads.len() {
+        anyhow::bail!(
+            "matrix benchmark summary has {} comparison(s) but manifest expects {}",
+            summary.comparisons.len(),
+            manifest.heads.len()
+        );
+    }
+    if summary.baseline != summary.runs[0] {
+        anyhow::bail!("matrix benchmark summary baseline does not match first run");
+    }
+
+    verify_matrix_run_summary_identity("baseline", &manifest.baseline, &summary.baseline)?;
+    verify_matrix_run_summary_identity("run `0`", &manifest.baseline, &summary.runs[0])?;
+    for (index, (manifest_run, summary_run)) in manifest
+        .heads
+        .iter()
+        .zip(summary.runs.iter().skip(1))
+        .enumerate()
+    {
+        verify_matrix_run_summary_identity(
+            &format!("run `{}`", index + 1),
+            manifest_run,
+            summary_run,
+        )?;
+    }
+    for (index, (manifest_run, comparison)) in manifest
+        .heads
+        .iter()
+        .zip(summary.comparisons.iter())
+        .enumerate()
+    {
+        if manifest_run.agent != comparison.head_agent
+            || manifest_run.variant != comparison.head_variant
+        {
+            anyhow::bail!(
+                "matrix comparison `{}` is {} / {:?}, manifest head `{}` is {} / {:?}",
+                index,
+                comparison.head_agent,
+                comparison.head_variant,
+                manifest_run.name,
+                manifest_run.agent,
+                manifest_run.variant
+            );
+        }
+    }
+    Ok(())
 }
 
 fn validate_run_matrix_privacy_report(path: &Path) -> Result<()> {
@@ -4124,16 +4185,7 @@ fn matrix_history_run(
     manifest_run: &RunMatrixManifestRun,
     summary_run: &BenchmarkRunSummary,
 ) -> Result<MatrixHistoryRun> {
-    if manifest_run.agent != summary_run.agent || manifest_run.variant != summary_run.variant {
-        anyhow::bail!(
-            "manifest run `{}` is {} / {:?}, summary is {} / {:?}",
-            manifest_run.name,
-            manifest_run.agent,
-            manifest_run.variant,
-            summary_run.agent,
-            summary_run.variant
-        );
-    }
+    verify_matrix_run_summary_identity("history run", manifest_run, summary_run)?;
     Ok(MatrixHistoryRun {
         name: manifest_run.name.clone(),
         agent: summary_run.agent.clone(),
@@ -4152,6 +4204,25 @@ fn matrix_history_run(
         tool_calls_per_success: summary_run.tool_calls_per_success,
         token_estimate_per_success: summary_run.token_estimate_per_success,
     })
+}
+
+fn verify_matrix_run_summary_identity(
+    label: &str,
+    manifest_run: &RunMatrixManifestRun,
+    summary_run: &BenchmarkRunSummary,
+) -> Result<()> {
+    if manifest_run.agent != summary_run.agent || manifest_run.variant != summary_run.variant {
+        anyhow::bail!(
+            "matrix {} `{}` is {} / {:?}, summary is {} / {:?}",
+            label,
+            manifest_run.name,
+            manifest_run.agent,
+            manifest_run.variant,
+            summary_run.agent,
+            summary_run.variant
+        );
+    }
+    Ok(())
 }
 
 fn matrix_history_trends(entries: &[MatrixHistoryEntry]) -> Result<Vec<MatrixRunTrend>> {
@@ -6666,6 +6737,17 @@ mod tests {
         assert_eq!(verified.heads.len(), 2);
         assert!(verified.evidence_bundle_verified);
         let first_summary_path = out.join("reports/benchmark-summary.json");
+        let original_summary =
+            read_benchmark_summary(&first_summary_path).expect("original benchmark summary");
+        let mut mismatched_summary = original_summary.clone();
+        mismatched_summary.runs[1].agent = "wrong-agent".to_string();
+        write_json(&mismatched_summary, &first_summary_path).expect("mismatched summary");
+        refresh_matrix_manifest_digests(&out);
+        let error = verify_run_matrix(&out).expect_err("reject mismatched benchmark summary");
+        assert!(error.to_string().contains("matrix run `1` `native-search`"));
+        write_json(&original_summary, &first_summary_path).expect("restore benchmark summary");
+        refresh_matrix_manifest_digests(&out);
+
         let mut first_summary =
             read_benchmark_summary(&first_summary_path).expect("first benchmark summary");
         first_summary.runs[1].average_time_to_first_relevant_file_millis = Some(150.0);
