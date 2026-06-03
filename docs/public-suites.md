@@ -10,6 +10,8 @@ is too small to prove navigation quality. Current presets:
   MCP, web diff, AST diff, and git-history components.
 - `flask`: Python web framework with focused config, blueprint/routing,
   templating, and CLI task areas.
+- `ripgrep`: Rust CLI/workspace codebase with ignore traversal, pattern
+  parsing, printer, and searcher task areas.
 
 ## RefactoringMiner
 
@@ -43,6 +45,8 @@ preset-specific defaults:
 - `.helmbench/refactoring-miner-public-suite-health.json`
 - `suites/flask-public.json`
 - `.helmbench/flask-public-suite-health.json`
+- `suites/ripgrep-public.json`
+- `.helmbench/ripgrep-public-suite-health.json`
 
 ## Included Tasks
 
@@ -79,6 +83,29 @@ The Flask preset emits four source-free tasks:
 Each task contains Python source paths, pytest files, tags, timeout metadata,
 and a targeted `python -m pytest ...` `successCommand`. This gives HelmBench a
 smaller non-Java public suite for cross-ecosystem agent navigation checks.
+
+## ripgrep
+
+```bash
+helmbench init-public-suite \
+  --preset ripgrep \
+  --repo ../ripgrep \
+  --suite-out /tmp/ripgrep-suite.json \
+  --health-out /tmp/ripgrep-health.json \
+  --force
+```
+
+The ripgrep preset emits four source-free tasks:
+
+- `rg-ignore-walk-001`
+- `rg-cli-pattern-001`
+- `rg-json-printer-001`
+- `rg-searcher-multiline-001`
+
+Each task contains Rust source paths, integration or crate test paths, tags,
+timeout metadata, and a targeted `cargo test ...` `successCommand`. This gives
+HelmBench a Rust public-suite lane that pairs naturally with ctxhelm and with
+HelmBench's own implementation language.
 
 ## Run Pattern
 

@@ -472,6 +472,7 @@ enum TraceVariant {
 enum PublicSuitePreset {
     RefactoringMiner,
     Flask,
+    Ripgrep,
 }
 
 #[derive(Debug, Clone, Copy, ValueEnum)]
@@ -1779,6 +1780,7 @@ fn public_suite_for_preset(preset: PublicSuitePreset) -> helmbench::TaskSuite {
     match preset {
         PublicSuitePreset::RefactoringMiner => refactoring_miner_suite(),
         PublicSuitePreset::Flask => flask_suite(),
+        PublicSuitePreset::Ripgrep => ripgrep_suite(),
     }
 }
 
@@ -1786,6 +1788,7 @@ fn public_suite_preset_name(preset: PublicSuitePreset) -> &'static str {
     match preset {
         PublicSuitePreset::RefactoringMiner => "refactoring-miner",
         PublicSuitePreset::Flask => "flask",
+        PublicSuitePreset::Ripgrep => "ripgrep",
     }
 }
 
@@ -1807,6 +1810,7 @@ fn public_suite_anchor_files(preset: PublicSuitePreset) -> &'static [&'static st
     match preset {
         PublicSuitePreset::RefactoringMiner => &["README.md", "build.gradle", "gradlew"],
         PublicSuitePreset::Flask => &["README.md", "pyproject.toml", "src/flask/__init__.py"],
+        PublicSuitePreset::Ripgrep => &["README.md", "Cargo.toml", "crates/cli/Cargo.toml"],
     }
 }
 
@@ -2089,6 +2093,102 @@ fn flask_suite() -> helmbench::TaskSuite {
                     "python".to_string(),
                     "cli".to_string(),
                     "feature".to_string(),
+                ],
+                timeout_seconds: Some(900),
+            },
+        ],
+    }
+}
+
+fn ripgrep_suite() -> helmbench::TaskSuite {
+    helmbench::TaskSuite {
+        schema_version: helmbench::SUITE_SCHEMA_VERSION,
+        name: "ripgrep-public".to_string(),
+        description:
+            "Source-free public-repo suite for ripgrep Rust CLI navigation, validation, and ctxhelm comparison."
+                .to_string(),
+        tasks: vec![
+            helmbench::BenchTask {
+                id: "rg-ignore-walk-001".to_string(),
+                prompt: "Fix ignore-file walking behavior without changing unrelated directory traversal semantics.".to_string(),
+                expected_files: vec![
+                    "crates/ignore/src/gitignore.rs".to_string(),
+                    "crates/ignore/src/walk.rs".to_string(),
+                ],
+                expected_tests: vec![
+                    "crates/ignore/tests/gitignore_matched_path_or_any_parents_tests.rs"
+                        .to_string(),
+                    "crates/ignore/tests/gitignore_skip_bom.rs".to_string(),
+                ],
+                success_command: Some("cargo test -p ignore gitignore".to_string()),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "rust".to_string(),
+                    "ignore".to_string(),
+                    "bug_fix".to_string(),
+                ],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "rg-cli-pattern-001".to_string(),
+                prompt: "Improve CLI pattern parsing or escaping behavior while preserving existing feature and regression coverage.".to_string(),
+                expected_files: vec![
+                    "crates/cli/src/pattern.rs".to_string(),
+                    "crates/cli/src/escape.rs".to_string(),
+                ],
+                expected_tests: vec![
+                    "tests/feature.rs".to_string(),
+                    "tests/regression.rs".to_string(),
+                ],
+                success_command: Some(
+                    "cargo test -p ripgrep --test feature --test regression".to_string(),
+                ),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "rust".to_string(),
+                    "cli".to_string(),
+                    "regression".to_string(),
+                ],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "rg-json-printer-001".to_string(),
+                prompt: "Adjust JSON printer behavior without leaking formatting changes into unrelated standard output modes.".to_string(),
+                expected_files: vec![
+                    "crates/printer/src/json.rs".to_string(),
+                    "crates/printer/src/jsont.rs".to_string(),
+                    "crates/printer/src/standard.rs".to_string(),
+                ],
+                expected_tests: vec!["tests/json.rs".to_string()],
+                success_command: Some("cargo test -p ripgrep --test json".to_string()),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "rust".to_string(),
+                    "json".to_string(),
+                    "output".to_string(),
+                ],
+                timeout_seconds: Some(900),
+            },
+            helmbench::BenchTask {
+                id: "rg-searcher-multiline-001".to_string(),
+                prompt: "Improve multiline search behavior while keeping searcher buffering and sink behavior targeted.".to_string(),
+                expected_files: vec![
+                    "crates/searcher/src/searcher/core.rs".to_string(),
+                    "crates/searcher/src/line_buffer.rs".to_string(),
+                    "crates/searcher/src/sink.rs".to_string(),
+                ],
+                expected_tests: vec![
+                    "tests/multiline.rs".to_string(),
+                    "tests/misc.rs".to_string(),
+                ],
+                success_command: Some(
+                    "cargo test -p ripgrep --test multiline --test misc".to_string(),
+                ),
+                tags: vec![
+                    "public_repo".to_string(),
+                    "rust".to_string(),
+                    "searcher".to_string(),
+                    "bug_fix".to_string(),
                 ],
                 timeout_seconds: Some(900),
             },
@@ -6007,6 +6107,42 @@ mod tests {
     }
 
     #[test]
+    fn ripgrep_public_suite_uses_rust_paths_and_health_anchors() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let repo = temp.path().join("repo");
+        create_public_suite_fixture_repo(PublicSuitePreset::Ripgrep, &repo).expect("fixture repo");
+        let suite = ripgrep_suite();
+
+        validate_suite(&suite).expect("suite");
+        assert_eq!(suite.name, "ripgrep-public");
+        assert_eq!(suite.tasks.len(), 4);
+        assert!(suite
+            .tasks
+            .iter()
+            .all(|task| task.tags.contains(&"rust".to_string())));
+        assert!(suite.tasks.iter().any(|task| task
+            .expected_files
+            .contains(&"crates/ignore/src/gitignore.rs".to_string())));
+        assert!(suite
+            .tasks
+            .iter()
+            .any(|task| task.expected_tests.contains(&"tests/json.rs".to_string())));
+
+        let checked = checked_files_for_suite(PublicSuitePreset::Ripgrep, &suite);
+        assert!(checked.contains(&"Cargo.toml".to_string()));
+        assert!(checked.contains(&"crates/cli/Cargo.toml".to_string()));
+        assert!(checked.contains(&"crates/searcher/src/searcher/core.rs".to_string()));
+        assert!(!checked.contains(&"pyproject.toml".to_string()));
+
+        let health =
+            public_suite_health(PublicSuitePreset::Ripgrep, &repo, 1, &suite).expect("health");
+        assert!(health.ok);
+        assert_eq!(health.preset, "ripgrep");
+        assert!(health.missing_files.is_empty());
+        assert!(health.privacy.source_free);
+    }
+
+    #[test]
     fn suite_health_accepts_generic_demo_suite() {
         let temp = tempfile::tempdir().expect("tempdir");
         let repo = temp.path().join("repo");
@@ -6085,6 +6221,14 @@ mod tests {
         assert_eq!(
             default_public_health_out(PublicSuitePreset::Flask),
             PathBuf::from(".helmbench/flask-public-suite-health.json")
+        );
+        assert_eq!(
+            default_public_suite_out(PublicSuitePreset::Ripgrep),
+            PathBuf::from("suites/ripgrep-public.json")
+        );
+        assert_eq!(
+            default_public_health_out(PublicSuitePreset::Ripgrep),
+            PathBuf::from(".helmbench/ripgrep-public-suite-health.json")
         );
     }
 
