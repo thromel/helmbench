@@ -36,6 +36,8 @@ pub struct BenchTask {
     pub expected_tests: Vec<String>,
     pub success_command: Option<String>,
     #[serde(default)]
+    pub setup_commands: Vec<String>,
+    #[serde(default)]
     pub tags: Vec<String>,
     pub timeout_seconds: Option<u64>,
 }
@@ -540,6 +542,11 @@ pub fn validate_suite(suite: &TaskSuite) -> Result<()> {
         }
         if task.prompt.trim().is_empty() {
             bail!("task `{}` prompt is required", task.id);
+        }
+        for command in &task.setup_commands {
+            if command.trim().is_empty() {
+                bail!("task `{}` setup command must not be empty", task.id);
+            }
         }
         for path in task.expected_files.iter().chain(task.expected_tests.iter()) {
             validate_safe_relative_path(path)
@@ -2329,6 +2336,7 @@ pub fn example_suite() -> TaskSuite {
             ],
             expected_tests: vec!["tests/auth/session.test.ts".to_string()],
             success_command: Some("pnpm vitest run tests/auth/session.test.ts".to_string()),
+            setup_commands: Vec::new(),
             tags: vec!["bug_fix".to_string(), "auth".to_string()],
             timeout_seconds: Some(600),
         }],

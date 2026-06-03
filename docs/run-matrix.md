@@ -118,10 +118,12 @@ provided. `qualityGate` configures the source-free quality gate written to
 `--max-token-estimate-per-success-delta` CLI flags override those optional
 thresholds for one run. `healthMinCommits` and `allowDirtyHealth` control the
 matrix suite-health gate. `setupCommands` from the config run before
-additional `--setup-command` values. Config paths are resolved from the current
-working directory. The checked-in `suites/demo-matrix.json` uses the tracked
-`local-run-smoke` suite plus `scripts/demo-ctxhelm.sh`, so it can be validated
-and run from a fresh HelmBench checkout without a real ctxhelm install.
+additional `--setup-command` values; both are global setup commands that run in
+every task clone before task-level `setupCommands`. Config paths are resolved
+from the current working directory. The checked-in `suites/demo-matrix.json`
+uses the tracked `local-run-smoke` suite plus `scripts/demo-ctxhelm.sh`, so it
+can be validated and run from a fresh HelmBench checkout without a real ctxhelm
+install.
 
 Before any agent row executes, `run-matrix` writes `reports/suite-health.json`
 and fails if the suite/repo preflight is unhealthy. This keeps publishable
@@ -130,10 +132,11 @@ success-command coverage, and source-free privacy flags.
 
 For task-success claims, run `suite-health --check-success-commands` before
 publishing a real-agent matrix. That explicit gate runs validation commands in
-isolated clones and proves they fail before the agent changes the repo. If they
-already pass, treat the matrix as navigation/validation-behavior evidence, not
-outcome evidence. Add `--fail-fast-success-commands` for large suites when the
-first pre-agent pass is enough to disprove outcome readiness.
+isolated clones after any task-level `setupCommands` and proves they fail
+before the agent changes the repo. If they already pass, treat the matrix as
+navigation/validation-behavior evidence, not outcome evidence. Add
+`--fail-fast-success-commands` for large suites when the first pre-agent pass
+is enough to disprove outcome readiness.
 
 Run specs use comma-separated `key=value` fields:
 

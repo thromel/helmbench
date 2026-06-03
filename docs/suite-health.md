@@ -40,14 +40,16 @@ helmbench suite-health \
 ```
 
 With this flag, HelmBench runs each `successCommand` inside an isolated clone
-and stores only source-free command metadata: task id, command class, command
-hash, exit status, timeout status, and elapsed milliseconds. If validation
-already passes before the agent edits the repo, `validationBaselineReady` is
-`false` and the health command exits non-zero after writing the report.
-`--fail-fast-success-commands` stops after the first pre-agent pass and records
-the remaining tasks as skipped, which is useful for large public suites.
-Use `--preset` for generated public suites so the report includes the preset
-label and preset-specific anchor-file checks.
+after that task's `setupCommands`, if any. It stores only source-free command
+metadata: task id, command class, command hash, exit status, timeout status,
+and elapsed milliseconds. If validation already passes before the agent edits
+the repo, `validationBaselineReady` is `false` and the health command exits
+non-zero after writing the report. If a task setup command fails, the report
+records only that task id in `tasksFailedSetupCommand` and marks the baseline
+not ready. `--fail-fast-success-commands` stops after the first pre-agent pass
+and records the remaining tasks as skipped, which is useful for large public
+suites. Use `--preset` for generated public suites so the report includes the
+preset label and preset-specific anchor-file checks.
 
 By default, HelmBench requires a clean checkout and at least one commit. For
 local exploratory runs, a dirty checkout can be allowed explicitly:
@@ -72,6 +74,7 @@ The report records only source-free metadata:
 - expected file/test counts;
 - missing expected files and tests;
 - tasks missing `successCommand`;
+- tasks whose per-task setup command failed;
 - optional validation-baseline status for `successCommand`s, including whether
   the check ran in fail-fast mode;
 - source-free privacy flags.
@@ -94,7 +97,9 @@ A suite is healthy when:
 When `--check-success-commands` is enabled, the suite is additionally healthy
 only when every `successCommand` fails before the agent runs. This prevents
 publishing task-success claims for suites whose validation commands already pass
-on a clean checkout.
+on a clean checkout. Task-level `setupCommands` are applied inside the isolated
+clone before the validation command, so suites can seed a failing state without
+committing broken files to the fixture repo.
 
 If the suite is unhealthy, HelmBench writes the report first and then exits
 non-zero. This makes it useful in CI because the failure still leaves a

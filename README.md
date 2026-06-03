@@ -78,6 +78,8 @@ This repository currently implements the core HelmBench workflow:
 - opt-in `suite-health --check-success-commands` gate that runs validation
   commands in isolated clones and flags suites whose success commands already
   pass before any agent changes
+- task-level `setupCommands` for seeding per-task failures inside isolated
+  clones before ctxhelm, agents, and validation commands run
 - `demo-run` one-command deterministic demo pipeline with reports, dashboard,
   privacy report, quality gate, and evidence bundle
 - `run-matrix` benchmark coordinator that runs one baseline plus one or more

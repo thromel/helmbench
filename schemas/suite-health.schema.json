@@ -96,6 +96,13 @@
     "missingExpectedTests": {
       "$ref": "#/$defs/safePathArray"
     },
+    "tasksFailedSetupCommand": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
     "tasksMissingSuccessCommand": {
       "type": "array",
       "items": {

@@ -1828,6 +1828,8 @@ struct PublicSuiteHealth {
     missing_files: Vec<String>,
     missing_expected_files: Vec<String>,
     missing_expected_tests: Vec<String>,
+    #[serde(default)]
+    tasks_failed_setup_command: Vec<String>,
     tasks_missing_success_command: Vec<String>,
     #[serde(default)]
     success_command_check_requested: bool,
@@ -2458,10 +2460,10 @@ fn suite_health_report(
         .map(|task| task.expected_tests.len())
         .sum::<usize>();
     let validation_ready = tasks_missing_success_command.is_empty();
-    let baseline_success_commands = if check_success_commands {
+    let (baseline_success_commands, tasks_failed_setup_command) = if check_success_commands {
         success_command_baseline(repo, suite, fail_fast_success_commands)?
     } else {
-        Vec::new()
+        (Vec::new(), Vec::new())
     };
     let baseline_success_command_pass_count = baseline_success_commands
         .iter()
@@ -2483,8 +2485,10 @@ fn suite_health_report(
         .len()
         .saturating_sub(baseline_success_command_pass_count)
         .saturating_sub(baseline_success_command_timeout_count);
-    let success_command_check_ready =
-        check_success_commands && validation_ready && baseline_success_command_skipped_count == 0;
+    let success_command_check_ready = check_success_commands
+        && validation_ready
+        && baseline_success_command_skipped_count == 0
+        && tasks_failed_setup_command.is_empty();
     let validation_baseline_ready = success_command_check_ready
         && baseline_success_command_fail_count == suite.tasks.len()
         && baseline_success_command_pass_count == 0
@@ -2504,6 +2508,7 @@ fn suite_health_report(
         && (!dirty || allow_dirty)
         && fsck_ok
         && validation_ready
+        && tasks_failed_setup_command.is_empty()
         && (!check_success_commands || validation_baseline_ready)
         && missing_files.is_empty()
         && missing_expected_files.is_empty()
@@ -2528,6 +2533,7 @@ fn suite_health_report(
         missing_files,
         missing_expected_files,
         missing_expected_tests,
+        tasks_failed_setup_command,
         tasks_missing_success_command,
         success_command_check_requested: check_success_commands,
         success_command_check_fail_fast: fail_fast_success_commands,
@@ -2547,9 +2553,10 @@ fn success_command_baseline(
     repo: &Path,
     suite: &helmbench::TaskSuite,
     fail_fast_on_pass: bool,
-) -> Result<Vec<SuccessCommandBaseline>> {
+) -> Result<(Vec<SuccessCommandBaseline>, Vec<String>)> {
     let temp = TempDirGuard::create("helmbench-success-baseline")?;
     let mut results = Vec::new();
+    let mut tasks_failed_setup_command = Vec::new();
     for task in &suite.tasks {
         let Some(command) = task
             .success_command
@@ -2560,6 +2567,10 @@ fn success_command_baseline(
         };
         let task_dir = temp.path().join(safe_task_dir_name(&task.id));
         clone_repo(repo, &task_dir)?;
+        if !run_task_setup_commands(task, &task_dir, true)? {
+            tasks_failed_setup_command.push(task.id.clone());
+            continue;
+        }
         let result = run_shell_suppressed(command, &task_dir, &[], task.timeout_seconds)?;
         let command_passed = !result.timed_out && result.exit_status == Some(0);
         results.push(SuccessCommandBaseline {
@@ -2574,7 +2585,25 @@ fn success_command_baseline(
             break;
         }
     }
-    Ok(results)
+    Ok((results, tasks_failed_setup_command))
+}
+
+fn run_task_setup_commands(
+    task: &helmbench::BenchTask,
+    task_dir: &Path,
+    suppress_output: bool,
+) -> Result<bool> {
+    for setup in &task.setup_commands {
+        let result = if suppress_output {
+            run_shell_suppressed(setup, task_dir, &[], task.timeout_seconds)?
+        } else {
+            run_shell(setup, task_dir, &[], task.timeout_seconds)?
+        };
+        if !result.success {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 struct TempDirGuard {
@@ -2759,6 +2788,11 @@ fn render_markdown_suite_health(health: &PublicSuiteHealth) -> String {
     );
     append_markdown_list(
         &mut out,
+        "Tasks failed setup commands",
+        &health.tasks_failed_setup_command,
+    );
+    append_markdown_list(
+        &mut out,
         "Tasks missing success commands",
         &health.tasks_missing_success_command,
     );
@@ -2864,6 +2898,7 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                     "src/test/java/org/refactoringminer/mcp/McpValidationContractTest.java".to_string(),
                 ],
                 success_command: Some("./gradlew test --tests org.refactoringminer.mcp.McpIntentValidatorTest --tests org.refactoringminer.mcp.McpValidationContractTest".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["public_repo".to_string(), "mcp".to_string(), "bug_fix".to_string()],
                 timeout_seconds: Some(900),
             },
@@ -2880,6 +2915,7 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                     "src/test/java/org/refactoringminer/mcp/WorktreeChangeCollectorTest.java".to_string(),
                 ],
                 success_command: Some("./gradlew test --tests org.refactoringminer.mcp.RefactoringMinerMcpToolsTest --tests org.refactoringminer.mcp.WorktreeChangeCollectorTest".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["public_repo".to_string(), "mcp".to_string(), "feature".to_string()],
                 timeout_seconds: Some(900),
             },
@@ -2895,6 +2931,7 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                     "src/test/java/gui/webdiff/viewers/spv/SinglePageViewViewedFilesTest.java".to_string(),
                 ],
                 success_command: Some("./gradlew test --tests gui.MarkAsViewedTest --tests gui.webdiff.viewers.spv.SinglePageViewViewedFilesTest".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["public_repo".to_string(), "webdiff".to_string(), "bug_fix".to_string()],
                 timeout_seconds: Some(900),
             },
@@ -2910,6 +2947,7 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                     "src/test/java/org/refactoringminer/util/GitServiceImplTest.java".to_string(),
                 ],
                 success_command: Some("./gradlew test --tests org.refactoringminer.rm1.GitHistoryRefactoringMinerImplMergeCommitTest --tests org.refactoringminer.util.GitServiceImplTest".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["public_repo".to_string(), "git_history".to_string(), "bug_fix".to_string()],
                 timeout_seconds: Some(1200),
             },
@@ -2926,6 +2964,7 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                     "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServiceRepositoryTest.java".to_string(),
                 ],
                 success_command: Some("./gradlew test --tests org.refactoringminer.mcp.RefactoringMinerMcpServiceTest --tests org.refactoringminer.mcp.RefactoringMinerMcpServiceRepositoryTest".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["public_repo".to_string(), "mcp".to_string(), "repository".to_string(), "bug_fix".to_string()],
                 timeout_seconds: Some(900),
             },
@@ -2942,6 +2981,7 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                     "src/test/java/org/refactoringminer/mcp/WebDiffBrowserLauncherTest.java".to_string(),
                 ],
                 success_command: Some("./gradlew test --tests org.refactoringminer.mcp.RefactoringMinerMcpServerStartupTest --tests org.refactoringminer.mcp.WebDiffBrowserLauncherTest".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["public_repo".to_string(), "mcp".to_string(), "startup".to_string(), "feature".to_string()],
                 timeout_seconds: Some(900),
             },
@@ -2958,6 +2998,7 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                     "src/test/java/org/refactoringminer/astDiff/tests/IgnoringCommentsVisitorTest.java".to_string(),
                 ],
                 success_command: Some("./gradlew test --tests org.refactoringminer.astDiff.tests.ConsideringCommentsVisitorTest --tests org.refactoringminer.astDiff.tests.IgnoringCommentsVisitorTest".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["public_repo".to_string(), "ast_diff".to_string(), "comments".to_string(), "bug_fix".to_string()],
                 timeout_seconds: Some(1200),
             },
@@ -2974,6 +3015,7 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                     "src/test/java/org/refactoringminer/astDiff/tests/TreeFromParserTest.java".to_string(),
                 ],
                 success_command: Some("./gradlew test --tests org.refactoringminer.astDiff.tests.PythonDiffTest --tests org.refactoringminer.astDiff.tests.TreeFromParserTest".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["public_repo".to_string(), "ast_diff".to_string(), "python".to_string(), "feature".to_string()],
                 timeout_seconds: Some(1200),
             },
@@ -2990,6 +3032,7 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                     "src/test/java/org/refactoringminer/astDiff/tests/SpecificCasesTest.java".to_string(),
                 ],
                 success_command: Some("./gradlew test --tests org.refactoringminer.astDiff.tests.TreeMatcherTest --tests org.refactoringminer.astDiff.tests.SpecificCasesTest".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["public_repo".to_string(), "ast_diff".to_string(), "matcher".to_string(), "refactor".to_string()],
                 timeout_seconds: Some(1200),
             },
@@ -3004,6 +3047,7 @@ fn refactoring_miner_suite() -> helmbench::TaskSuite {
                     "src/test/java/org/refactoringminer/test/TestCommandLine.java".to_string(),
                 ],
                 success_command: Some("./gradlew test --tests org.refactoringminer.test.TestCommandLine".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["public_repo".to_string(), "cli".to_string(), "git_history".to_string(), "bug_fix".to_string()],
                 timeout_seconds: Some(1200),
             },
@@ -3034,6 +3078,7 @@ fn flask_suite() -> helmbench::TaskSuite {
                     "python -m pytest tests/test_config.py tests/test_instance_config.py"
                         .to_string(),
                 ),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "python".to_string(),
@@ -3057,6 +3102,7 @@ fn flask_suite() -> helmbench::TaskSuite {
                 success_command: Some(
                     "python -m pytest tests/test_blueprints.py tests/test_basic.py".to_string(),
                 ),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "python".to_string(),
@@ -3074,6 +3120,7 @@ fn flask_suite() -> helmbench::TaskSuite {
                 ],
                 expected_tests: vec!["tests/test_templating.py".to_string()],
                 success_command: Some("python -m pytest tests/test_templating.py".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "python".to_string(),
@@ -3091,6 +3138,7 @@ fn flask_suite() -> helmbench::TaskSuite {
                 ],
                 expected_tests: vec!["tests/test_cli.py".to_string()],
                 success_command: Some("python -m pytest tests/test_cli.py".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "python".to_string(),
@@ -3124,6 +3172,7 @@ fn ripgrep_suite() -> helmbench::TaskSuite {
                     "crates/ignore/tests/gitignore_skip_bom.rs".to_string(),
                 ],
                 success_command: Some("cargo test -p ignore gitignore".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "rust".to_string(),
@@ -3146,6 +3195,7 @@ fn ripgrep_suite() -> helmbench::TaskSuite {
                 success_command: Some(
                     "cargo test -p ripgrep --test feature --test regression".to_string(),
                 ),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "rust".to_string(),
@@ -3164,6 +3214,7 @@ fn ripgrep_suite() -> helmbench::TaskSuite {
                 ],
                 expected_tests: vec!["tests/json.rs".to_string()],
                 success_command: Some("cargo test -p ripgrep --test json".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "rust".to_string(),
@@ -3187,6 +3238,7 @@ fn ripgrep_suite() -> helmbench::TaskSuite {
                 success_command: Some(
                     "cargo test -p ripgrep --test multiline --test misc".to_string(),
                 ),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "rust".to_string(),
@@ -3222,6 +3274,7 @@ fn express_suite() -> helmbench::TaskSuite {
                     "npx mocha --require test/support/env --check-leaks test/app.router.js test/Router.js"
                         .to_string(),
                 ),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "javascript".to_string(),
@@ -3246,6 +3299,7 @@ fn express_suite() -> helmbench::TaskSuite {
                     "npx mocha --require test/support/env --check-leaks test/res.json.js test/res.jsonp.js"
                         .to_string(),
                 ),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "javascript".to_string(),
@@ -3271,6 +3325,7 @@ fn express_suite() -> helmbench::TaskSuite {
                     "npx mocha --require test/support/env --check-leaks test/req.accepts.js test/req.is.js test/req.range.js"
                         .to_string(),
                 ),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "javascript".to_string(),
@@ -3297,6 +3352,7 @@ fn express_suite() -> helmbench::TaskSuite {
                     "npx mocha --require test/support/env --check-leaks test/express.static.js test/express.json.js test/express.urlencoded.js test/middleware.basic.js"
                         .to_string(),
                 ),
+                setup_commands: Vec::new(),
                 tags: vec![
                     "public_repo".to_string(),
                     "javascript".to_string(),
@@ -6128,6 +6184,7 @@ fn init_demo_repo(repo_out: &Path, suite_out: &Path, force: bool) -> Result<()> 
                 expected_files: vec!["src/auth/session.txt".to_string()],
                 expected_tests: vec!["tests/auth/session.test.sh".to_string()],
                 success_command: Some("sh tests/auth/session.test.sh".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["bug_fix".to_string(), "auth".to_string()],
                 timeout_seconds: Some(60),
             },
@@ -6137,6 +6194,7 @@ fn init_demo_repo(repo_out: &Path, suite_out: &Path, force: bool) -> Result<()> 
                 expected_files: vec!["src/billing/invoice.txt".to_string()],
                 expected_tests: vec!["tests/billing/invoice.test.sh".to_string()],
                 success_command: Some("sh tests/billing/invoice.test.sh".to_string()),
+                setup_commands: Vec::new(),
                 tags: vec!["bug_fix".to_string(), "billing".to_string()],
                 timeout_seconds: Some(60),
             },
@@ -6299,6 +6357,9 @@ fn run_local_suite(
                     timed_out_suffix(setup_result.timed_out)
                 );
             }
+        }
+        if !run_task_setup_commands(task, &task_dir, false)? {
+            anyhow::bail!("task setup command failed for `{}`", task.id);
         }
 
         if let Some(ctxhelm) = ctxhelm {
@@ -8476,6 +8537,7 @@ mod tests {
                 expected_files: vec!["src/target.txt".to_string()],
                 expected_tests: vec!["tests/target.test".to_string()],
                 success_command: Some("test -f fixed.txt".to_string()),
+                setup_commands: Vec::new(),
                 tags: Vec::new(),
                 timeout_seconds: Some(30),
             }],
@@ -8495,12 +8557,33 @@ mod tests {
             .starts_with("cmd:"));
 
         suite.tasks[0].success_command = Some("test -f src/target.txt".to_string());
+        suite.tasks[0].setup_commands = vec!["rm src/target.txt".to_string()];
+        let seeded = suite_health_report(None, &repo, 1, false, true, false, &suite, &[])
+            .expect("seeded baseline health");
+        assert!(seeded.ok);
+        assert!(seeded.validation_baseline_ready);
+        assert_eq!(seeded.baseline_success_command_fail_count, 1);
+        assert!(seeded.tasks_failed_setup_command.is_empty());
+
+        suite.tasks[0].setup_commands = vec!["exit 2".to_string()];
+        let setup_failed = suite_health_report(None, &repo, 1, false, true, false, &suite, &[])
+            .expect("setup failure health");
+        assert!(!setup_failed.ok);
+        assert_eq!(
+            setup_failed.tasks_failed_setup_command,
+            vec!["needs-agent-change"]
+        );
+        assert_eq!(setup_failed.baseline_success_commands.len(), 0);
+
+        suite.tasks[0].success_command = Some("test -f src/target.txt".to_string());
+        suite.tasks[0].setup_commands = Vec::new();
         suite.tasks.push(helmbench::BenchTask {
             id: "second-task".to_string(),
             prompt: "Fix the second target.".to_string(),
             expected_files: vec!["src/target.txt".to_string()],
             expected_tests: vec!["tests/target.test".to_string()],
             success_command: Some("test -f never-created.txt".to_string()),
+            setup_commands: Vec::new(),
             tags: Vec::new(),
             timeout_seconds: Some(30),
         });
@@ -8540,6 +8623,7 @@ mod tests {
                 expected_files: vec!["src/missing.rs".to_string()],
                 expected_tests: vec!["tests/missing.rs".to_string()],
                 success_command: None,
+                setup_commands: Vec::new(),
                 tags: Vec::new(),
                 timeout_seconds: None,
             }],
@@ -8630,6 +8714,7 @@ mod tests {
                 missing_files: Vec::new(),
                 missing_expected_files: Vec::new(),
                 missing_expected_tests: Vec::new(),
+                tasks_failed_setup_command: Vec::new(),
                 tasks_missing_success_command: Vec::new(),
                 success_command_check_requested: false,
                 success_command_check_fail_fast: false,

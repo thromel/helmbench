@@ -8,7 +8,8 @@ raw transcripts, raw terminal logs, or raw agent output.
 ```text
 suite task
   -> git clone target repo into .helmbench/workdirs/<task-id>
-  -> run optional setup commands
+  -> run optional global setup commands
+  -> run optional task setupCommands
   -> run adapter command with HELMBENCH_* environment
   -> adapter appends source-free events
   -> infer edited paths from git status
@@ -54,6 +55,12 @@ native-search` when the adapter exercises the agent's own repository search or
 built-in context discovery without ctxhelm.
 
 Use `--keep-workdirs` to preserve isolated clones for debugging.
+
+Suite-level `setupCommands` run in every task clone before the adapter starts.
+Each task can also define `setupCommands`; those run after the global setup and
+before ctxhelm or the agent. Use task setup commands for seeded benchmark
+tasks, such as deleting a generated file or applying a fixture mutation that
+the agent must repair.
 
 ## Privacy Boundary
 

@@ -6,7 +6,9 @@ artifacts.
 Available schema kinds:
 
 - `task-suite`: benchmark suite JSON consumed by `validate-suite`, `local-run`,
-  `ctxhelm-run`, and `run-matrix`.
+  `ctxhelm-run`, and `run-matrix`. Tasks may include source-free
+  `setupCommands` that run inside isolated clones before ctxhelm, agents, and
+  validation commands.
 - `agent-event`: source-free JSONL event records emitted by adapters or parsed
   from structured streams.
 - `agent-trace`: per-task source-free agent behavior traces.
@@ -29,7 +31,8 @@ Available schema kinds:
   one benchmark task.
 - `suite-health`: source-free preflight report proving a suite is usable
   against a local git repository before benchmark results are trusted,
-  optionally including validation-baseline command hashes and statuses.
+  optionally including validation-baseline command hashes, statuses, and task
+  ids whose setup commands failed.
 - `evidence-bundle`: source-free manifest for publishable benchmark evidence,
   including artifact paths, byte counts, and content hashes.
 - `run-matrix-manifest`: top-level source-free identity and artifact index for
