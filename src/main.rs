@@ -21,6 +21,8 @@ use std::time::{Duration, Instant};
 const RUN_MATRIX_MANIFEST_SCHEMA_VERSION: u32 = 6;
 const RUN_MATRIX_PRIVACY_REPORT_SCHEMA_VERSION: u32 = 1;
 const MATRIX_HISTORY_SCHEMA_VERSION: u32 = 2;
+const SUITE_HEALTH_SCHEMA_VERSION: u32 = 1;
+const EVIDENCE_BUNDLE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Parser)]
 #[command(
@@ -495,6 +497,8 @@ enum SchemaKind {
     BenchmarkSummary,
     QualityGate,
     MatrixHistory,
+    SuiteHealth,
+    EvidenceBundle,
     RunMatrixManifest,
     RunMatrixPrivacyReport,
 }
@@ -1286,6 +1290,8 @@ fn schema_contract(kind: SchemaKind) -> &'static str {
         SchemaKind::BenchmarkSummary => include_str!("../schemas/benchmark-summary.schema.json"),
         SchemaKind::QualityGate => include_str!("../schemas/quality-gate.schema.json"),
         SchemaKind::MatrixHistory => include_str!("../schemas/matrix-history.schema.json"),
+        SchemaKind::SuiteHealth => include_str!("../schemas/suite-health.schema.json"),
+        SchemaKind::EvidenceBundle => include_str!("../schemas/evidence-bundle.schema.json"),
         SchemaKind::RunMatrixManifest => {
             include_str!("../schemas/run-matrix-manifest.schema.json")
         }
@@ -1666,10 +1672,11 @@ fn verify_evidence_bundle(bundle: &Path) -> Result<()> {
     let manifest = serde_json::from_str::<EvidenceBundleManifest>(&raw)
         .with_context(|| format!("parse {}", manifest_path.display()))?;
 
-    if manifest.schema_version != 1 {
+    if manifest.schema_version != EVIDENCE_BUNDLE_SCHEMA_VERSION {
         anyhow::bail!(
-            "unsupported evidence bundle schemaVersion {}; expected 1",
-            manifest.schema_version
+            "unsupported evidence bundle schemaVersion {}; expected {}",
+            manifest.schema_version,
+            EVIDENCE_BUNDLE_SCHEMA_VERSION
         );
     }
     if manifest.suite_name.trim().is_empty() {
@@ -1851,7 +1858,7 @@ fn write_evidence_bundle(
     )?);
 
     let manifest = EvidenceBundleManifest {
-        schema_version: 1,
+        schema_version: EVIDENCE_BUNDLE_SCHEMA_VERSION,
         suite_name: suite.name,
         baseline_agent: base_report.agent,
         baseline_variant: base_report.variant,
@@ -1866,10 +1873,11 @@ fn validate_public_suite_health(path: &Path) -> Result<()> {
     let raw = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
     let health = serde_json::from_str::<PublicSuiteHealth>(&raw)
         .with_context(|| format!("parse health {}", path.display()))?;
-    if health.schema_version != 1 {
+    if health.schema_version != SUITE_HEALTH_SCHEMA_VERSION {
         anyhow::bail!(
-            "unsupported health schema version {}",
-            health.schema_version
+            "unsupported health schema version {}; expected {}",
+            health.schema_version,
+            SUITE_HEALTH_SCHEMA_VERSION
         );
     }
     if !health.privacy.source_free
@@ -2080,7 +2088,7 @@ fn suite_health_report(
         && missing_expected_tests.is_empty();
 
     Ok(PublicSuiteHealth {
-        schema_version: 1,
+        schema_version: SUITE_HEALTH_SCHEMA_VERSION,
         preset: preset.unwrap_or("custom").to_string(),
         suite_name: suite.name.clone(),
         task_count: suite.tasks.len(),
@@ -7048,6 +7056,8 @@ mod tests {
             (SchemaKind::BenchmarkSummary, "HelmBench Benchmark Summary"),
             (SchemaKind::QualityGate, "HelmBench Quality Gate"),
             (SchemaKind::MatrixHistory, "HelmBench Matrix History"),
+            (SchemaKind::SuiteHealth, "HelmBench Suite Health"),
+            (SchemaKind::EvidenceBundle, "HelmBench Evidence Bundle"),
             (
                 SchemaKind::RunMatrixManifest,
                 "HelmBench Run Matrix Manifest",
@@ -7086,6 +7096,18 @@ mod tests {
                 assert_eq!(
                     value["properties"]["schemaVersion"]["const"],
                     MATRIX_HISTORY_SCHEMA_VERSION
+                );
+            }
+            if matches!(kind, SchemaKind::SuiteHealth) {
+                assert_eq!(
+                    value["properties"]["schemaVersion"]["const"],
+                    SUITE_HEALTH_SCHEMA_VERSION
+                );
+            }
+            if matches!(kind, SchemaKind::EvidenceBundle) {
+                assert_eq!(
+                    value["properties"]["schemaVersion"]["const"],
+                    EVIDENCE_BUNDLE_SCHEMA_VERSION
                 );
             }
             if matches!(kind, SchemaKind::RunMatrixManifest) {

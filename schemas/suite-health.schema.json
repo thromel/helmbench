@@ -1,0 +1,170 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/suite-health.schema.json",
+  "title": "HelmBench Suite Health",
+  "description": "Source-free preflight health report for a benchmark suite against a local git repo.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "preset",
+    "suiteName",
+    "taskCount",
+    "repoName",
+    "head",
+    "commitCount",
+    "minCommits",
+    "allowDirty",
+    "dirty",
+    "fsckOk",
+    "validationReady",
+    "expectedFileCount",
+    "expectedTestCount",
+    "checkedFiles",
+    "missingFiles",
+    "missingExpectedFiles",
+    "missingExpectedTests",
+    "tasksMissingSuccessCommand",
+    "ok",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "preset": {
+      "type": "string",
+      "minLength": 1
+    },
+    "suiteName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taskCount": {
+      "$ref": "#/$defs/nonNegativeInteger"
+    },
+    "repoName": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "[/\\\\]"
+      }
+    },
+    "head": {
+      "type": ["string", "null"]
+    },
+    "commitCount": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "minCommits": {
+      "$ref": "#/$defs/nonNegativeInteger"
+    },
+    "allowDirty": {
+      "type": "boolean"
+    },
+    "dirty": {
+      "type": "boolean"
+    },
+    "fsckOk": {
+      "type": "boolean"
+    },
+    "validationReady": {
+      "type": "boolean"
+    },
+    "expectedFileCount": {
+      "$ref": "#/$defs/nonNegativeInteger"
+    },
+    "expectedTestCount": {
+      "$ref": "#/$defs/nonNegativeInteger"
+    },
+    "checkedFiles": {
+      "$ref": "#/$defs/safePathArray"
+    },
+    "missingFiles": {
+      "$ref": "#/$defs/safePathArray"
+    },
+    "missingExpectedFiles": {
+      "$ref": "#/$defs/safePathArray"
+    },
+    "missingExpectedTests": {
+      "$ref": "#/$defs/safePathArray"
+    },
+    "tasksMissingSuccessCommand": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "safeRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^/"
+          },
+          {
+            "pattern": "^[A-Za-z]:"
+          },
+          {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        ]
+      }
+    },
+    "safePathArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/safeRelativePath"
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}
