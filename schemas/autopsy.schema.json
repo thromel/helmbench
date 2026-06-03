@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/autopsy.schema.json",
+  "title": "HelmBench Autopsy",
+  "description": "Source-free reviewer-style diagnosis of agent traces.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteName",
+    "agent",
+    "variant",
+    "summary",
+    "tasks",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "suiteName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "agent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "variant": {
+      "$ref": "#/$defs/agentVariant"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "tasks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/task"
+      }
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "agentVariant": {
+      "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "taskStatus": {
+      "enum": ["success", "failure", "skipped"]
+    },
+    "risk": {
+      "enum": ["low", "medium", "high"]
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "safeRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^/"
+          },
+          {
+            "pattern": "^[A-Za-z]:"
+          },
+          {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        ]
+      }
+    },
+    "pathArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/safeRelativePath"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskCount",
+        "failedTaskCount",
+        "validationGapCount",
+        "overbroadEditCount",
+        "missingExpectedInspectionCount",
+        "changedWithoutReadCount",
+        "highRiskCount"
+      ],
+      "properties": {
+        "taskCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "failedTaskCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "validationGapCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "overbroadEditCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "missingExpectedInspectionCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "changedWithoutReadCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "highRiskCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "status",
+        "risk",
+        "changedFiles",
+        "expectedFiles",
+        "missingExpectedInspections",
+        "changedWithoutRead",
+        "overbroadEdits",
+        "validationGap",
+        "notes"
+      ],
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "$ref": "#/$defs/taskStatus"
+        },
+        "risk": {
+          "$ref": "#/$defs/risk"
+        },
+        "changedFiles": {
+          "$ref": "#/$defs/pathArray"
+        },
+        "expectedFiles": {
+          "$ref": "#/$defs/pathArray"
+        },
+        "missingExpectedInspections": {
+          "$ref": "#/$defs/pathArray"
+        },
+        "changedWithoutRead": {
+          "$ref": "#/$defs/pathArray"
+        },
+        "overbroadEdits": {
+          "$ref": "#/$defs/pathArray"
+        },
+        "validationGap": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}

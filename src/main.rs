@@ -497,6 +497,8 @@ enum SchemaKind {
     BenchmarkSummary,
     QualityGate,
     MatrixHistory,
+    Autopsy,
+    DiffAutopsy,
     SuiteHealth,
     EvidenceBundle,
     RunMatrixManifest,
@@ -1290,6 +1292,8 @@ fn schema_contract(kind: SchemaKind) -> &'static str {
         SchemaKind::BenchmarkSummary => include_str!("../schemas/benchmark-summary.schema.json"),
         SchemaKind::QualityGate => include_str!("../schemas/quality-gate.schema.json"),
         SchemaKind::MatrixHistory => include_str!("../schemas/matrix-history.schema.json"),
+        SchemaKind::Autopsy => include_str!("../schemas/autopsy.schema.json"),
+        SchemaKind::DiffAutopsy => include_str!("../schemas/diff-autopsy.schema.json"),
         SchemaKind::SuiteHealth => include_str!("../schemas/suite-health.schema.json"),
         SchemaKind::EvidenceBundle => include_str!("../schemas/evidence-bundle.schema.json"),
         SchemaKind::RunMatrixManifest => {
@@ -7056,6 +7060,8 @@ mod tests {
             (SchemaKind::BenchmarkSummary, "HelmBench Benchmark Summary"),
             (SchemaKind::QualityGate, "HelmBench Quality Gate"),
             (SchemaKind::MatrixHistory, "HelmBench Matrix History"),
+            (SchemaKind::Autopsy, "HelmBench Autopsy"),
+            (SchemaKind::DiffAutopsy, "HelmBench Diff Autopsy"),
             (SchemaKind::SuiteHealth, "HelmBench Suite Health"),
             (SchemaKind::EvidenceBundle, "HelmBench Evidence Bundle"),
             (
@@ -7096,6 +7102,18 @@ mod tests {
                 assert_eq!(
                     value["properties"]["schemaVersion"]["const"],
                     MATRIX_HISTORY_SCHEMA_VERSION
+                );
+            }
+            if matches!(kind, SchemaKind::Autopsy) {
+                assert_eq!(
+                    value["properties"]["schemaVersion"]["const"],
+                    helmbench::AUTOPSY_SCHEMA_VERSION
+                );
+            }
+            if matches!(kind, SchemaKind::DiffAutopsy) {
+                assert_eq!(
+                    value["properties"]["schemaVersion"]["const"],
+                    helmbench::DIFF_AUTOPSY_SCHEMA_VERSION
                 );
             }
             if matches!(kind, SchemaKind::SuiteHealth) {

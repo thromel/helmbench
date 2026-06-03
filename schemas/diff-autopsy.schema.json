@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/diff-autopsy.schema.json",
+  "title": "HelmBench Diff Autopsy",
+  "description": "Source-free reviewer-style diagnosis of changed paths against one benchmark task.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "suiteName",
+    "taskId",
+    "baseRef",
+    "headRef",
+    "changedFiles",
+    "expectedFiles",
+    "expectedTests",
+    "expectedFileChanges",
+    "expectedTestChanges",
+    "expectedFilesUnchanged",
+    "expectedTestsUnchanged",
+    "overbroadChanges",
+    "risk",
+    "summary",
+    "notes",
+    "privacy"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "suiteName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "taskId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "headRef": {
+      "type": ["string", "null"]
+    },
+    "changedFiles": {
+      "$ref": "#/$defs/pathArray"
+    },
+    "expectedFiles": {
+      "$ref": "#/$defs/pathArray"
+    },
+    "expectedTests": {
+      "$ref": "#/$defs/pathArray"
+    },
+    "expectedFileChanges": {
+      "$ref": "#/$defs/pathArray"
+    },
+    "expectedTestChanges": {
+      "$ref": "#/$defs/pathArray"
+    },
+    "expectedFilesUnchanged": {
+      "$ref": "#/$defs/pathArray"
+    },
+    "expectedTestsUnchanged": {
+      "$ref": "#/$defs/pathArray"
+    },
+    "overbroadChanges": {
+      "$ref": "#/$defs/pathArray"
+    },
+    "risk": {
+      "$ref": "#/$defs/risk"
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "privacy": {
+      "$ref": "#/$defs/privacy"
+    }
+  },
+  "$defs": {
+    "risk": {
+      "enum": ["low", "medium", "high"]
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "safeRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "anyOf": [
+          {
+            "pattern": "^/"
+          },
+          {
+            "pattern": "^[A-Za-z]:"
+          },
+          {
+            "pattern": "(^|/)\\.\\.(/|$)"
+          }
+        ]
+      }
+    },
+    "pathArray": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/safeRelativePath"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "changedFileCount",
+        "expectedFileChangeCount",
+        "expectedTestChangeCount",
+        "expectedFilesUnchangedCount",
+        "expectedTestsUnchangedCount",
+        "overbroadChangeCount"
+      ],
+      "properties": {
+        "changedFileCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "expectedFileChangeCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "expectedTestChangeCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "expectedFilesUnchangedCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "expectedTestsUnchangedCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "overbroadChangeCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "privacy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceFree",
+        "rawSourceLogged",
+        "rawPromptLogged",
+        "rawTranscriptLogged",
+        "rawTerminalLogged"
+      ],
+      "properties": {
+        "sourceFree": {
+          "const": true
+        },
+        "rawSourceLogged": {
+          "const": false
+        },
+        "rawPromptLogged": {
+          "const": false
+        },
+        "rawTranscriptLogged": {
+          "const": false
+        },
+        "rawTerminalLogged": {
+          "const": false
+        }
+      }
+    }
+  }
+}

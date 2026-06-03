@@ -17,6 +17,9 @@ Available schema kinds:
   summary.
 - `matrix-history`: source-free longitudinal trend report for verified
   `run-matrix` outputs.
+- `autopsy`: source-free reviewer-style diagnosis generated from agent traces.
+- `diff-autopsy`: source-free reviewer-style diagnosis of changed paths against
+  one benchmark task.
 - `suite-health`: source-free preflight report proving a suite is usable
   against a local git repository before benchmark results are trusted.
 - `evidence-bundle`: source-free manifest for publishable benchmark evidence,
