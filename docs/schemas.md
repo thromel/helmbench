@@ -17,6 +17,8 @@ Available schema kinds:
   `quality-gate`, `run-matrix`, and `matrix-history`.
 - `quality-gate`: source-free CI decision report generated from a benchmark
   summary.
+- `run-matrix-config`: repeatable input configuration for `validate-matrix`
+  and `run-matrix`.
 - `matrix-history`: source-free longitudinal trend report for verified
   `run-matrix` outputs.
 - `doctor-report`: source-free local readiness report for required checks,

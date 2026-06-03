@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/thromel/helmbench/schemas/run-matrix-config.schema.json",
+  "title": "HelmBench Run Matrix Config",
+  "description": "Repeatable input configuration for a HelmBench run-matrix benchmark.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["suite", "repo", "baseline", "heads"],
+  "properties": {
+    "suite": {
+      "type": "string",
+      "minLength": 1
+    },
+    "repo": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outDir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "setupCommands": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "baseline": {
+      "$ref": "#/$defs/runSpec"
+    },
+    "heads": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/runSpec"
+      }
+    },
+    "keepWorkdirs": {
+      "type": "boolean"
+    },
+    "failOnRegression": {
+      "type": "boolean"
+    },
+    "qualityGate": {
+      "$ref": "#/$defs/qualityGate"
+    },
+    "healthMinCommits": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "allowDirtyHealth": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "agentVariant": {
+      "enum": ["native", "native_search", "ctxhelm_plan", "ctxhelm_mcp", "ctxhelm_pack", "other"]
+    },
+    "optionalNumber": {
+      "type": "number"
+    },
+    "runSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "agent", "variant"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "variant": {
+          "$ref": "#/$defs/agentVariant"
+        },
+        "ctxhelm": {
+          "type": "boolean"
+        },
+        "ctxhelmBin": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetAgent": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semantic": {
+          "type": "boolean"
+        },
+        "semanticProvider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semanticModel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semanticDimensions": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535
+        },
+        "pack": {
+          "type": "boolean"
+        },
+        "packBudget": {
+          "type": "string",
+          "minLength": 1
+        },
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adapterCommand": {
+          "type": "string",
+          "minLength": 1
+        },
+        "captureStream": {
+          "type": "boolean"
+        }
+      }
+    },
+    "qualityGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minTaskCount": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minSuccessRateDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "minValidationCoverageRateDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "maxIrrelevantReadRateDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "minRecommendationRecallDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "minContextPrecisionDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "minEditedFileRecallDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "maxAverageTimeToFirstRelevantFileMillisDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "maxTotalToolCallsDelta": {
+          "type": "integer"
+        },
+        "maxTotalTokenEstimateDelta": {
+          "type": "integer"
+        },
+        "maxToolCallsPerSuccessDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "maxTokenEstimatePerSuccessDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        }
+      }
+    }
+  }
+}
