@@ -25,32 +25,32 @@
       "kind": "base_report",
       "path": "reports/base.json",
       "sourceName": "native.json",
-      "byteCount": 11320,
-      "contentHash": "fnv64:fdba1fcd8b24c6d1",
+      "byteCount": 12167,
+      "contentHash": "fnv64:ddb637ce972f26bf",
       "sourceFreeChecked": true
     },
     {
       "kind": "head_report",
       "path": "reports/head-1.json",
       "sourceName": "ctxhelm.json",
-      "byteCount": 11389,
-      "contentHash": "fnv64:2cf7aecd7f51c6aa",
+      "byteCount": 12236,
+      "contentHash": "fnv64:6396466441b4f178",
       "sourceFreeChecked": true
     },
     {
       "kind": "benchmark_summary_json",
       "path": "benchmark-summary.json",
       "sourceName": "generated",
-      "byteCount": 5380,
-      "contentHash": "fnv64:b20fa32aad0a075d",
+      "byteCount": 5551,
+      "contentHash": "fnv64:51e535e4de5e1da3",
       "sourceFreeChecked": true
     },
     {
       "kind": "benchmark_summary_markdown",
       "path": "benchmark-summary.md",
       "sourceName": "generated",
-      "byteCount": 2190,
-      "contentHash": "fnv64:dff2b13d77f0784b",
+      "byteCount": 2268,
+      "contentHash": "fnv64:a0b83b80acd0fd4f",
       "sourceFreeChecked": true
     }
   ],

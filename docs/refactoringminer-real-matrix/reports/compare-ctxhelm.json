@@ -9,6 +9,7 @@
   "irrelevantReadRateDelta": -0.07692308,
   "averageRecommendationPrecisionDelta": 0.14,
   "averageRecommendationRecallDelta": 0.5008334,
+  "averageRecommendationFollowThroughDelta": 0.0,
   "averageContextPrecisionDelta": -0.7416667,
   "averageEditedFileRecallDelta": -0.59952384,
   "validationCoverageRateDelta": -0.3,

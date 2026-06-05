@@ -349,6 +349,23 @@ artifact hashes for matrix-owned files and trace JSON, and then verifies the
 nested evidence bundle hashes. It also checks that `suiteEvidenceUse` matches
 the suite-health report.
 
+Refresh a published matrix after HelmBench adds new source-free metrics or
+report fields:
+
+```bash
+helmbench refresh-matrix \
+  --matrix /tmp/helmbench-matrix \
+  --min-task-count 10 \
+  --min-recommendation-follow-through 0.1
+```
+
+`refresh-matrix` rebuilds run reports from existing trace JSON, regenerates
+comparison reports, benchmark summaries, quality gates, autopsies, dashboards,
+privacy reports, evidence bundles, and manifest digests, then runs
+`verify-matrix`. It does not execute agents or change trace files, so it is for
+schema/metric refreshes and proof-publication upkeep, not for claiming a new
+benchmark outcome.
+
 Use `--fail-on-regression` when this command runs in CI and should exit
 non-zero if the configured quality gate fails.
 

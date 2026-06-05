@@ -14,10 +14,10 @@ Baseline: **claude-code / Native**
 
 ## Runs
 
-| Run | Tasks | Success | 95% CI | Validation | 95% CI | Rec recall | Context precision | Edited recall | Irrelevant reads | Avg first relevant | Tools | Tokens | Tools/success | Tokens/success |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| claude-code / Native | 10 | 30.0% | 10.8-60.3% | 30.0% | 10.8-60.3% | 0.0% | 74.2% | 60.0% | 7.7% | n/a | 68 | 0 | 22.7 | 0.0 |
-| claude-code / CtxhelmMcp | 10 | 0.0% | 0.0-27.8% | 0.0% | 0.0-27.8% | 50.1% | 0.0% | 0.0% | 0.0% | n/a | 250 | 26587 | n/a | n/a |
+| Run | Tasks | Success | 95% CI | Validation | 95% CI | Rec recall | Rec follow-through | Context precision | Edited recall | Irrelevant reads | Avg first relevant | Tools | Tokens | Tools/success | Tokens/success |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| claude-code / Native | 10 | 30.0% | 10.8-60.3% | 30.0% | 10.8-60.3% | 0.0% | 0.0% | 74.2% | 60.0% | 7.7% | n/a | 68 | 0 | 22.7 | 0.0 |
+| claude-code / CtxhelmMcp | 10 | 0.0% | 0.0-27.8% | 0.0% | 0.0-27.8% | 50.1% | 0.0% | 0.0% | 0.0% | 0.0% | n/a | 250 | 26587 | n/a | n/a |
 
 ## Command Mix
 
@@ -37,9 +37,9 @@ Counts are source-free and may overlap when one task has multiple issues.
 
 ## Deltas From Baseline
 
-| Variant | Verdict | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens | Tools/success | Tokens/success |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| claude-code / CtxhelmMcp | Mixed | -30.0% | -30.0% | +50.1% | -74.2% | -60.0% | -7.7% | n/a | +182 | +26587 | n/a | n/a |
+| Variant | Verdict | Success | Validation | Rec recall | Rec follow-through | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens | Tools/success | Tokens/success |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| claude-code / CtxhelmMcp | Mixed | -30.0% | -30.0% | +50.1% | +0.0% | -74.2% | -60.0% | -7.7% | n/a | +182 | +26587 | n/a | n/a |
 
 ## Privacy
 

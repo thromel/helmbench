@@ -70,6 +70,10 @@ grep -q '"evidenceUse": "outcome_ready"' docs/local-smoke-matrix/evidence/manife
 grep -q '"suiteEvidenceUse": "outcome_ready"' docs/refactoringminer-real-matrix/matrix-manifest.json
 grep -q '"qualityGatePassed": false' docs/refactoringminer-real-matrix/matrix-manifest.json
 grep -q 'Status: \*\*failed\*\*' docs/refactoringminer-real-matrix/docs/quality-gate.md
+grep -q 'Rec follow-through' docs/refactoringminer-real-matrix/docs/benchmark-summary.md
+grep -q 'recommendation_follow_through' docs/refactoringminer-real-matrix/docs/quality-gate.md
+grep -q '"recommendationFollowThrough": 0.0' docs/refactoringminer-real-matrix/reports/benchmark-summary.json
+grep -q 'refresh-matrix' docs/run-matrix.md
 grep -q 'claude-real-smoke' docs/launch-proof.md
 grep -q 'claude-real-smoke' docs/direct-agent-runs.md
 grep -q 'Low sample size: 1 task' docs/example-benchmark-summary.md
@@ -96,6 +100,10 @@ cargo run -- schema --help >/dev/null
 cargo run -- demo-run --help >/dev/null
 cargo run -- validate-matrix --help >/dev/null
 cargo run -- run-matrix --help >/dev/null
+cargo run -- refresh-matrix --help >/dev/null
+cargo run -- refresh-matrix --help | grep -q -- '--min-task-count'
+cargo run -- refresh-matrix --help | grep -q -- '--min-recommendation-follow-through '
+cargo run -- refresh-matrix --help | grep -q -- '--min-recommendation-follow-through-delta'
 cargo run -- init-public-matrix --help | grep -q -- '--health-out'
 cargo run -- init-public-matrix --help | grep -q -- '--health-check-success-commands'
 cargo run -- init-git-regression-suite --help | grep -q -- '--check-success-commands'

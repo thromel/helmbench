@@ -110,16 +110,22 @@ git-regression suite:
 
 This matrix is outcome-ready and source-free, but the quality gate failed. It
 should be read as a diagnostic result: ctxhelm improved recommendation recall,
-but the `ctxhelm_mcp` agent row did not make successful repairs.
+but the `ctxhelm_mcp` agent row did not read the recommended files or make
+successful repairs.
 
 | Metric | Native Claude Code | Claude Code + ctxhelm_mcp | Delta |
 | --- | ---: | ---: | ---: |
 | Success | 30.0% | 0.0% | -30.0% |
 | Validation coverage | 30.0% | 0.0% | -30.0% |
 | Recommendation recall | 0.0% | 50.1% | +50.1% |
+| Recommendation follow-through | 0.0% | 0.0% | +0.0% |
 | Context precision | 74.2% | 0.0% | -74.2% |
 | Edited-file recall | 60.0% | 0.0% | -60.0% |
 | Irrelevant reads | 7.7% | 0.0% | -7.7% |
+
+The quality gate includes `minRecommendationFollowThrough = 0.1` for this
+diagnostic matrix, so the checked artifact fails explicitly when a guided row
+receives recommendations but inspects none of them.
 
 Artifacts:
 
@@ -254,6 +260,11 @@ cargo run -- suite-health \
 cargo run -- run-matrix \
   --config /tmp/refactoring-miner-matrix.json \
   --force
+
+cargo run -- refresh-matrix \
+  --matrix /tmp/refactoring-miner-matrix \
+  --min-task-count 10 \
+  --min-recommendation-follow-through 0.1
 ```
 
 This recommendation proof established the public-suite target and source-free
@@ -261,5 +272,6 @@ measurement contract first. The seeded git-regression suite then supplied
 outcome-ready task setup, and the checked real-agent matrix now supplies the
 first 10-task public outcome run. The remaining launch-readiness gap is not
 missing infrastructure; it is that the `ctxhelm_mcp` row failed the quality
-gate. The next iteration should harden the ctxhelm-guided adapter/prompt path
-and rerun the same matrix until the public-matrix quality gate passes.
+gate, including the absolute recommendation follow-through check. The next
+iteration should harden the ctxhelm-guided adapter/prompt path and rerun the
+same matrix until the public-matrix quality gate passes.

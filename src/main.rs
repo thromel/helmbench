@@ -576,6 +576,17 @@ enum Command {
         #[arg(long)]
         matrix: PathBuf,
     },
+    /// Refresh source-free reports, summaries, gates, dashboards, and digests from existing matrix traces.
+    RefreshMatrix {
+        #[arg(long)]
+        matrix: PathBuf,
+        #[arg(long)]
+        min_task_count: Option<usize>,
+        #[arg(long)]
+        min_recommendation_follow_through: Option<f32>,
+        #[arg(long, default_value_t = 0.0)]
+        min_recommendation_follow_through_delta: f32,
+    },
     /// Fail if a benchmark summary violates source-free quality thresholds.
     QualityGate {
         #[arg(long)]
@@ -1557,6 +1568,28 @@ fn main() -> Result<()> {
             let manifest = verify_run_matrix(&matrix)?;
             println!(
                 "matrix `{}` is valid: {} head run(s), evidence bundle verified, quality gate passed: {}",
+                matrix.display(),
+                manifest.heads.len(),
+                manifest.quality_gate_passed
+            );
+        }
+        Command::RefreshMatrix {
+            matrix,
+            min_task_count,
+            min_recommendation_follow_through,
+            min_recommendation_follow_through_delta,
+        } => {
+            let manifest = refresh_run_matrix_artifacts(
+                &matrix,
+                &QualityGateConfig {
+                    min_task_count,
+                    min_recommendation_follow_through,
+                    min_recommendation_follow_through_delta,
+                    ..QualityGateConfig::default()
+                },
+            )?;
+            println!(
+                "refreshed matrix `{}`: {} head run(s), quality gate passed: {}",
                 matrix.display(),
                 manifest.heads.len(),
                 manifest.quality_gate_passed
@@ -6427,12 +6460,244 @@ fn render_markdown_matrix_reproduction(manifest: &RunMatrixManifest) -> String {
     out
 }
 
-fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
+fn read_run_matrix_manifest(matrix_dir: &Path) -> Result<RunMatrixManifest> {
     let manifest_path = matrix_dir.join("matrix-manifest.json");
     let raw = std::fs::read_to_string(&manifest_path)
         .with_context(|| format!("read {}", manifest_path.display()))?;
-    let manifest = serde_json::from_str::<RunMatrixManifest>(&raw)
-        .with_context(|| format!("parse {}", manifest_path.display()))?;
+    serde_json::from_str::<RunMatrixManifest>(&raw)
+        .with_context(|| format!("parse {}", manifest_path.display()))
+}
+
+fn refresh_run_matrix_artifacts(
+    matrix_dir: &Path,
+    quality_gate_config: &QualityGateConfig,
+) -> Result<RunMatrixManifest> {
+    let mut manifest = read_run_matrix_manifest(matrix_dir)?;
+    if manifest.schema_version != RUN_MATRIX_MANIFEST_SCHEMA_VERSION {
+        anyhow::bail!(
+            "unsupported matrix manifest schemaVersion {}; expected {}",
+            manifest.schema_version,
+            RUN_MATRIX_MANIFEST_SCHEMA_VERSION
+        );
+    }
+
+    let suite_path = resolve_refresh_matrix_suite_path(matrix_dir, &manifest)?;
+    let suite = load_suite(&suite_path)
+        .with_context(|| format!("load matrix suite {}", suite_path.display()))?;
+
+    let baseline = refresh_matrix_run_report(matrix_dir, &suite, &manifest.baseline)
+        .with_context(|| format!("refresh baseline run `{}`", manifest.baseline.name))?;
+    let heads = manifest
+        .heads
+        .iter()
+        .map(|head| {
+            refresh_matrix_run_report(matrix_dir, &suite, head)
+                .with_context(|| format!("refresh head run `{}`", head.name))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    let head_reports = heads
+        .iter()
+        .map(|head| head.report.clone())
+        .collect::<Vec<_>>();
+    let summary = build_benchmark_summary(&baseline.report, &head_reports)?;
+    let summary_json_path = matrix_path(matrix_dir, &manifest.artifacts.benchmark_summary_json)?;
+    write_json(&summary, &summary_json_path)?;
+    let summary_markdown_path =
+        matrix_path(matrix_dir, &manifest.artifacts.benchmark_summary_markdown)?;
+    write_text(
+        &render_markdown_benchmark_summary(&summary),
+        &summary_markdown_path,
+    )?;
+
+    for (head_manifest, head_result) in manifest.heads.iter().zip(heads.iter()) {
+        let compare = compare_reports(&baseline.report, &head_result.report);
+        if let Some(path) = &head_manifest.comparison_json {
+            write_json(&compare, &matrix_path(matrix_dir, path)?)?;
+        }
+        if let Some(path) = &head_manifest.comparison_markdown {
+            write_text(
+                &render_markdown_compare(&compare),
+                &matrix_path(matrix_dir, path)?,
+            )?;
+        }
+    }
+
+    let gate = evaluate_quality_gate(&summary, quality_gate_config)?;
+    let gate_json_path = matrix_path(matrix_dir, &manifest.artifacts.quality_gate_json)?;
+    write_json(&gate, &gate_json_path)?;
+    let gate_markdown_path = matrix_path(matrix_dir, &manifest.artifacts.quality_gate_markdown)?;
+    write_text(&render_markdown_quality_gate(&gate), &gate_markdown_path)?;
+
+    refresh_matrix_autopsy(matrix_dir, &suite, &manifest.baseline)?;
+    for head in &manifest.heads {
+        refresh_matrix_autopsy(matrix_dir, &suite, head)?;
+    }
+
+    let all_reports = std::iter::once(baseline.report.clone())
+        .chain(heads.iter().map(|head| head.report.clone()))
+        .collect::<Vec<_>>();
+    let dashboard_path = matrix_path(matrix_dir, &manifest.artifacts.dashboard_html)?;
+    write_text(&render_html_dashboard(&all_reports)?, &dashboard_path)?;
+
+    let all_results = std::iter::once(&baseline)
+        .chain(heads.iter())
+        .collect::<Vec<_>>();
+    let privacy_report = build_run_matrix_privacy_report(&suite, matrix_dir, &all_results)?;
+    let privacy_json_path = matrix_path(matrix_dir, &manifest.artifacts.privacy_report_json)?;
+    write_json(&privacy_report, &privacy_json_path)?;
+    let privacy_markdown_path =
+        matrix_path(matrix_dir, &manifest.artifacts.privacy_report_markdown)?;
+    write_text(
+        &render_markdown_run_matrix_privacy_report(&privacy_report),
+        &privacy_markdown_path,
+    )?;
+
+    let head_report_paths = heads
+        .iter()
+        .map(|head| head.report_path.clone())
+        .collect::<Vec<_>>();
+    let evidence_manifest_path = matrix_path(matrix_dir, &manifest.artifacts.evidence_manifest)?;
+    let evidence_dir = evidence_manifest_path
+        .parent()
+        .with_context(|| format!("resolve evidence dir {}", evidence_manifest_path.display()))?;
+    let suite_health_path = matrix_path(matrix_dir, &manifest.artifacts.suite_health_json)?;
+    let suite_bundle_temp = if suite_path.starts_with(evidence_dir) {
+        Some(TempDirGuard::create("helmbench-refresh-matrix-suite")?)
+    } else {
+        None
+    };
+    let suite_bundle_path = if let Some(temp) = suite_bundle_temp.as_ref() {
+        let copy_path = temp.path().join("suite.json");
+        std::fs::copy(&suite_path, &copy_path)
+            .with_context(|| format!("copy suite {}", suite_path.display()))?;
+        copy_path
+    } else {
+        suite_path.clone()
+    };
+    write_evidence_bundle(
+        &suite_bundle_path,
+        Some(&suite_health_path),
+        &baseline.report_path,
+        &head_report_paths,
+        evidence_dir,
+        true,
+    )?;
+    verify_evidence_bundle(evidence_dir)?;
+
+    manifest.quality_gate_passed = gate.passed;
+    manifest.evidence_bundle_verified = true;
+    manifest.privacy = PrivacyStatus::source_free();
+
+    let reproduction_path = matrix_path(matrix_dir, &manifest.artifacts.reproduction_markdown)?;
+    write_text(
+        &render_markdown_matrix_reproduction(&manifest),
+        &reproduction_path,
+    )?;
+    manifest.artifact_digests = collect_matrix_artifact_digests(matrix_dir, &manifest)?;
+    write_json(&manifest, &matrix_dir.join("matrix-manifest.json"))?;
+    verify_run_matrix(matrix_dir)?;
+    Ok(manifest)
+}
+
+fn resolve_refresh_matrix_suite_path(
+    matrix_dir: &Path,
+    manifest: &RunMatrixManifest,
+) -> Result<PathBuf> {
+    let manifest_suite_path = PathBuf::from(&manifest.suite_path);
+    if manifest_suite_path.exists() {
+        return Ok(manifest_suite_path);
+    }
+    let evidence_manifest = matrix_path(matrix_dir, &manifest.artifacts.evidence_manifest)?;
+    let evidence_suite = evidence_manifest
+        .parent()
+        .with_context(|| format!("resolve evidence dir {}", evidence_manifest.display()))?
+        .join("suite.json");
+    if evidence_suite.exists() {
+        return Ok(evidence_suite);
+    }
+    anyhow::bail!(
+        "matrix suite `{}` is unavailable and evidence bundle has no suite copy",
+        manifest.suite_path
+    )
+}
+
+fn refresh_matrix_run_report(
+    matrix_dir: &Path,
+    suite: &helmbench::TaskSuite,
+    run: &RunMatrixManifestRun,
+) -> Result<RunMatrixResult> {
+    let trace_dir = matrix_path(matrix_dir, &run.trace_dir)?;
+    let traces = load_traces(&trace_dir)?;
+    let report = build_report(suite, &traces)?;
+    if report.agent != run.agent || report.variant != run.variant {
+        anyhow::bail!(
+            "run `{}` trace identity {} / {:?} does not match manifest {} / {:?}",
+            run.name,
+            report.agent,
+            report.variant,
+            run.agent,
+            run.variant
+        );
+    }
+    let report_path = matrix_path(matrix_dir, &run.report_path)?;
+    write_json(&report, &report_path)?;
+    let markdown_path = report_path.with_extension("md");
+    write_text(&render_markdown_report(&report), &markdown_path)?;
+
+    Ok(RunMatrixResult {
+        spec: run_matrix_spec_from_manifest(run),
+        report,
+        report_path,
+        trace_dir,
+    })
+}
+
+fn refresh_matrix_autopsy(
+    matrix_dir: &Path,
+    suite: &helmbench::TaskSuite,
+    run: &RunMatrixManifestRun,
+) -> Result<()> {
+    let traces = load_traces(&matrix_path(matrix_dir, &run.trace_dir)?)?;
+    let autopsy = build_autopsy(suite, &traces)?;
+    write_text(
+        &render_markdown_autopsy(&autopsy),
+        &matrix_path(matrix_dir, &run.autopsy_markdown)?,
+    )
+}
+
+fn run_matrix_spec_from_manifest(run: &RunMatrixManifestRun) -> RunMatrixSpec {
+    RunMatrixSpec {
+        name: run.name.clone(),
+        safe_name: safe_task_dir_name(&run.name),
+        agent: run.agent.clone(),
+        variant: run.variant.clone(),
+        ctxhelm: run.ctxhelm_enabled.then_some(CtxhelmRunConfig {
+            ctxhelm_bin: PathBuf::from("ctxhelm"),
+            mode: "bug-fix".to_string(),
+            target_agent: run.agent.clone(),
+            semantic: false,
+            semantic_provider: None,
+            semantic_model: None,
+            semantic_dimensions: None,
+            include_pack: run.pack_enabled,
+            pack_budget: "brief".to_string(),
+        }),
+        adapter_command: None,
+        adapter_preset: run.adapter_preset.map(|preset| AdapterPresetRunConfig {
+            preset,
+            bin: default_preset_bin(preset),
+            model: None,
+            args: Vec::new(),
+            dangerously_skip_permissions: false,
+            dangerously_bypass_approvals_and_sandbox: false,
+        }),
+        capture_stream: run.stream_capture_enabled,
+    }
+}
+
+fn verify_run_matrix(matrix_dir: &Path) -> Result<RunMatrixManifest> {
+    let manifest = read_run_matrix_manifest(matrix_dir)?;
 
     if manifest.schema_version != RUN_MATRIX_MANIFEST_SCHEMA_VERSION {
         anyhow::bail!(
@@ -9806,6 +10071,34 @@ mod tests {
             SuiteEvidenceUse::NavigationOnly
         );
         assert!(verified.evidence_bundle_verified);
+        let refreshed = refresh_run_matrix_artifacts(
+            &out,
+            &QualityGateConfig {
+                min_task_count: Some(2),
+                min_recommendation_follow_through: Some(1.1),
+                ..QualityGateConfig::default()
+            },
+        )
+        .expect("refresh matrix");
+        assert!(!refreshed.quality_gate_passed);
+        let refreshed_gate =
+            std::fs::read_to_string(out.join("reports/quality-gate.json")).expect("gate");
+        let refreshed_gate =
+            serde_json::from_str::<serde_json::Value>(&refreshed_gate).expect("gate json");
+        assert!(refreshed_gate["checks"]
+            .as_array()
+            .expect("checks")
+            .iter()
+            .any(|check| check["metric"] == "recommendation_follow_through"));
+        let refreshed_summary =
+            std::fs::read_to_string(out.join("reports/benchmark-summary.json")).expect("summary");
+        let refreshed_summary =
+            serde_json::from_str::<serde_json::Value>(&refreshed_summary).expect("summary json");
+        assert!(refreshed_summary["runs"]
+            .as_array()
+            .expect("runs")
+            .iter()
+            .any(|run| run.get("recommendationFollowThrough").is_some()));
         let manifest_path = out.join("matrix-manifest.json");
         let manifest_raw = std::fs::read_to_string(&manifest_path).expect("manifest raw");
         let mut mismatched_manifest: RunMatrixManifest =

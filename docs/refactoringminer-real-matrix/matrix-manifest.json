@@ -62,13 +62,13 @@
   "artifactDigests": [
     {
       "path": "docs/benchmark-summary.md",
-      "byteCount": 2190,
-      "contentHash": "fnv64:dff2b13d77f0784b"
+      "byteCount": 2268,
+      "contentHash": "fnv64:a0b83b80acd0fd4f"
     },
     {
       "path": "docs/compare-ctxhelm.md",
-      "byteCount": 430,
-      "contentHash": "fnv64:471e0f8ee1694f5d"
+      "byteCount": 472,
+      "contentHash": "fnv64:7ea9c31da4a4dfef"
     },
     {
       "path": "docs/ctxhelm-autopsy.md",
@@ -92,8 +92,8 @@
     },
     {
       "path": "docs/quality-gate.md",
-      "byteCount": 782,
-      "contentHash": "fnv64:66877fc08e5c7598"
+      "byteCount": 970,
+      "contentHash": "fnv64:996495c475807a79"
     },
     {
       "path": "docs/reproduction.md",
@@ -103,27 +103,27 @@
     {
       "path": "evidence/manifest.json",
       "byteCount": 1705,
-      "contentHash": "fnv64:bb6ec5a7201c183b"
+      "contentHash": "fnv64:d12bb8f1e1731efd"
     },
     {
       "path": "reports/benchmark-summary.json",
-      "byteCount": 5380,
-      "contentHash": "fnv64:b20fa32aad0a075d"
+      "byteCount": 5551,
+      "contentHash": "fnv64:51e535e4de5e1da3"
     },
     {
       "path": "reports/compare-ctxhelm.json",
-      "byteCount": 606,
-      "contentHash": "fnv64:c87c36e1e6ed274c"
+      "byteCount": 656,
+      "contentHash": "fnv64:6253aceb6fc625be"
     },
     {
       "path": "reports/ctxhelm.json",
-      "byteCount": 11389,
-      "contentHash": "fnv64:2cf7aecd7f51c6aa"
+      "byteCount": 12236,
+      "contentHash": "fnv64:6396466441b4f178"
     },
     {
       "path": "reports/native.json",
-      "byteCount": 11320,
-      "contentHash": "fnv64:fdba1fcd8b24c6d1"
+      "byteCount": 12167,
+      "contentHash": "fnv64:ddb637ce972f26bf"
     },
     {
       "path": "reports/privacy-report.json",
@@ -132,8 +132,8 @@
     },
     {
       "path": "reports/quality-gate.json",
-      "byteCount": 1898,
-      "contentHash": "fnv64:6a04f64d19d01609"
+      "byteCount": 2365,
+      "contentHash": "fnv64:367916cac7bf87fb"
     },
     {
       "path": "reports/suite-health.json",

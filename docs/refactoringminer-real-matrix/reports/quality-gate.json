@@ -52,6 +52,24 @@
     {
       "headAgent": "claude-code",
       "headVariant": "ctxhelm_mcp",
+      "metric": "recommendation_follow_through_delta",
+      "operator": ">=",
+      "actual": 0.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "claude-code",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "recommendation_follow_through",
+      "operator": ">=",
+      "actual": 0.0,
+      "threshold": 0.10000000149011612,
+      "passed": false
+    },
+    {
+      "headAgent": "claude-code",
+      "headVariant": "ctxhelm_mcp",
       "metric": "context_precision_delta",
       "operator": ">=",
       "actual": -0.7416666746139526,

@@ -69,6 +69,7 @@ of tasks and the `ctxhelm_mcp` row solved `0.0%`.
 | Success | 30.0% | 0.0% | -30.0% |
 | Validation coverage | 30.0% | 0.0% | -30.0% |
 | Recommendation recall | 0.0% | 50.1% | +50.1% |
+| Recommendation follow-through | 0.0% | 0.0% | +0.0% |
 | Context precision | 74.2% | 0.0% | -74.2% |
 | Edited-file recall | 60.0% | 0.0% | -60.0% |
 | Irrelevant reads | 7.7% | 0.0% | -7.7% |
@@ -76,9 +77,10 @@ of tasks and the `ctxhelm_mcp` row solved `0.0%`.
 | Token estimate | 0 | 26587 | +26587 |
 
 The quality gate failed on success rate, validation coverage, context
-precision, and edited-file recall. That failure is useful proof of the product:
-HelmBench detected that ctxhelm recommendations improved recall but the
-ctxhelm-guided agent row did not act effectively.
+precision, recommendation follow-through, and edited-file recall. That failure
+is useful proof of the product: HelmBench detected that ctxhelm recommendations
+improved recall, but the ctxhelm-guided agent row read `0.0%` of those
+recommended paths.
 
 ## Evidence Artifacts
 
@@ -130,6 +132,11 @@ cargo run -- dashboard \
   --report reports/example-ctxhelm.json \
   --report reports/example-claude-code.json \
   --out docs/example-dashboard.html
+
+cargo run -- refresh-matrix \
+  --matrix docs/refactoringminer-real-matrix \
+  --min-task-count 10 \
+  --min-recommendation-follow-through 0.1
 
 cargo run -- launch-readiness \
   --suite suites/local-run-smoke.json \
