@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 3,
+  "repoName": "repo",
+  "requiredChecks": [
+    {
+      "name": "git available",
+      "ok": true
+    },
+    {
+      "name": "cargo available",
+      "ok": true
+    },
+    {
+      "name": "repo is a git checkout",
+      "ok": true
+    },
+    {
+      "name": "Cargo.toml exists",
+      "ok": true
+    },
+    {
+      "name": "verification script exists",
+      "ok": true
+    },
+    {
+      "name": "CI workflow exists",
+      "ok": true
+    },
+    {
+      "name": "release workflow exists",
+      "ok": true
+    },
+    {
+      "name": "example suite loads",
+      "ok": true
+    },
+    {
+      "name": "example native report is source-free",
+      "ok": true
+    },
+    {
+      "name": "example ctxhelm report is source-free",
+      "ok": true
+    }
+  ],
+  "optionalIntegrations": [
+    {
+      "name": "ctxhelm",
+      "command": "ctxhelm",
+      "available": true,
+      "versionHash": "version:b1a4ea3d40893d30"
+    },
+    {
+      "name": "claude-code",
+      "command": "claude",
+      "available": true,
+      "versionHash": "version:0b9961f23b21474c"
+    },
+    {
+      "name": "codex",
+      "command": "codex",
+      "available": true,
+      "versionHash": "version:5eba67c1b011c7dd"
+    }
+  ],
+  "directRunners": [
+    {
+      "name": "claude-run",
+      "command": "claude",
+      "available": true,
+      "runtimePreflight": {
+        "checked": true,
+        "ok": false,
+        "exitStatus": 1,
+        "outputHash": "output:eceb0bdf852a6129",
+        "diagnosticHash": "diagnostic:4285b37bc92f197c",
+        "failureClass": "session_limit",
+        "elapsedMillis": 1925
+      },
+      "isolatedClones": true,
+      "injectsSourceFreeEventContract": true,
+      "captureStreamSupported": true,
+      "suppressesRawOutputByDefault": true,
+      "unrestrictedFlag": "--dangerously-skip-permissions"
+    },
+    {
+      "name": "codex-run",
+      "command": "codex",
+      "available": true,
+      "runtimePreflight": {
+        "checked": true,
+        "ok": false,
+        "exitStatus": 1,
+        "outputHash": "output:569a56c9c47b277a",
+        "diagnosticHash": "diagnostic:b86d3db892d3353d",
+        "failureClass": "cli_upgrade_required",
+        "elapsedMillis": 9328
+      },
+      "isolatedClones": true,
+      "injectsSourceFreeEventContract": true,
+      "captureStreamSupported": true,
+      "suppressesRawOutputByDefault": true,
+      "unrestrictedFlag": "--dangerously-bypass-approvals-and-sandbox"
+    }
+  ],
+  "observationModes": [
+    {
+      "name": "record-event",
+      "sourceFree": true,
+      "persistsRawStream": false,
+      "description": "agent or hook appends validated source-free events"
+    },
+    {
+      "name": "capture-stream",
+      "sourceFree": true,
+      "persistsRawStream": false,
+      "description": "structured stdout is parsed in memory and discarded"
+    },
+    {
+      "name": "git-diff-inference",
+      "sourceFree": true,
+      "persistsRawStream": false,
+      "description": "edited files are inferred from git status after each isolated run"
+    },
+    {
+      "name": "validation-command-summary",
+      "sourceFree": true,
+      "persistsRawStream": false,
+      "description": "success commands are stored by class/hash/exit status"
+    }
+  ],
+  "supportedVariants": [
+    "native",
+    "native_search",
+    "ctxhelm_plan",
+    "ctxhelm_mcp",
+    "ctxhelm_pack"
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  },
+  "ok": true
+}

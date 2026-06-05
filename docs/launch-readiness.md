@@ -28,6 +28,7 @@ Status: **smoke_proof**
 | source-free reports | `pass` | 3 report(s) accepted by benchmark-summary |
 | public benchmark coverage | `pass` | 1 outcome task(s), 10 public recommendation task(s); launch target is 10 |
 | real-agent evidence | `pass` | 0 matching real-agent matrix row(s), 1 matching real-agent report(s), 0 suite mismatch(es), 0 non-real-agent report(s); launch target is 1 |
+| direct-runner runtime | `warn` | 1 doctor report(s), 2 checked direct runner(s), 0 ok, 2 warning(s); failure classes: cli_upgrade_required=1, session_limit=1 |
 | outcome-health evidence | `pass` | matching suite-health evidenceUse: outcome_ready |
 | verified run matrix | `pass` | 1 matching verified matrix output(s), 1 suite mismatch(es), 0 failure(s) |
 | launch-grade public matrix | `warn` | 0 verified outcome-ready quality-gated real-agent matrix output(s) at 10+ task(s), 1 quality-gate failure(s); launch target is 1 real-agent row(s) |
@@ -43,6 +44,7 @@ Status: **smoke_proof**
 | `head_report` | `head_report:79bc53e09722fd5b` | yes |
 | `real_agent_report` | `real_agent_report:3270fb3ab1f8d24e` | yes |
 | `public_report` | `public_report:a5dde3393a65557c` | yes |
+| `doctor_report` | `doctor_report:012bd953fbad34f4` | yes |
 | `health` | `health:7de86413dc8bde4c` | yes |
 | `matrix` | `matrix:2b1d7fc8d4c043a4` | yes |
 | `matrix_evidence_use` | `outcome_ready` | yes |

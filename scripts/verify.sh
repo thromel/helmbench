@@ -41,7 +41,9 @@ test -f docs/example-benchmark-summary.md
 test -f docs/refactoringminer-public-proof.md
 test -f docs/refactoringminer-ctxhelm-plan.md
 test -f docs/claude-real-smoke.md
+test -f docs/direct-runner-runtime.md
 test -f reports/claude-real-smoke.json
+test -f reports/direct-runner-runtime.json
 test -f reports/launch-readiness.json
 test -f reports/refactoringminer-suite-health.json
 test -f reports/refactoringminer-outcome-health.json
@@ -60,6 +62,8 @@ grep -q '"publicReportCount": 1' reports/launch-readiness.json
 grep -q '"publicTaskCount": 10' reports/launch-readiness.json
 grep -q 'public benchmark coverage | `pass`' docs/launch-readiness.md
 grep -q 'real-agent evidence | `pass`' docs/launch-readiness.md
+grep -q 'direct-runner runtime | `warn`' docs/launch-readiness.md
+grep -q 'failure classes: cli_upgrade_required=1, session_limit=1' docs/launch-readiness.md
 grep -q 'outcome-health evidence | `pass`' docs/launch-readiness.md
 grep -q 'verified run matrix | `pass`' docs/launch-readiness.md
 grep -q 'launch-grade public matrix | `warn`' docs/launch-readiness.md
@@ -76,6 +80,13 @@ grep -q '"recommendationFollowThrough": 0.0' docs/refactoringminer-real-matrix/r
 grep -q 'refresh-matrix' docs/run-matrix.md
 grep -q 'claude-real-smoke' docs/launch-proof.md
 grep -q 'claude-real-smoke' docs/direct-agent-runs.md
+grep -q 'direct-runner-runtime' docs/launch-proof.md
+grep -q 'direct-runner-runtime' docs/direct-agent-runs.md
+grep -q 'session_limit' docs/direct-runner-runtime.md
+grep -q 'cli_upgrade_required' docs/direct-runner-runtime.md
+grep -q '"failureClass": "session_limit"' reports/direct-runner-runtime.json
+grep -q '"failureClass": "cli_upgrade_required"' reports/direct-runner-runtime.json
+grep -q '"sourceFree": true' reports/direct-runner-runtime.json
 grep -q 'Low sample size: 1 task' docs/example-benchmark-summary.md
 grep -q 'raw source' docs/launch-proof.md
 grep -q '"successRate": 1.0' reports/claude-real-smoke.json

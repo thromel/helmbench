@@ -50,6 +50,11 @@
       "sourceFree": true
     },
     {
+      "kind": "doctor_report",
+      "label": "doctor_report:012bd953fbad34f4",
+      "sourceFree": true
+    },
+    {
       "kind": "health",
       "label": "health:7de86413dc8bde4c",
       "sourceFree": true
@@ -99,6 +104,12 @@
       "status": "pass",
       "evidence": "real_agent_reports",
       "detail": "0 matching real-agent matrix row(s), 1 matching real-agent report(s), 0 suite mismatch(es), 0 non-real-agent report(s); launch target is 1"
+    },
+    {
+      "name": "direct-runner runtime",
+      "status": "warn",
+      "evidence": "doctor_report",
+      "detail": "1 doctor report(s), 2 checked direct runner(s), 0 ok, 2 warning(s); failure classes: cli_upgrade_required=1, session_limit=1"
     },
     {
       "name": "outcome-health evidence",

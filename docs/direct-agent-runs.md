@@ -48,6 +48,12 @@ helmbench doctor \
   --out /tmp/helmbench-doctor-runtime.json
 ```
 
+The checked runtime snapshot is published at
+[`reports/direct-runner-runtime.json`](../reports/direct-runner-runtime.json),
+with a Markdown rendering at
+[`docs/direct-runner-runtime.md`](direct-runner-runtime.md). It is source-free
+runtime evidence, not a raw agent transcript.
+
 ## Claude Code
 
 ```bash

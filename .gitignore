@@ -8,6 +8,7 @@
 !/reports/example-ctxhelm-plan-meta.json
 !/reports/example-claude-code.json
 !/reports/claude-real-smoke.json
+!/reports/direct-runner-runtime.json
 !/reports/refactoringminer-suite-health.json
 !/reports/refactoringminer-outcome-health.json
 !/reports/refactoringminer-ctxhelm-plan.json

@@ -39,6 +39,11 @@ exits. The tracked fixture is healthy at rest; the suite's task-level
 agent runs, so `suite-health --check-success-commands` can prove the validation
 command fails pre-agent and passes only after repair.
 
+The checked direct-runner runtime snapshot is also source-free. It proves the
+CLI adapters are installed and privacy-safe, while recording the current rerun
+blockers as coarse failure classes: Claude Code is blocked by `session_limit`
+and Codex is blocked by `cli_upgrade_required`.
+
 ## Current Source-Free Result
 
 Baseline: `claude-code / native`
@@ -94,6 +99,10 @@ recommended paths.
   [`reports/claude-real-smoke.json`](../reports/claude-real-smoke.json)
 - Real Claude Code smoke Markdown:
   [`docs/claude-real-smoke.md`](claude-real-smoke.md)
+- Direct-runner runtime report:
+  [`docs/direct-runner-runtime.md`](direct-runner-runtime.md)
+- Direct-runner runtime JSON:
+  [`reports/direct-runner-runtime.json`](../reports/direct-runner-runtime.json)
 - RefactoringMiner outcome-readiness report:
   [`reports/refactoringminer-outcome-health.json`](../reports/refactoringminer-outcome-health.json)
 - RefactoringMiner seeded git-regression suite:
@@ -138,6 +147,18 @@ cargo run -- refresh-matrix \
   --min-task-count 10 \
   --min-recommendation-follow-through 0.1
 
+cargo run -- doctor \
+  --repo . \
+  --check-direct-runners \
+  --format json \
+  --out reports/direct-runner-runtime.json
+
+cargo run -- doctor \
+  --repo . \
+  --check-direct-runners \
+  --format markdown \
+  --out docs/direct-runner-runtime.md
+
 cargo run -- launch-readiness \
   --suite suites/local-run-smoke.json \
   --base-report docs/local-smoke-matrix/reports/native.json \
@@ -148,6 +169,7 @@ cargo run -- launch-readiness \
   --matrix docs/refactoringminer-real-matrix \
   --real-agent-report reports/claude-real-smoke.json \
   --public-report reports/refactoringminer-ctxhelm-plan.json \
+  --doctor-report reports/direct-runner-runtime.json \
   --out docs/launch-readiness.md \
   --format markdown
 
@@ -161,6 +183,7 @@ cargo run -- launch-readiness \
   --matrix docs/refactoringminer-real-matrix \
   --real-agent-report reports/claude-real-smoke.json \
   --public-report reports/refactoringminer-ctxhelm-plan.json \
+  --doctor-report reports/direct-runner-runtime.json \
   --out reports/launch-readiness.json \
   --format json
 
