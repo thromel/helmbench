@@ -109,7 +109,7 @@
       "name": "direct-runner runtime",
       "status": "warn",
       "evidence": "doctor_report",
-      "detail": "1 doctor report(s), 2 checked direct runner(s), 0 ok, 2 warning(s); failure classes: cli_upgrade_required=1, session_limit=1"
+      "detail": "1 doctor report(s), 2 checked direct runner(s), 1 ok, 1 warning(s); failure classes: cli_upgrade_required=1"
     },
     {
       "name": "outcome-health evidence",
@@ -141,7 +141,7 @@
       "name": "direct-runner runtime",
       "severity": "warn",
       "evidence": "doctor_report",
-      "detail": "1 doctor report(s), 2 checked direct runner(s), 0 ok, 2 warning(s); failure classes: cli_upgrade_required=1, session_limit=1",
+      "detail": "1 doctor report(s), 2 checked direct runner(s), 1 ok, 1 warning(s); failure classes: cli_upgrade_required=1",
       "nextAction": "Resolve the reported direct-runner runtime failure classes and rerun doctor preflight."
     },
     {

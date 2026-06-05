@@ -43,9 +43,9 @@ agent runs, so `suite-health --check-success-commands` can prove the validation
 command fails pre-agent and passes only after repair.
 
 The checked direct-runner runtime snapshot is also source-free. It proves the
-CLI adapters are installed and privacy-safe, while recording the current rerun
-blockers as coarse failure classes: Claude Code is blocked by `session_limit`
-and Codex is blocked by `cli_upgrade_required`.
+CLI adapters are installed and privacy-safe, while recording current rerun
+readiness without raw stdout or stderr. Claude Code currently passes the
+runtime preflight; Codex is still blocked by `cli_upgrade_required`.
 
 ## Current Source-Free Result
 

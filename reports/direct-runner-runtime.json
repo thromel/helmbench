@@ -70,12 +70,12 @@
       "available": true,
       "runtimePreflight": {
         "checked": true,
-        "ok": false,
-        "exitStatus": 1,
-        "outputHash": "output:eceb0bdf852a6129",
-        "diagnosticHash": "diagnostic:4285b37bc92f197c",
-        "failureClass": "session_limit",
-        "elapsedMillis": 1925
+        "ok": true,
+        "exitStatus": 0,
+        "outputHash": "output:1a19f91921d9561f",
+        "diagnosticHash": "diagnostic:b9f1f840af5529a4",
+        "failureClass": null,
+        "elapsedMillis": 5579
       },
       "isolatedClones": true,
       "injectsSourceFreeEventContract": true,
@@ -91,10 +91,10 @@
         "checked": true,
         "ok": false,
         "exitStatus": 1,
-        "outputHash": "output:569a56c9c47b277a",
-        "diagnosticHash": "diagnostic:b86d3db892d3353d",
+        "outputHash": "output:363d07ddd6856169",
+        "diagnosticHash": "diagnostic:19c24c38db238d66",
         "failureClass": "cli_upgrade_required",
-        "elapsedMillis": 9328
+        "elapsedMillis": 10754
       },
       "isolatedClones": true,
       "injectsSourceFreeEventContract": true,

@@ -28,7 +28,7 @@ Status: **smoke_proof**
 | source-free reports | `pass` | 3 report(s) accepted by benchmark-summary |
 | public benchmark coverage | `pass` | 1 outcome task(s), 10 public recommendation task(s); launch target is 10 |
 | real-agent evidence | `pass` | 0 matching real-agent matrix row(s), 1 matching real-agent report(s), 0 suite mismatch(es), 0 non-real-agent report(s); launch target is 1 |
-| direct-runner runtime | `warn` | 1 doctor report(s), 2 checked direct runner(s), 0 ok, 2 warning(s); failure classes: cli_upgrade_required=1, session_limit=1 |
+| direct-runner runtime | `warn` | 1 doctor report(s), 2 checked direct runner(s), 1 ok, 1 warning(s); failure classes: cli_upgrade_required=1 |
 | outcome-health evidence | `pass` | matching suite-health evidenceUse: outcome_ready |
 | verified run matrix | `pass` | 1 matching verified matrix output(s), 1 suite mismatch(es), 0 failure(s) |
 | launch-grade public matrix | `warn` | 0 verified outcome-ready quality-gated real-agent matrix output(s) at 10+ task(s), 1 quality-gate failure(s); launch target is 1 real-agent row(s) |

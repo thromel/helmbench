@@ -29,7 +29,7 @@ Status: **ok**
 
 | Runner | Command | Available | Runtime preflight | Event contract | Capture stream | Raw output suppressed | Isolated clones |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| `claude-run` | `claude` | yes | warn (session_limit) | yes | yes | yes | yes |
+| `claude-run` | `claude` | yes | ok | yes | yes | yes | yes |
 | `codex-run` | `codex` | yes | warn (cli_upgrade_required) | yes | yes | yes | yes |
 
 ## Observation Modes
