@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-23e298ae221c",
+  "agent": "claude-code",
+  "variant": "native",
+  "status": "failure",
+  "recommendedFiles": [],
+  "filesRead": [
+    {
+      "path": "src/main/java/org/refactoringminer/astDiff/models/DiffMetaInfo.java",
+      "pathHash": "path:603ddb592d89ab89",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java",
+      "pathHash": "path:e1d0578ca861a78c",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/gui/webdiff/WebDiff.java",
+      "pathHash": "path:3afc28c49da35a56",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/gui/webdiff/dir/DirectoryDiffView.java",
+      "pathHash": "path:6392c1f1191f0a06",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/RefactoringMiner.java",
+      "pathHash": "path:73ecdd9e040293a1",
+      "observedAtMillis": null
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "src/main/java/gui/webdiff/WebDiff.java",
+      "pathHash": "path:3afc28c49da35a56",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/astDiff/models/DiffMetaInfo.java",
+      "pathHash": "path:603ddb592d89ab89",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java",
+      "pathHash": "path:e1d0578ca861a78c",
+      "observedAtMillis": null
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:f5b254571f2b1e85",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImplMergeCommitTest.java"
+      ],
+      "exitStatus": 1,
+      "elapsedMillis": 35124
+    }
+  ],
+  "toolCallCount": 10,
+  "tokenEstimate": null,
+  "elapsedMillis": 232149,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-4fa3c1a48ad4",
+  "agent": "claude-code",
+  "variant": "native",
+  "status": "success",
+  "recommendedFiles": [],
+  "filesRead": [
+    {
+      "path": "src/main/java/gui/webdiff/WebDiff.java",
+      "pathHash": "path:3afc28c49da35a56",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/McpDiffBrowserResult.java",
+      "pathHash": "path:a7bed44a64244429",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java",
+      "pathHash": "path:4ec34542cfc58ddc",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/mcp/WebDiffBrowserLauncherTest.java",
+      "pathHash": "path:0b90981b0ff18f39",
+      "observedAtMillis": null
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "src/main/java/gui/webdiff/WebDiff.java",
+      "pathHash": "path:3afc28c49da35a56",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/McpDiffBrowserResult.java",
+      "pathHash": "path:a7bed44a64244429",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java",
+      "pathHash": "path:4ec34542cfc58ddc",
+      "observedAtMillis": null
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:8cc3f46d39172e10",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/mcp/WebDiffBrowserLauncherTest.java"
+      ],
+      "exitStatus": 0,
+      "elapsedMillis": 24027
+    }
+  ],
+  "toolCallCount": 9,
+  "tokenEstimate": null,
+  "elapsedMillis": 283921,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

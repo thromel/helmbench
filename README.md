@@ -23,10 +23,9 @@ See [HelmBench Launch Proof](docs/launch-proof.md) and the generated
 summary, dashboard, privacy contract, and regeneration commands. The current
 readiness status is `smoke_proof`: it now includes a verified, source-free
 local smoke matrix with outcome-ready suite health and a real Claude Code smoke
-report. It also counts the 10-task RefactoringMiner recommendation proof as
-public benchmark coverage, while still warning that launch-grade proof needs a
-10-task real-agent public matrix. Larger public-suite proofs should use
-`run-matrix` on the RefactoringMiner, Flask, ripgrep, or Express presets.
+report. It also includes a verified 10-task RefactoringMiner real-agent matrix,
+but keeps launch readiness at `smoke_proof` because that matrix's quality gate
+failed.
 
 The checked-in [RefactoringMiner public recommendation proof](docs/refactoringminer-public-proof.md)
 runs `ctxhelm prepare-task` over a healthy 10-task public suite and records
@@ -40,8 +39,12 @@ HelmBench also includes a seeded
 with an `outcome_ready`
 [source-free health report](reports/refactoringminer-git-regressions-health.json):
 10 tasks, 10 failing pre-agent validation baselines, zero setup failures, and
-zero validation timeouts. This is the launch-grade public task substrate for the
-next real-agent matrix run.
+zero validation timeouts. The checked-in
+[RefactoringMiner real-agent matrix](docs/refactoringminer-real-matrix/docs/benchmark-summary.md)
+runs Claude Code native vs `ctxhelm_mcp` over that suite. It is diagnostic, not
+a launch win: native solved `30.0%` of tasks while `ctxhelm_mcp` solved `0.0%`;
+the failed quality gate shows HelmBench catching a real regression instead of
+papering over it.
 
 The checked-in [real Claude Code smoke report](docs/claude-real-smoke.md)
 launches Claude Code through `claude-run` on the local smoke suite and records
@@ -103,6 +106,9 @@ This repository currently implements the core HelmBench workflow:
 - checked-in verified local smoke matrix under `docs/local-smoke-matrix/`,
   including outcome-ready suite health, privacy report, evidence bundle, and
   matrix manifest
+- checked-in verified 10-task RefactoringMiner real-agent matrix under
+  `docs/refactoringminer-real-matrix/`, including source-free traces, reports,
+  dashboard, evidence bundle, privacy report, and a failed quality gate
 - `launch-readiness` report that classifies checked-in proof artifacts as
   `launch_ready`, `smoke_proof`, or `not_ready` without storing source
 - first-class `run-matrix` row presets for Claude Code and Codex, so real

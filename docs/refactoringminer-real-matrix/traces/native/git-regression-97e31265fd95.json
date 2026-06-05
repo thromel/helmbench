@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-97e31265fd95",
+  "agent": "claude-code",
+  "variant": "native",
+  "status": "failure",
+  "recommendedFiles": [],
+  "filesRead": [],
+  "filesEdited": [],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:3f0859f91cc55992",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/astDiff/utils/URLHelperTest.java"
+      ],
+      "exitStatus": 1,
+      "elapsedMillis": 12810
+    }
+  ],
+  "toolCallCount": 2,
+  "tokenEstimate": null,
+  "elapsedMillis": 50514,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

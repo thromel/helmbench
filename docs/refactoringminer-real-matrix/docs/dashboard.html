@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HelmBench Dashboard</title>
+<style>
+
+:root {
+  color-scheme: light;
+  --bg: #f5f7fb;
+  --ink: #172033;
+  --muted: #5c667a;
+  --line: #d8deea;
+  --card: #ffffff;
+  --accent: #0f766e;
+  --accent-weak: #e0f2f1;
+  --danger: #b42318;
+  --warning: #b54708;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.shell { width: min(1180px, calc(100% - 32px)); margin: 0 auto; padding: 40px 0; }
+.hero { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 28px; }
+.eyebrow { margin: 0 0 8px; color: var(--accent); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; }
+h1 { margin: 0; font-size: 44px; line-height: 1.05; letter-spacing: 0; }
+h2 { margin: 0 0 16px; font-size: 22px; letter-spacing: 0; }
+.lede { margin: 12px 0 0; color: var(--muted); max-width: 680px; font-size: 17px; line-height: 1.5; }
+.privacy-badge { border: 1px solid var(--line); background: var(--card); color: var(--accent); padding: 10px 12px; border-radius: 8px; font-weight: 700; white-space: nowrap; }
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 20px; }
+.run-card, .panel, .privacy { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 18px; box-shadow: 0 8px 28px rgba(23, 32, 51, .06); }
+.run-title { display: flex; justify-content: space-between; gap: 12px; align-items: center; font-size: 18px; font-weight: 800; }
+code { background: #eef2f7; border-radius: 5px; padding: 2px 5px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: .88em; }
+.suite { margin: 10px 0 16px; color: var(--muted); }
+.metric-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.metric { background: #f8fafc; border: 1px solid #e6ebf3; border-radius: 8px; padding: 12px; }
+.metric span { display: block; color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0; }
+.metric strong { display: block; margin-top: 8px; font-size: 24px; }
+.facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 16px 0 0; }
+.facts div { display: flex; justify-content: space-between; gap: 12px; border-top: 1px solid #edf1f7; padding-top: 8px; }
+dt { color: var(--muted); }
+dd { margin: 0; font-weight: 700; }
+.panel { margin-top: 20px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; min-width: 860px; }
+th, td { border-bottom: 1px solid #edf1f7; padding: 11px 10px; text-align: left; vertical-align: top; }
+th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0; }
+.status { display: inline-block; border-radius: 5px; padding: 3px 7px; font-weight: 800; font-size: 12px; }
+.status-success { background: var(--accent-weak); color: var(--accent); }
+.status-failure { background: #fee4e2; color: var(--danger); }
+.status-skipped { background: #fff4e5; color: var(--warning); }
+.privacy { margin-top: 20px; color: var(--muted); line-height: 1.55; }
+.privacy p { margin: 0; }
+@media (max-width: 720px) {
+  .shell { width: min(100% - 20px, 1180px); padding: 24px 0; }
+  .hero { display: block; }
+  .privacy-badge { display: inline-block; margin-top: 16px; }
+  h1 { font-size: 34px; }
+}
+
+</style>
+</head>
+<body>
+<main class="shell">
+<header class="hero">
+<div><p class="eyebrow">Source-free agent evaluation</p>
+<h1>HelmBench Dashboard</h1>
+<p class="lede">Measure how coding agents navigate repositories, validate changes, and spend context.</p></div>
+<div class="privacy-badge">Source-free reports</div>
+</header>
+<section class="summary-grid" aria-label="Run summaries">
+<article class="run-card">
+<div class="run-title"><span>claude-code</span><code>Native</code></div>
+<p class="suite">Suite: <strong>refactoringminer-git-regressions</strong></p>
+<div class="metric-row">
+<div class="metric"><span>Success</span><strong>30.0%</strong></div>
+<div class="metric"><span>Validation</span><strong>30.0%</strong></div>
+<div class="metric"><span>Context precision</span><strong>74.2%</strong></div>
+<div class="metric"><span>Irrelevant reads</span><strong>7.7%</strong></div>
+</div>
+<dl class="facts">
+<div><dt>Tasks</dt><dd>10</dd></div>
+<div><dt>Files read</dt><dd>26</dd></div>
+<div><dt>Tool calls</dt><dd>68</dd></div>
+<div><dt>Commands</dt><dd>10</dd></div>
+<div><dt>Test commands</dt><dd>10</dd></div>
+<div><dt>Token estimate</dt><dd>0</dd></div>
+</dl>
+</article>
+<article class="run-card">
+<div class="run-title"><span>claude-code</span><code>CtxhelmMcp</code></div>
+<p class="suite">Suite: <strong>refactoringminer-git-regressions</strong></p>
+<div class="metric-row">
+<div class="metric"><span>Success</span><strong>0.0%</strong></div>
+<div class="metric"><span>Validation</span><strong>0.0%</strong></div>
+<div class="metric"><span>Context precision</span><strong>0.0%</strong></div>
+<div class="metric"><span>Irrelevant reads</span><strong>0.0%</strong></div>
+</div>
+<dl class="facts">
+<div><dt>Tasks</dt><dd>10</dd></div>
+<div><dt>Files read</dt><dd>0</dd></div>
+<div><dt>Tool calls</dt><dd>250</dd></div>
+<div><dt>Commands</dt><dd>30</dd></div>
+<div><dt>Test commands</dt><dd>10</dd></div>
+<div><dt>Token estimate</dt><dd>26587</dd></div>
+</dl>
+</article>
+</section>
+<section class="panel">
+<h2>Run Comparison</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Run</th><th>Suite</th><th>Tasks</th><th>Success</th><th>Validation</th><th>Context precision</th><th>Edited recall</th><th>Irrelevant reads</th><th>Tools</th><th>Tokens</th></tr></thead>
+<tbody>
+<tr><td><strong>claude-code</strong><br><code>Native</code></td><td>refactoringminer-git-regressions</td><td>10</td><td>30.0%</td><td>30.0%</td><td>74.2%</td><td>60.0%</td><td>7.7%</td><td>68</td><td>0</td></tr>
+<tr><td><strong>claude-code</strong><br><code>CtxhelmMcp</code></td><td>refactoringminer-git-regressions</td><td>10</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>250</td><td>26587</td></tr>
+</tbody></table></div>
+</section>
+<section class="panel">
+<h2>Task Detail</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Run</th><th>Task</th><th>Status</th><th>Recommendations</th><th>Reads</th><th>Irrelevant</th><th>Validation</th><th>First relevant file</th></tr></thead>
+<tbody>
+<tr><td>claude-code<br><code>Native</code></td><td><code>git-regression-092c13f035f9</code></td><td><span class="status status-failure">Failure</span></td><td>0 / 0 relevant</td><td>1</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>Native</code></td><td><code>git-regression-1b04d6aae2e4</code></td><td><span class="status status-success">Success</span></td><td>0 / 0 relevant</td><td>3</td><td>1</td><td>yes</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>Native</code></td><td><code>git-regression-1b9f2cf08b3c</code></td><td><span class="status status-failure">Failure</span></td><td>0 / 0 relevant</td><td>5</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>Native</code></td><td><code>git-regression-23e298ae221c</code></td><td><span class="status status-failure">Failure</span></td><td>0 / 0 relevant</td><td>5</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>Native</code></td><td><code>git-regression-4fa3c1a48ad4</code></td><td><span class="status status-success">Success</span></td><td>0 / 0 relevant</td><td>4</td><td>1</td><td>yes</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>Native</code></td><td><code>git-regression-949bddcd3509</code></td><td><span class="status status-success">Success</span></td><td>0 / 0 relevant</td><td>2</td><td>0</td><td>yes</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>Native</code></td><td><code>git-regression-97e31265fd95</code></td><td><span class="status status-failure">Failure</span></td><td>0 / 0 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>Native</code></td><td><code>git-regression-bd0b2277933f</code></td><td><span class="status status-failure">Failure</span></td><td>0 / 0 relevant</td><td>4</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>Native</code></td><td><code>git-regression-fa29ed0c80c8</code></td><td><span class="status status-failure">Failure</span></td><td>0 / 0 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>Native</code></td><td><code>git-regression-fa8df046b0e0</code></td><td><span class="status status-failure">Failure</span></td><td>0 / 0 relevant</td><td>2</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>git-regression-092c13f035f9</code></td><td><span class="status status-failure">Failure</span></td><td>1 / 20 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>git-regression-1b04d6aae2e4</code></td><td><span class="status status-failure">Failure</span></td><td>0 / 20 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>git-regression-1b9f2cf08b3c</code></td><td><span class="status status-failure">Failure</span></td><td>7 / 20 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>git-regression-23e298ae221c</code></td><td><span class="status status-failure">Failure</span></td><td>2 / 20 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>git-regression-4fa3c1a48ad4</code></td><td><span class="status status-failure">Failure</span></td><td>5 / 20 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>git-regression-949bddcd3509</code></td><td><span class="status status-failure">Failure</span></td><td>4 / 20 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>git-regression-97e31265fd95</code></td><td><span class="status status-failure">Failure</span></td><td>1 / 20 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>git-regression-bd0b2277933f</code></td><td><span class="status status-failure">Failure</span></td><td>3 / 20 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>git-regression-fa29ed0c80c8</code></td><td><span class="status status-failure">Failure</span></td><td>2 / 20 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+<tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>git-regression-fa8df046b0e0</code></td><td><span class="status status-failure">Failure</span></td><td>3 / 20 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
+</tbody></table></div>
+</section>
+<section class="privacy">
+<h2>Privacy Contract</h2>
+<p>This dashboard is generated from source-free HelmBench reports. It contains paths/count-derived metrics only; raw source, raw prompts, raw transcripts, raw terminal logs, and raw MCP payloads are not included.</p>
+</section>
+</main>
+</body>
+</html>

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-1b04d6aae2e4",
+  "agent": "claude-code",
+  "variant": "native",
+  "status": "success",
+  "recommendedFiles": [],
+  "filesRead": [
+    {
+      "path": "src/main/java/gui/MarkAsViewed.java",
+      "pathHash": "path:e0fcd9c7e4cb9246",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/gui/viewers/spv/AbstractSinglePageView.java",
+      "pathHash": "path:f8c30db7272269b5",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/gui/webdiff/viewers/spv/AbstractSinglePageView.java",
+      "pathHash": "path:55dc7928b260e30b",
+      "observedAtMillis": null
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "src/main/java/gui/MarkAsViewed.java",
+      "pathHash": "path:e0fcd9c7e4cb9246",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/gui/webdiff/viewers/spv/AbstractSinglePageView.java",
+      "pathHash": "path:55dc7928b260e30b",
+      "observedAtMillis": null
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:0cdfdc5ff6909a80",
+      "touchedTests": [
+        "src/test/java/gui/MarkAsViewedTest.java"
+      ],
+      "exitStatus": 0,
+      "elapsedMillis": 86500
+    }
+  ],
+  "toolCallCount": 7,
+  "tokenEstimate": null,
+  "elapsedMillis": 244890,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

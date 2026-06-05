@@ -63,6 +63,16 @@
       "kind": "matrix_evidence_use",
       "label": "outcome_ready",
       "sourceFree": true
+    },
+    {
+      "kind": "matrix",
+      "label": "matrix:bdd084df0c428319",
+      "sourceFree": true
+    },
+    {
+      "kind": "matrix_evidence_use",
+      "label": "outcome_ready",
+      "sourceFree": true
     }
   ],
   "checks": [
@@ -100,13 +110,13 @@
       "name": "verified run matrix",
       "status": "pass",
       "evidence": "run_matrix",
-      "detail": "1 matching verified matrix output(s), 0 suite mismatch(es), 0 failure(s)"
+      "detail": "1 matching verified matrix output(s), 1 suite mismatch(es), 0 failure(s)"
     },
     {
       "name": "launch-grade public matrix",
       "status": "warn",
       "evidence": "run_matrix",
-      "detail": "0 verified outcome-ready real-agent matrix output(s) at 10+ task(s); launch target is 1 real-agent row(s)"
+      "detail": "0 verified outcome-ready quality-gated real-agent matrix output(s) at 10+ task(s), 1 quality-gate failure(s); launch target is 1 real-agent row(s)"
     },
     {
       "name": "privacy boundary",

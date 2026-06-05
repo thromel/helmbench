@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-092c13f035f9",
+  "agent": "claude-code",
+  "variant": "ctxhelm_mcp",
+  "status": "failure",
+  "recommendedFiles": [
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/CompositeStatementObject.java",
+      "pathHash": "path:07207349ce722f1c",
+      "observedAtMillis": 48945
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/LeafMapping.java",
+      "pathHash": "path:10056e1d98ea4a45",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/ReplacementAlgorithm.java",
+      "pathHash": "path:9b00d54dca59bd7a",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/UMLOperationBodyMapper.java",
+      "pathHash": "path:a5e3c4836cffcfb7",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/diff/UMLClassBaseDiff.java",
+      "pathHash": "path:39aad3242f7ce9f3",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/diff/UMLModelDiff.java",
+      "pathHash": "path:fd3283df97b3ab0b",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/astDiff/actions/editscript/ExtendedChawatheScriptGenerator.java",
+      "pathHash": "path:44ef4ba584e83192",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/astDiff/actions/editscript/ExtendedEditScriptGenerator.java",
+      "pathHash": "path:adf90b3d58385b0b",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/astDiff/actions/editscript/MultiMoveActionGenerator.java",
+      "pathHash": "path:2bce66675ae4ae17",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/astDiff/matchers/ProjectASTDiffer.java",
+      "pathHash": "path:008a26ee274a556b",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/astDiff/tests/Defects4JPerfectDiffTest.java",
+      "pathHash": "path:2dcecee2a018948f",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/mcp/WebDiffBrowserLauncherTest.java",
+      "pathHash": "path:0b90981b0ff18f39",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImplMergeCommitTest.java",
+      "pathHash": "path:86f909026d875688",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/AdvancedAssertionMigrationTest.java",
+      "pathHash": "path:f048e5ac244506d8",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/TestJavadocDiff.java",
+      "pathHash": "path:f5da18801a729f55",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/TestParameterizeTestRefactoring.java",
+      "pathHash": "path:8aaec599192319c3",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/TestStatementMappings.java",
+      "pathHash": "path:e6e93941e0082fd8",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/TestStatementMappingsJunit4.java",
+      "pathHash": "path:aa4f25fdf184aa44",
+      "observedAtMillis": 48946
+    },
+    {
+      "path": "src/test/resources/commandline/drill-2800c57981f27d04b97e5994c3f6325ca301f110-expected.json",
+      "pathHash": "path:69201c11de8338d0",
+      "observedAtMillis": 48947
+    },
+    {
+      "path": "src/test/resources/commandline/drill-gp-expected.json",
+      "pathHash": "path:e6cd803aef7bc6bf",
+      "observedAtMillis": 48947
+    }
+  ],
+  "filesRead": [],
+  "filesEdited": [],
+  "commands": [
+    {
+      "commandClass": "other",
+      "commandHash": "cmd:5538ef9e8993006d",
+      "touchedTests": [],
+      "exitStatus": 0,
+      "elapsedMillis": null
+    },
+    {
+      "commandClass": "other",
+      "commandHash": "cmd:2128418447ea1c90",
+      "touchedTests": [],
+      "exitStatus": 0,
+      "elapsedMillis": null
+    },
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:382a226beca45fca",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/test/TestNewDatasetRefactorings.java",
+        "src/test/resources/oracle/tse-dataset/lucene-solr.json"
+      ],
+      "exitStatus": 1,
+      "elapsedMillis": 9383
+    }
+  ],
+  "toolCallCount": 25,
+  "tokenEstimate": 2575,
+  "elapsedMillis": 101580,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

@@ -25,14 +25,17 @@
       "const": 6
     },
     "suitePath": {
+      "description": "Source-free suite display identity. Absolute local input paths are reduced to basenames before publication.",
       "type": "string",
       "minLength": 1
     },
     "repoPath": {
+      "description": "Source-free repository display identity. Absolute local repository paths are reduced to basenames before publication.",
       "type": "string",
       "minLength": 1
     },
     "outDir": {
+      "description": "Source-free output directory display identity. Absolute local output paths are reduced to basenames before publication.",
       "type": "string",
       "minLength": 1
     },

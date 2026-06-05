@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-bd0b2277933f",
+  "agent": "claude-code",
+  "variant": "native",
+  "status": "failure",
+  "recommendedFiles": [],
+  "filesRead": [
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java",
+      "pathHash": "path:d4de68dc1d485c23",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java",
+      "pathHash": "path:4ec34542cfc58ddc",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/resources/logback.xml",
+      "pathHash": "path:8bed2e6dd2357114",
+      "observedAtMillis": null
+    },
+    {
+      "path": "build.gradle",
+      "pathHash": "path:5708c89825320158",
+      "observedAtMillis": null
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "build.gradle",
+      "pathHash": "path:5708c89825320158",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java",
+      "pathHash": "path:d4de68dc1d485c23",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java",
+      "pathHash": "path:4ec34542cfc58ddc",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/resources/logback.xml",
+      "pathHash": "path:8bed2e6dd2357114",
+      "observedAtMillis": null
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:e57bd0c7eae49943",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpToolsTest.java"
+      ],
+      "exitStatus": 1,
+      "elapsedMillis": 12828
+    }
+  ],
+  "toolCallCount": 10,
+  "tokenEstimate": null,
+  "elapsedMillis": 184977,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

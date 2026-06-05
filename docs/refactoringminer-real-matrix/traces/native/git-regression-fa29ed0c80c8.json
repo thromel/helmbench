@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-fa29ed0c80c8",
+  "agent": "claude-code",
+  "variant": "native",
+  "status": "failure",
+  "recommendedFiles": [],
+  "filesRead": [],
+  "filesEdited": [],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:f5b254571f2b1e85",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImplMergeCommitTest.java"
+      ],
+      "exitStatus": 1,
+      "elapsedMillis": 8612
+    }
+  ],
+  "toolCallCount": 2,
+  "tokenEstimate": null,
+  "elapsedMillis": 49602,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

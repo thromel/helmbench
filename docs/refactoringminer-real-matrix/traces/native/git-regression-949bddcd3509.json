@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-949bddcd3509",
+  "agent": "claude-code",
+  "variant": "native",
+  "status": "success",
+  "recommendedFiles": [],
+  "filesRead": [
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java",
+      "pathHash": "path:e67bc752f6705ba3",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java",
+      "pathHash": "path:d4de68dc1d485c23",
+      "observedAtMillis": null
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java",
+      "pathHash": "path:e67bc752f6705ba3",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java",
+      "pathHash": "path:d4de68dc1d485c23",
+      "observedAtMillis": null
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:a7e875156d1f3f1b",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServiceRepositoryTest.java",
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpToolsTest.java"
+      ],
+      "exitStatus": 0,
+      "elapsedMillis": 76778
+    }
+  ],
+  "toolCallCount": 6,
+  "tokenEstimate": null,
+  "elapsedMillis": 354449,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

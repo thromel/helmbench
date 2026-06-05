@@ -102,6 +102,36 @@ Per-task recommendation recall:
 | `rm-cli-command-line-001` | 33.3% |
 | `rm-astdiff-python-001` | 20.0% |
 
+## Real-Agent Matrix Result
+
+HelmBench now includes a verified real-agent matrix over the seeded
+git-regression suite:
+[`docs/refactoringminer-real-matrix/matrix-manifest.json`](refactoringminer-real-matrix/matrix-manifest.json).
+
+This matrix is outcome-ready and source-free, but the quality gate failed. It
+should be read as a diagnostic result: ctxhelm improved recommendation recall,
+but the `ctxhelm_mcp` agent row did not make successful repairs.
+
+| Metric | Native Claude Code | Claude Code + ctxhelm_mcp | Delta |
+| --- | ---: | ---: | ---: |
+| Success | 30.0% | 0.0% | -30.0% |
+| Validation coverage | 30.0% | 0.0% | -30.0% |
+| Recommendation recall | 0.0% | 50.1% | +50.1% |
+| Context precision | 74.2% | 0.0% | -74.2% |
+| Edited-file recall | 60.0% | 0.0% | -60.0% |
+| Irrelevant reads | 7.7% | 0.0% | -7.7% |
+
+Artifacts:
+
+- Benchmark summary:
+  [`docs/refactoringminer-real-matrix/docs/benchmark-summary.md`](refactoringminer-real-matrix/docs/benchmark-summary.md)
+- Quality gate:
+  [`docs/refactoringminer-real-matrix/docs/quality-gate.md`](refactoringminer-real-matrix/docs/quality-gate.md)
+- Privacy report:
+  [`docs/refactoringminer-real-matrix/docs/privacy-report.md`](refactoringminer-real-matrix/docs/privacy-report.md)
+- Static dashboard:
+  [`docs/refactoringminer-real-matrix/docs/dashboard.html`](refactoringminer-real-matrix/docs/dashboard.html)
+
 ## Regenerate
 
 ```bash
@@ -226,11 +256,10 @@ cargo run -- run-matrix \
   --force
 ```
 
-This recommendation proof establishes the public-suite target and source-free
-measurement contract first; `init-public-matrix` is the repeatable bridge from
-that target to real agent outcome evidence. If the success commands already
-pass before any agent changes, treat the matrix as navigation/validation
-behavior evidence, not task-success evidence, until seeded task setup is added.
-Once seeded task setup is present, add `--health-check-success-commands` and
-`--health-require-setup-commands` to `init-public-matrix` so the generated
-matrix config carries the outcome-health preflight forward.
+This recommendation proof established the public-suite target and source-free
+measurement contract first. The seeded git-regression suite then supplied
+outcome-ready task setup, and the checked real-agent matrix now supplies the
+first 10-task public outcome run. The remaining launch-readiness gap is not
+missing infrastructure; it is that the `ctxhelm_mcp` row failed the quality
+gate. The next iteration should harden the ctxhelm-guided adapter/prompt path
+and rerun the same matrix until the public-matrix quality gate passes.

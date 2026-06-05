@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-092c13f035f9",
+  "agent": "claude-code",
+  "variant": "native",
+  "status": "failure",
+  "recommendedFiles": [],
+  "filesRead": [
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/UMLOperationBodyMapper.java",
+      "pathHash": "path:a5e3c4836cffcfb7",
+      "observedAtMillis": null
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/UMLOperationBodyMapper.java",
+      "pathHash": "path:a5e3c4836cffcfb7",
+      "observedAtMillis": null
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:382a226beca45fca",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/test/TestNewDatasetRefactorings.java",
+        "src/test/resources/oracle/tse-dataset/lucene-solr.json"
+      ],
+      "exitStatus": 1,
+      "elapsedMillis": 9674
+    }
+  ],
+  "toolCallCount": 4,
+  "tokenEstimate": null,
+  "elapsedMillis": 90609,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

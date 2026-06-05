@@ -2306,6 +2306,7 @@ fn build_launch_readiness_report(
     let mut verified_matrices = 0usize;
     let mut verified_matching_matrices = 0usize;
     let mut launch_grade_public_matrices = 0usize;
+    let mut matrix_quality_gate_failures = 0usize;
     let mut matrix_suite_mismatches = 0usize;
     let mut matrix_failures = 0usize;
     for path in inputs.matrix_paths {
@@ -2324,11 +2325,14 @@ fn build_launch_readiness_report(
                 } else {
                     matrix_suite_mismatches += 1;
                 }
-                if manifest.suite_evidence_use == SuiteEvidenceUse::OutcomeReady
+                let launch_grade_candidate = manifest.suite_evidence_use
+                    == SuiteEvidenceUse::OutcomeReady
                     && matrix_summary.confidence.task_count >= inputs.min_task_count
-                    && matrix_real_agent_rows >= inputs.min_real_agent_rows
-                {
+                    && matrix_real_agent_rows >= inputs.min_real_agent_rows;
+                if launch_grade_candidate && manifest.quality_gate_passed {
                     launch_grade_public_matrices += 1;
+                } else if launch_grade_candidate {
+                    matrix_quality_gate_failures += 1;
                 }
                 artifacts.push(launch_artifact("matrix", path));
                 artifacts.push(LaunchReadinessArtifact {
@@ -2372,8 +2376,9 @@ fn build_launch_readiness_report(
         },
         "run_matrix".to_string(),
         format!(
-            "{launch_grade_public_matrices} verified outcome-ready real-agent matrix output(s) at {}+ task(s); launch target is {} real-agent row(s)",
-            inputs.min_task_count, inputs.min_real_agent_rows
+            "{launch_grade_public_matrices} verified outcome-ready quality-gated real-agent matrix output(s) at {}+ task(s), {matrix_quality_gate_failures} quality-gate failure(s); launch target is {} real-agent row(s)",
+            inputs.min_task_count,
+            inputs.min_real_agent_rows
         ),
     ));
 
@@ -5793,9 +5798,9 @@ fn build_run_matrix_manifest(
     })?;
     Ok(RunMatrixManifest {
         schema_version: RUN_MATRIX_MANIFEST_SCHEMA_VERSION,
-        suite_path: request.suite_path.display().to_string(),
-        repo_path: request.repo.display().to_string(),
-        out_dir: request.out_dir.display().to_string(),
+        suite_path: source_free_display_path(&request.suite_path),
+        repo_path: source_free_display_path(&request.repo),
+        out_dir: source_free_display_path(&request.out_dir),
         provenance,
         suite_evidence_use: suite_health.evidence_use,
         baseline: run_matrix_manifest_run(
@@ -5828,6 +5833,23 @@ fn build_run_matrix_manifest(
         evidence_bundle_verified,
         privacy: PrivacyStatus::source_free(),
     })
+}
+
+fn source_free_display_path(path: &Path) -> String {
+    if path.is_absolute() {
+        return path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .filter(|name| !name.trim().is_empty())
+            .unwrap_or("<absolute-path>")
+            .to_string();
+    }
+    let display = path.display().to_string();
+    if display.trim().is_empty() {
+        ".".to_string()
+    } else {
+        display
+    }
 }
 
 fn run_matrix_provenance(request: &RunMatrixRequest) -> Result<RunMatrixProvenance> {
@@ -8709,6 +8731,23 @@ mod tests {
     }
 
     #[test]
+    fn source_free_display_path_sanitizes_absolute_paths() {
+        assert_eq!(
+            source_free_display_path(Path::new("/tmp/RefactoringMiner")),
+            "RefactoringMiner"
+        );
+        assert_eq!(
+            source_free_display_path(Path::new("/tmp/refactoringminer-real-matrix")),
+            "refactoringminer-real-matrix"
+        );
+        assert_eq!(
+            source_free_display_path(Path::new("docs/local-smoke-matrix")),
+            "docs/local-smoke-matrix"
+        );
+        assert_eq!(source_free_display_path(Path::new("")), ".");
+    }
+
+    #[test]
     fn claude_command_includes_source_free_event_instructions() {
         let command = claude_adapter_command(
             Path::new("/tmp/helmbench"),
@@ -10950,7 +10989,10 @@ mod tests {
                 root.join("docs/local-smoke-matrix/reports/guided.json"),
             ],
             health_paths: &[root.join("docs/local-smoke-matrix/reports/suite-health.json")],
-            matrix_paths: &[root.join("docs/local-smoke-matrix")],
+            matrix_paths: &[
+                root.join("docs/local-smoke-matrix"),
+                root.join("docs/refactoringminer-real-matrix"),
+            ],
             real_agent_report_paths: &[root.join("reports/claude-real-smoke.json")],
             public_report_paths: &[root.join("reports/refactoringminer-ctxhelm-plan.json")],
             min_task_count: helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS,
@@ -10976,6 +11018,7 @@ mod tests {
         assert!(report.checks.iter().any(|check| {
             check.name == "launch-grade public matrix"
                 && check.status == LaunchReadinessCheckStatus::Warn
+                && check.detail.contains("1 quality-gate failure(s)")
         }));
 
         let json = serde_json::to_string(&report).expect("json");

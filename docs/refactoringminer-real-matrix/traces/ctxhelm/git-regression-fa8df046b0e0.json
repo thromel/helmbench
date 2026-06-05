@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-fa8df046b0e0",
+  "agent": "claude-code",
+  "variant": "ctxhelm_mcp",
+  "status": "failure",
+  "recommendedFiles": [
+    {
+      "path": "src/main/java/gr/uom/java/xmi/JavaFileProcessor.java",
+      "pathHash": "path:1ad9ccbd5a3977f5",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/UMLAbstractClass.java",
+      "pathHash": "path:6f428f5702439819",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/AdvancedAssertionMigrationMatcher.java",
+      "pathHash": "path:8271738968be8f23",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/ReplacementAlgorithm.java",
+      "pathHash": "path:9b00d54dca59bd7a",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/UMLOperationBodyMapper.java",
+      "pathHash": "path:a5e3c4836cffcfb7",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/diff/UMLClassBaseDiff.java",
+      "pathHash": "path:39aad3242f7ce9f3",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/diff/UMLModelDiff.java",
+      "pathHash": "path:fd3283df97b3ab0b",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/astDiff/actions/editscript/ExtendedChawatheScriptGenerator.java",
+      "pathHash": "path:44ef4ba584e83192",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/astDiff/actions/editscript/ExtendedEditScriptGenerator.java",
+      "pathHash": "path:adf90b3d58385b0b",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java",
+      "pathHash": "path:e1d0578ca861a78c",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/astDiff/tests/SpecificCasesTest.java",
+      "pathHash": "path:f3fb8ad8235c0cb0",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImplMergeCommitTest.java",
+      "pathHash": "path:86f909026d875688",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/AdvancedAssertionMigrationTest.java",
+      "pathHash": "path:f048e5ac244506d8",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/ExpectedAnnotationToAssertThrowsTest.java",
+      "pathHash": "path:f952ce479e1e45bf",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/TestAllRefactoringsByCommit.java",
+      "pathHash": "path:3f4c0a896cfb3442",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/TestAllRefactoringsByCommitForPurity.java",
+      "pathHash": "path:eb95b14d030c7de8",
+      "observedAtMillis": 47878
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/TestJavadocDiff.java",
+      "pathHash": "path:f5da18801a729f55",
+      "observedAtMillis": 47879
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/TestStatementMappings.java",
+      "pathHash": "path:e6e93941e0082fd8",
+      "observedAtMillis": 47879
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/TestStatementMappingsJunit4.java",
+      "pathHash": "path:aa4f25fdf184aa44",
+      "observedAtMillis": 47879
+    },
+    {
+      "path": "src/test/resources/commandline/drill-gp-expected.json",
+      "pathHash": "path:e6cd803aef7bc6bf",
+      "observedAtMillis": 47879
+    }
+  ],
+  "filesRead": [],
+  "filesEdited": [],
+  "commands": [
+    {
+      "commandClass": "other",
+      "commandHash": "cmd:5538ef9e8993006d",
+      "touchedTests": [],
+      "exitStatus": 0,
+      "elapsedMillis": null
+    },
+    {
+      "commandClass": "other",
+      "commandHash": "cmd:2128418447ea1c90",
+      "touchedTests": [],
+      "exitStatus": 0,
+      "elapsedMillis": null
+    },
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:f8d18359da0ea9cb",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/test/AdvancedAssertionMigrationTest.java"
+      ],
+      "exitStatus": 1,
+      "elapsedMillis": 10224
+    }
+  ],
+  "toolCallCount": 25,
+  "tokenEstimate": 2586,
+  "elapsedMillis": 95875,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

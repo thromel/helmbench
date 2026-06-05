@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "suiteName": "refactoringminer-git-regressions",
+  "passed": false,
+  "warnings": [],
+  "checks": [
+    {
+      "headAgent": "all",
+      "headVariant": "other",
+      "metric": "task_count",
+      "operator": ">=",
+      "actual": 10.0,
+      "threshold": 10.0,
+      "passed": true
+    },
+    {
+      "headAgent": "claude-code",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "success_rate_delta",
+      "operator": ">=",
+      "actual": -0.30000001192092896,
+      "threshold": 0.0,
+      "passed": false
+    },
+    {
+      "headAgent": "claude-code",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "validation_coverage_rate_delta",
+      "operator": ">=",
+      "actual": -0.30000001192092896,
+      "threshold": 0.0,
+      "passed": false
+    },
+    {
+      "headAgent": "claude-code",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "irrelevant_read_rate_delta",
+      "operator": "<=",
+      "actual": -0.07692307978868484,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "claude-code",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "recommendation_recall_delta",
+      "operator": ">=",
+      "actual": 0.5008333921432495,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "claude-code",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "context_precision_delta",
+      "operator": ">=",
+      "actual": -0.7416666746139526,
+      "threshold": 0.0,
+      "passed": false
+    },
+    {
+      "headAgent": "claude-code",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "edited_file_recall_delta",
+      "operator": ">=",
+      "actual": -0.5995238423347473,
+      "threshold": 0.0,
+      "passed": false
+    }
+  ],
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

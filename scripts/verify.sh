@@ -33,6 +33,10 @@ test -f docs/launch-proof.md
 test -f docs/launch-readiness.md
 test -f docs/local-smoke-matrix/matrix-manifest.json
 test -f docs/local-smoke-matrix/evidence/manifest.json
+test -f docs/refactoringminer-real-matrix/matrix-manifest.json
+test -f docs/refactoringminer-real-matrix/evidence/manifest.json
+test -f docs/refactoringminer-real-matrix/docs/benchmark-summary.md
+test -f docs/refactoringminer-real-matrix/docs/quality-gate.md
 test -f docs/example-benchmark-summary.md
 test -f docs/refactoringminer-public-proof.md
 test -f docs/refactoringminer-ctxhelm-plan.md
@@ -59,9 +63,13 @@ grep -q 'real-agent evidence | `pass`' docs/launch-readiness.md
 grep -q 'outcome-health evidence | `pass`' docs/launch-readiness.md
 grep -q 'verified run matrix | `pass`' docs/launch-readiness.md
 grep -q 'launch-grade public matrix | `warn`' docs/launch-readiness.md
-grep -q 'verified outcome-ready real-agent matrix output' docs/launch-readiness.md
+grep -q 'verified outcome-ready quality-gated real-agent matrix output' docs/launch-readiness.md
+grep -q '1 quality-gate failure(s)' docs/launch-readiness.md
 grep -q '"suiteEvidenceUse": "outcome_ready"' docs/local-smoke-matrix/matrix-manifest.json
 grep -q '"evidenceUse": "outcome_ready"' docs/local-smoke-matrix/evidence/manifest.json
+grep -q '"suiteEvidenceUse": "outcome_ready"' docs/refactoringminer-real-matrix/matrix-manifest.json
+grep -q '"qualityGatePassed": false' docs/refactoringminer-real-matrix/matrix-manifest.json
+grep -q 'Status: \*\*failed\*\*' docs/refactoringminer-real-matrix/docs/quality-gate.md
 grep -q 'claude-real-smoke' docs/launch-proof.md
 grep -q 'claude-real-smoke' docs/direct-agent-runs.md
 grep -q 'Low sample size: 1 task' docs/example-benchmark-summary.md
@@ -115,6 +123,8 @@ grep -q '"directRunners"' "$TMP_DIR/doctor.json"
 
 cargo run -- verify-matrix \
   --matrix docs/local-smoke-matrix
+cargo run -- verify-matrix \
+  --matrix docs/refactoringminer-real-matrix
 
 cargo run -- schema --kind task-suite --out "$TMP_DIR/task-suite.schema.json"
 cargo run -- schema --kind agent-trace --out "$TMP_DIR/agent-trace.schema.json"
@@ -414,6 +424,7 @@ cargo run -- launch-readiness \
   --head-report docs/local-smoke-matrix/reports/guided.json \
   --health docs/local-smoke-matrix/reports/suite-health.json \
   --matrix docs/local-smoke-matrix \
+  --matrix docs/refactoringminer-real-matrix \
   --real-agent-report reports/claude-real-smoke.json \
   --public-report reports/refactoringminer-ctxhelm-plan.json \
   --out "$TMP_DIR/launch-readiness.md" \
@@ -426,6 +437,7 @@ cargo run -- launch-readiness \
   --head-report docs/local-smoke-matrix/reports/guided.json \
   --health docs/local-smoke-matrix/reports/suite-health.json \
   --matrix docs/local-smoke-matrix \
+  --matrix docs/refactoringminer-real-matrix \
   --real-agent-report reports/claude-real-smoke.json \
   --public-report reports/refactoringminer-ctxhelm-plan.json \
   --out "$TMP_DIR/launch-readiness.json" \
@@ -436,7 +448,8 @@ grep -q 'real-agent evidence | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'outcome-health evidence | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'verified run matrix | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'launch-grade public matrix | `warn`' "$TMP_DIR/launch-readiness.md"
-grep -q 'verified outcome-ready real-agent matrix output' "$TMP_DIR/launch-readiness.md"
+grep -q 'verified outcome-ready quality-gated real-agent matrix output' "$TMP_DIR/launch-readiness.md"
+grep -q '1 quality-gate failure(s)' "$TMP_DIR/launch-readiness.md"
 grep -q '"status": "smoke_proof"' "$TMP_DIR/launch-readiness.json"
 grep -q '"realAgentReportCount": 1' "$TMP_DIR/launch-readiness.json"
 grep -q '"publicReportCount": 1' "$TMP_DIR/launch-readiness.json"

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "baseAgent": "claude-code",
+  "baseVariant": "native",
+  "headAgent": "claude-code",
+  "headVariant": "ctxhelm_mcp",
+  "taskCountDelta": 0,
+  "successRateDelta": -0.3,
+  "irrelevantReadRateDelta": -0.07692308,
+  "averageRecommendationPrecisionDelta": 0.14,
+  "averageRecommendationRecallDelta": 0.5008334,
+  "averageContextPrecisionDelta": -0.7416667,
+  "averageEditedFileRecallDelta": -0.59952384,
+  "validationCoverageRateDelta": -0.3,
+  "totalToolCallsDelta": 182,
+  "totalTokenEstimateDelta": 26587,
+  "toolCallsPerSuccessDelta": null,
+  "tokenEstimatePerSuccessDelta": null
+}

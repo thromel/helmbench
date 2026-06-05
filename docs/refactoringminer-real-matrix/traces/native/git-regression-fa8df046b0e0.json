@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-fa8df046b0e0",
+  "agent": "claude-code",
+  "variant": "native",
+  "status": "failure",
+  "recommendedFiles": [],
+  "filesRead": [
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/ReplacementAlgorithm.java",
+      "pathHash": "path:9b00d54dca59bd7a",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/UMLOperationBodyMapper.java",
+      "pathHash": "path:a5e3c4836cffcfb7",
+      "observedAtMillis": null
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/ReplacementAlgorithm.java",
+      "pathHash": "path:9b00d54dca59bd7a",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/gr/uom/java/xmi/decomposition/UMLOperationBodyMapper.java",
+      "pathHash": "path:a5e3c4836cffcfb7",
+      "observedAtMillis": null
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:f8d18359da0ea9cb",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/test/AdvancedAssertionMigrationTest.java"
+      ],
+      "exitStatus": 1,
+      "elapsedMillis": 9667
+    }
+  ],
+  "toolCallCount": 6,
+  "tokenEstimate": null,
+  "elapsedMillis": 80921,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

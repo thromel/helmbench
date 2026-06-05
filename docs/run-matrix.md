@@ -291,11 +291,13 @@ path for real Claude/Codex matrices because they inject the source-free
 ```
 
 `matrix-manifest.json` is the top-level source-free run identity. It records the
-suite path, repo path, baseline/head run labels, relative report, trace,
-autopsy, and comparison paths, suite-health artifact, key artifact paths,
-artifact byte counts/content hashes, quality-gate status, evidence-bundle
-verification status, `suiteEvidenceUse`, source-free privacy-report paths,
-privacy flags, and reproducibility provenance.
+source-free suite/repo/output display identity, baseline/head run labels,
+relative report, trace, autopsy, and comparison paths, suite-health artifact,
+key artifact paths, artifact byte counts/content hashes, quality-gate status,
+evidence-bundle verification status, `suiteEvidenceUse`, source-free
+privacy-report paths, privacy flags, and reproducibility provenance. Absolute
+local suite, repo, and output paths are reduced to display basenames before
+they are written to the manifest.
 
 The provenance block includes the HelmBench version, suite content hash, repo
 HEAD, dirty-checkout flag, setup-command count, and setup-command hashes. Each

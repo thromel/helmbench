@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-1b9f2cf08b3c",
+  "agent": "claude-code",
+  "variant": "ctxhelm_mcp",
+  "status": "failure",
+  "recommendedFiles": [
+    {
+      "path": "documentation/mcp.md",
+      "pathHash": "path:f7f3f1a2702e7051",
+      "observedAtMillis": 51000
+    },
+    {
+      "path": "src/main/java/gui/webdiff/DiffDriver.java",
+      "pathHash": "path:6f77cb97642a5544",
+      "observedAtMillis": 51000
+    },
+    {
+      "path": "src/main/java/gui/webdiff/WebDiff.java",
+      "pathHash": "path:3afc28c49da35a56",
+      "observedAtMillis": 51000
+    },
+    {
+      "path": "src/main/java/gui/webdiff/dir/DirectoryDiffView.java",
+      "pathHash": "path:6392c1f1191f0a06",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/main/java/gui/webdiff/export/WebExporter.java",
+      "pathHash": "path:d8ec1b6b74acc22d",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/McpDiffBrowserResult.java",
+      "pathHash": "path:a7bed44a64244429",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java",
+      "pathHash": "path:e67bc752f6705ba3",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java",
+      "pathHash": "path:d4de68dc1d485c23",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java",
+      "pathHash": "path:4ec34542cfc58ddc",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImpl.java",
+      "pathHash": "path:e1d0578ca861a78c",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/mcp/McpIntentValidatorTest.java",
+      "pathHash": "path:de95223bfb6cc7b4",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/mcp/McpValidationContractTest.java",
+      "pathHash": "path:88e09dd1f7094acb",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServerStartupTest.java",
+      "pathHash": "path:c6b96996ffeb409b",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServiceRepositoryTest.java",
+      "pathHash": "path:1c383397332b0a4a",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpServiceTest.java",
+      "pathHash": "path:ecb5971d9f1b9e46",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpToolsTest.java",
+      "pathHash": "path:944f6c2020702566",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/mcp/WebDiffBrowserLauncherTest.java",
+      "pathHash": "path:0b90981b0ff18f39",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/mcp/WorktreeChangeCollectorTest.java",
+      "pathHash": "path:9a681b281ba9f3c4",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/rm1/GitHistoryRefactoringMinerImplMergeCommitTest.java",
+      "pathHash": "path:86f909026d875688",
+      "observedAtMillis": 51001
+    },
+    {
+      "path": "src/test/java/org/refactoringminer/test/TestStatementMappings.java",
+      "pathHash": "path:e6e93941e0082fd8",
+      "observedAtMillis": 51001
+    }
+  ],
+  "filesRead": [],
+  "filesEdited": [],
+  "commands": [
+    {
+      "commandClass": "other",
+      "commandHash": "cmd:5538ef9e8993006d",
+      "touchedTests": [],
+      "exitStatus": 0,
+      "elapsedMillis": null
+    },
+    {
+      "commandClass": "other",
+      "commandHash": "cmd:2128418447ea1c90",
+      "touchedTests": [],
+      "exitStatus": 0,
+      "elapsedMillis": null
+    },
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:fbafca0b02f53e64",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpToolsTest.java",
+        "src/test/java/org/refactoringminer/mcp/WebDiffBrowserLauncherTest.java"
+      ],
+      "exitStatus": 1,
+      "elapsedMillis": 11799
+    }
+  ],
+  "toolCallCount": 25,
+  "tokenEstimate": 2832,
+  "elapsedMillis": 106867,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

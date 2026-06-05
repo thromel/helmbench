@@ -1,0 +1,85 @@
+{
+  "schemaVersion": 1,
+  "taskId": "git-regression-1b9f2cf08b3c",
+  "agent": "claude-code",
+  "variant": "native",
+  "status": "failure",
+  "recommendedFiles": [],
+  "filesRead": [
+    {
+      "path": "src/main/java/gui/webdiff/WebDiff.java",
+      "pathHash": "path:3afc28c49da35a56",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java",
+      "pathHash": "path:e67bc752f6705ba3",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java",
+      "pathHash": "path:d4de68dc1d485c23",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java",
+      "pathHash": "path:4ec34542cfc58ddc",
+      "observedAtMillis": null
+    },
+    {
+      "path": "documentation/mcp.md",
+      "pathHash": "path:f7f3f1a2702e7051",
+      "observedAtMillis": null
+    }
+  ],
+  "filesEdited": [
+    {
+      "path": "documentation/mcp.md",
+      "pathHash": "path:f7f3f1a2702e7051",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/gui/webdiff/WebDiff.java",
+      "pathHash": "path:3afc28c49da35a56",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpService.java",
+      "pathHash": "path:e67bc752f6705ba3",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/RefactoringMinerMcpTools.java",
+      "pathHash": "path:d4de68dc1d485c23",
+      "observedAtMillis": null
+    },
+    {
+      "path": "src/main/java/org/refactoringminer/mcp/WebDiffBrowserLauncher.java",
+      "pathHash": "path:4ec34542cfc58ddc",
+      "observedAtMillis": null
+    }
+  ],
+  "commands": [
+    {
+      "commandClass": "test",
+      "commandHash": "cmd:fbafca0b02f53e64",
+      "touchedTests": [
+        "src/test/java/org/refactoringminer/mcp/RefactoringMinerMcpToolsTest.java",
+        "src/test/java/org/refactoringminer/mcp/WebDiffBrowserLauncherTest.java"
+      ],
+      "exitStatus": 1,
+      "elapsedMillis": 10329
+    }
+  ],
+  "toolCallCount": 12,
+  "tokenEstimate": null,
+  "elapsedMillis": 382317,
+  "timeToFirstRelevantFileMillis": null,
+  "privacy": {
+    "sourceFree": true,
+    "rawSourceLogged": false,
+    "rawPromptLogged": false,
+    "rawTranscriptLogged": false,
+    "rawTerminalLogged": false
+  }
+}

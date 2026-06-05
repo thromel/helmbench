@@ -29,8 +29,8 @@ Status: **smoke_proof**
 | public benchmark coverage | `pass` | 1 outcome task(s), 10 public recommendation task(s); launch target is 10 |
 | real-agent evidence | `pass` | 0 matching real-agent matrix row(s), 1 matching real-agent report(s), 0 suite mismatch(es), 0 non-real-agent report(s); launch target is 1 |
 | outcome-health evidence | `pass` | matching suite-health evidenceUse: outcome_ready |
-| verified run matrix | `pass` | 1 matching verified matrix output(s), 0 suite mismatch(es), 0 failure(s) |
-| launch-grade public matrix | `warn` | 0 verified outcome-ready real-agent matrix output(s) at 10+ task(s); launch target is 1 real-agent row(s) |
+| verified run matrix | `pass` | 1 matching verified matrix output(s), 1 suite mismatch(es), 0 failure(s) |
+| launch-grade public matrix | `warn` | 0 verified outcome-ready quality-gated real-agent matrix output(s) at 10+ task(s), 1 quality-gate failure(s); launch target is 1 real-agent row(s) |
 | privacy boundary | `pass` | artifacts store paths, counts, statuses, hashes, and source-free flags only |
 
 ## Artifacts
@@ -45,6 +45,8 @@ Status: **smoke_proof**
 | `public_report` | `public_report:a5dde3393a65557c` | yes |
 | `health` | `health:7de86413dc8bde4c` | yes |
 | `matrix` | `matrix:2b1d7fc8d4c043a4` | yes |
+| `matrix_evidence_use` | `outcome_ready` | yes |
+| `matrix` | `matrix:bdd084df0c428319` | yes |
 | `matrix_evidence_use` | `outcome_ready` | yes |
 
 ## Privacy
