@@ -79,6 +79,9 @@ grep -q '"evidenceUse": "outcome_ready"' docs/local-smoke-matrix/evidence/manife
 grep -q '"suiteEvidenceUse": "outcome_ready"' docs/refactoringminer-real-matrix/matrix-manifest.json
 grep -q '"qualityGatePassed": false' docs/refactoringminer-real-matrix/matrix-manifest.json
 grep -q 'Status: \*\*failed\*\*' docs/refactoringminer-real-matrix/docs/quality-gate.md
+grep -q 'Claude Matrix Rerun' docs/refactoringminer-real-matrix/docs/reproduction.md
+grep -q 'REFMINER_REPO' docs/refactoringminer-real-matrix/docs/reproduction.md
+grep -q 'Do not commit the generated matrix config' docs/refactoringminer-real-matrix/docs/reproduction.md
 grep -q 'Rec follow-through' docs/refactoringminer-real-matrix/docs/benchmark-summary.md
 grep -q 'Ignored recommendations' docs/refactoringminer-real-matrix/docs/benchmark-summary.md
 grep -q 'recommendation_follow_through' docs/refactoringminer-real-matrix/docs/quality-gate.md

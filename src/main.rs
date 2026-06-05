@@ -6541,6 +6541,40 @@ fn render_markdown_matrix_reproduction(manifest: &RunMatrixManifest) -> String {
     out.push_str("- Recreate adapter/setup commands from local configuration; HelmBench stores only hashes for privacy.\n");
     out.push_str("- Compare a new run with the published matrix using `helmbench matrix-history --matrix <old-matrix-dir> --matrix <new-matrix-dir> --out <history.md>`.\n\n");
 
+    out.push_str("## Claude Matrix Rerun\n\n");
+    out.push_str("Use local paths through environment variables so the command history and checked docs remain source-free:\n\n");
+    out.push_str("```bash\n");
+    out.push_str("export REFMINER_REPO=<path-to-refactoringminer-checkout>\n");
+    out.push_str("export HELMBENCH_MATRIX_OUT=/tmp/refactoringminer-claude-matrix\n\n");
+    out.push_str(&format!(
+        "git -C \"$REFMINER_REPO\" checkout {}\n",
+        manifest
+            .provenance
+            .repo_head
+            .as_deref()
+            .unwrap_or("<recorded-repo-head>")
+    ));
+    out.push_str("git -C \"$REFMINER_REPO\" status --short\n\n");
+    out.push_str("helmbench init-agent-matrix \\\n");
+    out.push_str(&format!("  --suite {} \\\n", manifest.suite_path));
+    out.push_str("  --repo \"$REFMINER_REPO\" \\\n");
+    out.push_str("  --out /tmp/refactoringminer-claude-matrix.json \\\n");
+    out.push_str("  --out-dir \"$HELMBENCH_MATRIX_OUT\" \\\n");
+    out.push_str("  --health-out /tmp/refactoringminer-claude-health.json \\\n");
+    out.push_str("  --agent-preset claude-code \\\n");
+    out.push_str("  --ctxhelm-bin ctxhelm \\\n");
+    out.push_str("  --pack \\\n");
+    out.push_str("  --dangerously-skip-permissions \\\n");
+    out.push_str("  --health-min-commits 1 \\\n");
+    out.push_str("  --force\n\n");
+    out.push_str("helmbench validate-matrix --config /tmp/refactoringminer-claude-matrix.json\n");
+    out.push_str(
+        "helmbench run-matrix --config /tmp/refactoringminer-claude-matrix.json --force\n",
+    );
+    out.push_str("helmbench verify-matrix --matrix \"$HELMBENCH_MATRIX_OUT\"\n");
+    out.push_str("```\n\n");
+    out.push_str("Do not commit the generated matrix config because it contains local filesystem paths. Commit only source-free reports, traces, manifests, dashboards, and evidence bundles produced under the matrix output directory after review.\n\n");
+
     out.push_str("## Privacy\n\n");
     out.push_str("- Source-free: `true`\n");
     out.push_str("- Raw source logged: `false`\n");
@@ -10151,6 +10185,10 @@ mod tests {
         assert!(reproduction.contains("docs/compare-guided.md"));
         assert!(reproduction.contains("reports/privacy-report.json"));
         assert!(reproduction.contains("docs/privacy-report.md"));
+        assert!(reproduction.contains("## Claude Matrix Rerun"));
+        assert!(reproduction.contains("REFMINER_REPO"));
+        assert!(reproduction.contains("helmbench init-agent-matrix"));
+        assert!(reproduction.contains("Do not commit the generated matrix config"));
         assert!(reproduction.contains(&command_hash(&adapter_command)));
         assert!(!reproduction.contains(adapter.to_string_lossy().as_ref()));
 

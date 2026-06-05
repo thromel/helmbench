@@ -48,6 +48,37 @@ helmbench verify-bundle --bundle <matrix-dir>/evidence
 - Recreate adapter/setup commands from local configuration; HelmBench stores only hashes for privacy.
 - Compare a new run with the published matrix using `helmbench matrix-history --matrix <old-matrix-dir> --matrix <new-matrix-dir> --out <history.md>`.
 
+## Claude Matrix Rerun
+
+Use local paths through environment variables so the command history and checked docs remain source-free:
+
+```bash
+export REFMINER_REPO=<path-to-refactoringminer-checkout>
+export HELMBENCH_MATRIX_OUT=/tmp/refactoringminer-claude-matrix
+
+git -C "$REFMINER_REPO" checkout 949bddcd3509a805f5e3bcc55fcdb71a691b0dac
+git -C "$REFMINER_REPO" status --short
+
+helmbench init-agent-matrix \
+  --suite suites/refactoring-miner-git-regressions.json \
+  --repo "$REFMINER_REPO" \
+  --out /tmp/refactoringminer-claude-matrix.json \
+  --out-dir "$HELMBENCH_MATRIX_OUT" \
+  --health-out /tmp/refactoringminer-claude-health.json \
+  --agent-preset claude-code \
+  --ctxhelm-bin ctxhelm \
+  --pack \
+  --dangerously-skip-permissions \
+  --health-min-commits 1 \
+  --force
+
+helmbench validate-matrix --config /tmp/refactoringminer-claude-matrix.json
+helmbench run-matrix --config /tmp/refactoringminer-claude-matrix.json --force
+helmbench verify-matrix --matrix "$HELMBENCH_MATRIX_OUT"
+```
+
+Do not commit the generated matrix config because it contains local filesystem paths. Commit only source-free reports, traces, manifests, dashboards, and evidence bundles produced under the matrix output directory after review.
+
 ## Privacy
 
 - Source-free: `true`
