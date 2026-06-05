@@ -115,11 +115,14 @@ cargo run -- quality-gate --help >/dev/null
 cargo run -- autopsy --help >/dev/null
 cargo run -- diff-autopsy --help >/dev/null
 cargo run -- dashboard --help >/dev/null
+cargo run -- doctor --help | grep -q -- '--check-direct-runners'
 cargo run -- doctor --repo . >/dev/null
 cargo run -- doctor --repo . --format json --out "$TMP_DIR/doctor.json"
 grep -q '"ok": true' "$TMP_DIR/doctor.json"
 grep -q '"sourceFree": true' "$TMP_DIR/doctor.json"
 grep -q '"directRunners"' "$TMP_DIR/doctor.json"
+grep -q '"runtimePreflight"' "$TMP_DIR/doctor.json"
+grep -q '"checked": false' "$TMP_DIR/doctor.json"
 
 cargo run -- verify-matrix \
   --matrix docs/local-smoke-matrix
@@ -165,6 +168,7 @@ grep -q '"healthFailFastSuccessCommands"' "$TMP_DIR/run-matrix-config.schema.jso
 grep -q '"healthRequireSetupCommands"' "$TMP_DIR/run-matrix-config.schema.json"
 grep -q '"title": "HelmBench Matrix History"' "$TMP_DIR/matrix-history.schema.json"
 grep -q '"title": "HelmBench Doctor Report"' "$TMP_DIR/doctor-report.schema.json"
+grep -q '"runtimePreflight"' "$TMP_DIR/doctor-report.schema.json"
 grep -q '"title": "HelmBench Autopsy"' "$TMP_DIR/autopsy.schema.json"
 grep -q '"title": "HelmBench Diff Autopsy"' "$TMP_DIR/diff-autopsy.schema.json"
 grep -q '"title": "HelmBench Suite Health"' "$TMP_DIR/suite-health.schema.json"

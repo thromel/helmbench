@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": 1
+      "const": 2
     },
     "repoName": {
       "type": "string",
@@ -121,6 +121,7 @@
         "name",
         "command",
         "available",
+        "runtimePreflight",
         "isolatedClones",
         "injectsSourceFreeEventContract",
         "captureStreamSupported",
@@ -139,6 +140,9 @@
         "available": {
           "type": "boolean"
         },
+        "runtimePreflight": {
+          "$ref": "#/$defs/runtimePreflight"
+        },
         "isolatedClones": {
           "const": true
         },
@@ -153,6 +157,37 @@
         },
         "unrestrictedFlag": {
           "type": ["string", "null"]
+        }
+      }
+    },
+    "runtimePreflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["checked", "ok", "exitStatus", "outputHash", "elapsedMillis"],
+      "properties": {
+        "checked": {
+          "type": "boolean"
+        },
+        "ok": {
+          "type": ["boolean", "null"]
+        },
+        "exitStatus": {
+          "type": ["integer", "null"]
+        },
+        "outputHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^output:[0-9a-f]{16}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "elapsedMillis": {
+          "type": ["integer", "null"],
+          "minimum": 0
         }
       }
     },

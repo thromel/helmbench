@@ -32,6 +32,19 @@ The report includes required HelmBench checks, optional `ctxhelm`/Claude/Codex
 availability, direct-runner readiness, observation modes, and privacy flags. It
 stores version hashes, not raw version strings.
 
+To catch runtime issues such as an expired Claude/Codex session before a matrix
+run, add `--check-direct-runners`. HelmBench runs bounded non-interactive smoke
+checks and stores only source-free status metadata: exit status, elapsed time,
+and an output hash.
+
+```bash
+helmbench doctor \
+  --repo . \
+  --check-direct-runners \
+  --format json \
+  --out /tmp/helmbench-doctor-runtime.json
+```
+
 ## Claude Code
 
 ```bash

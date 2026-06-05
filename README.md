@@ -167,7 +167,10 @@ cargo run -- doctor \
 
 The JSON doctor report is source-free. It records required checks, optional
 `ctxhelm`/Claude/Codex availability, direct-runner readiness, supported
-observation modes, and privacy flags without storing raw version strings.
+observation modes, and privacy flags without storing raw version strings. Add
+`--check-direct-runners` when you want HelmBench to run bounded, source-free
+non-interactive smoke checks for Claude/Codex and store only exit status,
+elapsed time, and output hashes.
 
 Install from source:
 
@@ -553,6 +556,7 @@ Run direct agent presets:
 
 ```bash
 cargo run -- doctor --repo . --format json --out /tmp/helmbench-doctor.json
+cargo run -- doctor --repo . --check-direct-runners --format json --out /tmp/helmbench-doctor-runtime.json
 
 cargo run -- claude-run \
   --suite suites/local-run-smoke.json \

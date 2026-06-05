@@ -23,7 +23,7 @@ const RUN_MATRIX_PRIVACY_REPORT_SCHEMA_VERSION: u32 = 1;
 const MATRIX_HISTORY_SCHEMA_VERSION: u32 = 2;
 const SUITE_HEALTH_SCHEMA_VERSION: u32 = 1;
 const EVIDENCE_BUNDLE_SCHEMA_VERSION: u32 = 1;
-const DOCTOR_REPORT_SCHEMA_VERSION: u32 = 1;
+const DOCTOR_REPORT_SCHEMA_VERSION: u32 = 2;
 const LAUNCH_READINESS_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Parser)]
@@ -648,6 +648,9 @@ enum Command {
     Doctor {
         #[arg(long)]
         repo: Option<PathBuf>,
+        /// Run source-free non-interactive smoke checks for direct agent CLIs.
+        #[arg(long)]
+        check_direct_runners: bool,
         #[arg(long, value_enum, default_value_t = OutputFormat::Markdown)]
         format: OutputFormat,
         #[arg(long)]
@@ -1670,9 +1673,14 @@ fn main() -> Result<()> {
             write_text(&rendered, &out)?;
             println!("wrote {}", out.display());
         }
-        Command::Doctor { repo, format, out } => {
+        Command::Doctor {
+            repo,
+            check_direct_runners,
+            format,
+            out,
+        } => {
             let root = project_root_for_cli(repo)?;
-            write_doctor_report(&root, format, out.as_ref())?;
+            write_doctor_report(&root, check_direct_runners, format, out.as_ref())?;
         }
     }
     Ok(())
@@ -1766,11 +1774,16 @@ fn write_all_schema_contracts(out_dir: &Path) -> Result<()> {
 
 #[cfg(test)]
 fn run_doctor(root: &Path) -> Result<()> {
-    write_doctor_report(root, OutputFormat::Markdown, None)
+    write_doctor_report(root, false, OutputFormat::Markdown, None)
 }
 
-fn write_doctor_report(root: &Path, format: OutputFormat, out: Option<&PathBuf>) -> Result<()> {
-    let report = build_doctor_report(root);
+fn write_doctor_report(
+    root: &Path,
+    check_direct_runners: bool,
+    format: OutputFormat,
+    out: Option<&PathBuf>,
+) -> Result<()> {
+    let report = build_doctor_report(root, check_direct_runners);
     let rendered = match format {
         OutputFormat::Json => serde_json::to_string_pretty(&report)?,
         OutputFormat::Markdown => render_markdown_doctor_report(root, &report),
@@ -1825,11 +1838,22 @@ struct DoctorDirectRunner {
     name: String,
     command: String,
     available: bool,
+    runtime_preflight: DoctorRuntimePreflight,
     isolated_clones: bool,
     injects_source_free_event_contract: bool,
     capture_stream_supported: bool,
     suppresses_raw_output_by_default: bool,
     unrestricted_flag: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DoctorRuntimePreflight {
+    checked: bool,
+    ok: Option<bool>,
+    exit_status: Option<i32>,
+    output_hash: Option<String>,
+    elapsed_millis: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1841,7 +1865,7 @@ struct DoctorObservationMode {
     description: String,
 }
 
-fn build_doctor_report(root: &Path) -> DoctorReport {
+fn build_doctor_report(root: &Path, check_direct_runners: bool) -> DoctorReport {
     let required_checks = vec![
         doctor_check("git available", command_available("git")),
         doctor_check("cargo available", command_available("cargo")),
@@ -1878,11 +1902,19 @@ fn build_doctor_report(root: &Path) -> DoctorReport {
         doctor_integration("codex", "codex"),
     ];
     let direct_runners = vec![
-        doctor_direct_runner("claude-run", "claude", "--dangerously-skip-permissions"),
         doctor_direct_runner(
+            root,
+            "claude-run",
+            "claude",
+            "--dangerously-skip-permissions",
+            check_direct_runners,
+        ),
+        doctor_direct_runner(
+            root,
             "codex-run",
             "codex",
             "--dangerously-bypass-approvals-and-sandbox",
+            check_direct_runners,
         ),
     ];
     let observation_modes = vec![
@@ -1951,16 +1983,91 @@ fn doctor_integration(name: &str, command: &str) -> DoctorIntegration {
     }
 }
 
-fn doctor_direct_runner(name: &str, command: &str, unrestricted_flag: &str) -> DoctorDirectRunner {
+fn doctor_direct_runner(
+    root: &Path,
+    name: &str,
+    command: &str,
+    unrestricted_flag: &str,
+    check_runtime: bool,
+) -> DoctorDirectRunner {
     DoctorDirectRunner {
         name: name.to_string(),
         command: command.to_string(),
         available: command_available(command),
+        runtime_preflight: doctor_runtime_preflight(root, command, check_runtime),
         isolated_clones: true,
         injects_source_free_event_contract: true,
         capture_stream_supported: true,
         suppresses_raw_output_by_default: true,
         unrestricted_flag: Some(unrestricted_flag.to_string()),
+    }
+}
+
+fn doctor_runtime_preflight(
+    root: &Path,
+    command: &str,
+    check_runtime: bool,
+) -> DoctorRuntimePreflight {
+    if !check_runtime {
+        return DoctorRuntimePreflight {
+            checked: false,
+            ok: None,
+            exit_status: None,
+            output_hash: None,
+            elapsed_millis: None,
+        };
+    }
+    if !command_available(command) {
+        return DoctorRuntimePreflight {
+            checked: true,
+            ok: Some(false),
+            exit_status: None,
+            output_hash: None,
+            elapsed_millis: None,
+        };
+    }
+
+    let command_line = match command {
+        "claude" => format!(
+            "{} --print --no-session-persistence --dangerously-skip-permissions {}",
+            shell_escape(command),
+            shell_escape("Return only ok.")
+        ),
+        "codex" => format!(
+            "{} exec --full-auto --cd {} {}",
+            shell_escape(command),
+            shell_escape(&root.display().to_string()),
+            shell_escape("Return only ok.")
+        ),
+        _ => return unknown_runtime_preflight(),
+    };
+
+    match run_shell_capture_stdout(&command_line, root, &[], Some(45)) {
+        Ok(result) => DoctorRuntimePreflight {
+            checked: true,
+            ok: Some(result.success && !result.stdout_truncated),
+            exit_status: result.exit_status,
+            output_hash: (!result.stdout.is_empty())
+                .then(|| source_free_hash("output", &result.stdout)),
+            elapsed_millis: Some(result.elapsed_millis),
+        },
+        Err(_) => DoctorRuntimePreflight {
+            checked: true,
+            ok: Some(false),
+            exit_status: None,
+            output_hash: None,
+            elapsed_millis: None,
+        },
+    }
+}
+
+fn unknown_runtime_preflight() -> DoctorRuntimePreflight {
+    DoctorRuntimePreflight {
+        checked: true,
+        ok: Some(false),
+        exit_status: None,
+        output_hash: None,
+        elapsed_millis: None,
     }
 }
 
@@ -1998,14 +2105,15 @@ fn render_markdown_doctor_report(root: &Path, report: &DoctorReport) -> String {
     }
 
     out.push_str("\n## Direct Runner Readiness\n\n");
-    out.push_str("| Runner | Command | Available | Event contract | Capture stream | Raw output suppressed | Isolated clones |\n");
-    out.push_str("| --- | --- | --- | --- | --- | --- | --- |\n");
+    out.push_str("| Runner | Command | Available | Runtime preflight | Event contract | Capture stream | Raw output suppressed | Isolated clones |\n");
+    out.push_str("| --- | --- | --- | --- | --- | --- | --- | --- |\n");
     for runner in &report.direct_runners {
         out.push_str(&format!(
-            "| `{}` | `{}` | {} | {} | {} | {} | {} |\n",
+            "| `{}` | `{}` | {} | {} | {} | {} | {} | {} |\n",
             runner.name,
             runner.command,
             yes_no(runner.available),
+            doctor_preflight_label(&runner.runtime_preflight),
             yes_no(runner.injects_source_free_event_contract),
             yes_no(runner.capture_stream_supported),
             yes_no(runner.suppresses_raw_output_by_default),
@@ -2036,6 +2144,16 @@ fn render_markdown_doctor_report(root: &Path, report: &DoctorReport) -> String {
     out.push_str("- Raw transcripts logged: `false`\n");
     out.push_str("- Raw terminal logs logged: `false`\n");
     out
+}
+
+fn doctor_preflight_label(preflight: &DoctorRuntimePreflight) -> &'static str {
+    if !preflight.checked {
+        "not checked"
+    } else if preflight.ok == Some(true) {
+        "ok"
+    } else {
+        "warn"
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -10991,10 +11109,10 @@ mod tests {
 
     #[test]
     fn doctor_report_describes_direct_runner_readiness_source_free() {
-        let report = build_doctor_report(Path::new(env!("CARGO_MANIFEST_DIR")));
+        let report = build_doctor_report(Path::new(env!("CARGO_MANIFEST_DIR")), false);
 
         assert!(report.ok);
-        assert_eq!(report.schema_version, 1);
+        assert_eq!(report.schema_version, DOCTOR_REPORT_SCHEMA_VERSION);
         assert!(report.privacy.source_free);
         assert!(report.direct_runners.iter().any(|runner| {
             runner.name == "claude-run"
@@ -11006,6 +11124,20 @@ mod tests {
             .direct_runners
             .iter()
             .any(|runner| runner.name == "codex-run" && runner.isolated_clones));
+        assert!(report
+            .direct_runners
+            .iter()
+            .all(|runner| !runner.runtime_preflight.checked
+                && runner.runtime_preflight.ok.is_none()
+                && runner.runtime_preflight.output_hash.is_none()));
+        let missing = doctor_runtime_preflight(
+            Path::new(env!("CARGO_MANIFEST_DIR")),
+            "helmbench-missing-agent",
+            true,
+        );
+        assert!(missing.checked);
+        assert_eq!(missing.ok, Some(false));
+        assert!(missing.output_hash.is_none());
         assert!(report
             .observation_modes
             .iter()
