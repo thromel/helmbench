@@ -113,6 +113,8 @@ cargo run -- evidence-bundle --help >/dev/null
 cargo run -- verify-bundle --help >/dev/null
 cargo run -- verify-matrix --help >/dev/null
 cargo run -- quality-gate --help >/dev/null
+cargo run -- quality-gate --help | grep -q -- '--min-recommendation-follow-through '
+cargo run -- quality-gate --help | grep -q -- '--min-recommendation-follow-through-delta'
 cargo run -- autopsy --help >/dev/null
 cargo run -- diff-autopsy --help >/dev/null
 cargo run -- dashboard --help >/dev/null
@@ -155,8 +157,11 @@ grep -q '"setupCommands"' "$TMP_DIR/task-suite.schema.json"
 grep -q '"title": "HelmBench Agent Trace"' "$TMP_DIR/agent-trace.schema.json"
 grep -q '"title": "HelmBench Agent Event"' "$TMP_DIR/agent-event.schema.json"
 grep -q '"title": "HelmBench Run Report"' "$TMP_DIR/run-report.schema.json"
+grep -q '"recommendationFollowThrough"' "$TMP_DIR/run-report.schema.json"
 grep -q '"title": "HelmBench Compare Report"' "$TMP_DIR/compare-report.schema.json"
+grep -q '"averageRecommendationFollowThroughDelta"' "$TMP_DIR/compare-report.schema.json"
 grep -q '"title": "HelmBench Benchmark Summary"' "$TMP_DIR/benchmark-summary.schema.json"
+grep -q '"recommendationFollowThrough"' "$TMP_DIR/benchmark-summary.schema.json"
 grep -q '"title": "HelmBench Launch Readiness"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"smoke_proof"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"realAgentReportCount"' "$TMP_DIR/launch-readiness.schema.json"
@@ -164,6 +169,8 @@ grep -q '"publicReportCount"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"publicTaskCount"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"title": "HelmBench Quality Gate"' "$TMP_DIR/quality-gate.schema.json"
 grep -q '"title": "HelmBench Run Matrix Config"' "$TMP_DIR/run-matrix-config.schema.json"
+grep -q '"minRecommendationFollowThrough"' "$TMP_DIR/run-matrix-config.schema.json"
+grep -q '"minRecommendationFollowThroughDelta"' "$TMP_DIR/run-matrix-config.schema.json"
 grep -q '"adapterPreset"' "$TMP_DIR/run-matrix-config.schema.json"
 grep -q '"claude-code"' "$TMP_DIR/run-matrix-config.schema.json"
 grep -q '"healthCheckSuccessCommands"' "$TMP_DIR/run-matrix-config.schema.json"

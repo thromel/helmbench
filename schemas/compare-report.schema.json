@@ -57,6 +57,9 @@
     "averageRecommendationRecallDelta": {
       "$ref": "#/$defs/delta"
     },
+    "averageRecommendationFollowThroughDelta": {
+      "$ref": "#/$defs/delta"
+    },
     "averageContextPrecisionDelta": {
       "$ref": "#/$defs/delta"
     },

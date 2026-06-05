@@ -196,6 +196,8 @@ pub struct ReportSummary {
     pub irrelevant_read_rate: f32,
     pub average_recommendation_precision: f32,
     pub average_recommendation_recall: f32,
+    #[serde(default)]
+    pub average_recommendation_follow_through: f32,
     pub average_context_precision: f32,
     pub average_edited_file_recall: f32,
     pub validation_coverage_rate: f32,
@@ -231,6 +233,10 @@ pub struct TaskReport {
     pub irrelevant_recommended_file_count: usize,
     pub recommendation_precision: f32,
     pub recommendation_recall: f32,
+    #[serde(default)]
+    pub recommended_files_read_count: usize,
+    #[serde(default)]
+    pub recommendation_follow_through: f32,
     pub files_read_count: usize,
     pub relevant_files_read_count: usize,
     pub irrelevant_file_read_count: usize,
@@ -260,6 +266,8 @@ pub struct CompareReport {
     pub irrelevant_read_rate_delta: f32,
     pub average_recommendation_precision_delta: f32,
     pub average_recommendation_recall_delta: f32,
+    #[serde(default)]
+    pub average_recommendation_follow_through_delta: f32,
     pub average_context_precision_delta: f32,
     pub average_edited_file_recall_delta: f32,
     pub validation_coverage_rate_delta: f32,
@@ -298,6 +306,8 @@ pub struct BenchmarkRunSummary {
     pub irrelevant_read_rate: f32,
     pub recommendation_precision: f32,
     pub recommendation_recall: f32,
+    #[serde(default)]
+    pub recommendation_follow_through: f32,
     pub context_precision: f32,
     pub edited_file_recall: f32,
     pub average_time_to_first_relevant_file_millis: Option<f32>,
@@ -333,6 +343,8 @@ pub struct BenchmarkComparison {
     pub validation_coverage_rate_delta: f32,
     pub irrelevant_read_rate_delta: f32,
     pub recommendation_recall_delta: f32,
+    #[serde(default)]
+    pub recommendation_follow_through_delta: f32,
     pub context_precision_delta: f32,
     pub edited_file_recall_delta: f32,
     pub average_time_to_first_relevant_file_millis_delta: Option<f32>,
@@ -402,6 +414,8 @@ pub struct QualityGateConfig {
     pub min_validation_coverage_rate_delta: f32,
     pub max_irrelevant_read_rate_delta: f32,
     pub min_recommendation_recall_delta: f32,
+    pub min_recommendation_follow_through: Option<f32>,
+    pub min_recommendation_follow_through_delta: f32,
     pub min_context_precision_delta: f32,
     pub min_edited_file_recall_delta: f32,
     pub max_average_time_to_first_relevant_file_millis_delta: Option<f32>,
@@ -419,6 +433,8 @@ impl Default for QualityGateConfig {
             min_validation_coverage_rate_delta: 0.0,
             max_irrelevant_read_rate_delta: 0.0,
             min_recommendation_recall_delta: 0.0,
+            min_recommendation_follow_through: None,
+            min_recommendation_follow_through_delta: 0.0,
             min_context_precision_delta: 0.0,
             min_edited_file_recall_delta: 0.0,
             max_average_time_to_first_relevant_file_millis_delta: None,
@@ -805,6 +821,10 @@ pub fn compare_reports(base: &RunReport, head: &RunReport) -> CompareReport {
             - base.summary.average_recommendation_precision,
         average_recommendation_recall_delta: head.summary.average_recommendation_recall
             - base.summary.average_recommendation_recall,
+        average_recommendation_follow_through_delta: head
+            .summary
+            .average_recommendation_follow_through
+            - base.summary.average_recommendation_follow_through,
         average_context_precision_delta: head.summary.average_context_precision
             - base.summary.average_context_precision,
         average_edited_file_recall_delta: head.summary.average_edited_file_recall
@@ -941,6 +961,7 @@ fn benchmark_run_summary(report: &RunReport) -> BenchmarkRunSummary {
         irrelevant_read_rate: report.summary.irrelevant_read_rate,
         recommendation_precision: report.summary.average_recommendation_precision,
         recommendation_recall: report.summary.average_recommendation_recall,
+        recommendation_follow_through: report.summary.average_recommendation_follow_through,
         context_precision: report.summary.average_context_precision,
         edited_file_recall: report.summary.average_edited_file_recall,
         average_time_to_first_relevant_file_millis: report
@@ -1068,6 +1089,8 @@ fn benchmark_comparison(baseline: &RunReport, head: &RunReport) -> BenchmarkComp
         head.summary.irrelevant_read_rate - baseline.summary.irrelevant_read_rate;
     let recommendation_recall_delta =
         head.summary.average_recommendation_recall - baseline.summary.average_recommendation_recall;
+    let recommendation_follow_through_delta = head.summary.average_recommendation_follow_through
+        - baseline.summary.average_recommendation_follow_through;
     let context_precision_delta =
         head.summary.average_context_precision - baseline.summary.average_context_precision;
     let edited_file_recall_delta =
@@ -1105,6 +1128,7 @@ fn benchmark_comparison(baseline: &RunReport, head: &RunReport) -> BenchmarkComp
         validation_coverage_rate_delta,
         irrelevant_read_rate_delta,
         recommendation_recall_delta,
+        recommendation_follow_through_delta,
         context_precision_delta,
         edited_file_recall_delta,
         average_time_to_first_relevant_file_millis_delta,
@@ -1342,13 +1366,14 @@ pub fn render_markdown_report(report: &RunReport) -> String {
     ));
     out.push_str("## Summary\n\n");
     out.push_str(&format!(
-        "- Suite: `{}`\n- Tasks: `{}`\n- Success rate: `{:.1}%`\n- Irrelevant read rate: `{:.1}%`\n- Recommendation precision: `{:.1}%`\n- Recommendation recall: `{:.1}%`\n- Context precision: `{:.1}%`\n- Edited-file recall: `{:.1}%`\n- Validation coverage: `{:.1}%`\n- Tool calls: `{}`\n- Token estimate: `{}`\n- Source-free: `{}`\n\n",
+        "- Suite: `{}`\n- Tasks: `{}`\n- Success rate: `{:.1}%`\n- Irrelevant read rate: `{:.1}%`\n- Recommendation precision: `{:.1}%`\n- Recommendation recall: `{:.1}%`\n- Recommendation follow-through: `{:.1}%`\n- Context precision: `{:.1}%`\n- Edited-file recall: `{:.1}%`\n- Validation coverage: `{:.1}%`\n- Tool calls: `{}`\n- Token estimate: `{}`\n- Source-free: `{}`\n\n",
         report.suite_name,
         report.summary.task_count,
         pct(report.summary.success_rate),
         pct(report.summary.irrelevant_read_rate),
         pct(report.summary.average_recommendation_precision),
         pct(report.summary.average_recommendation_recall),
+        pct(report.summary.average_recommendation_follow_through),
         pct(report.summary.average_context_precision),
         pct(report.summary.average_edited_file_recall),
         pct(report.summary.validation_coverage_rate),
@@ -1371,17 +1396,18 @@ pub fn render_markdown_report(report: &RunReport) -> String {
         report.summary.command_summary.failed_command_count
     ));
     out.push_str("## Tasks\n\n");
-    out.push_str("| Task | Status | Recommendations | Rec recall | Reads | Irrelevant reads | Context precision | Validation | Commands | Test commands | Failed commands | Tool calls |\n");
+    out.push_str("| Task | Status | Recommendations | Rec recall | Rec follow-through | Reads | Irrelevant reads | Context precision | Validation | Commands | Test commands | Failed commands | Tool calls |\n");
     out.push_str(
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |\n",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |\n",
     );
     for task in &report.tasks {
         out.push_str(&format!(
-            "| `{}` | {:?} | {} | {:.1}% | {} | {} | {:.1}% | {} | {} | {} | {} | {} |\n",
+            "| `{}` | {:?} | {} | {:.1}% | {:.1}% | {} | {} | {:.1}% | {} | {} | {} | {} | {} |\n",
             task.task_id,
             task.status,
             task.recommended_file_count,
             pct(task.recommendation_recall),
+            pct(task.recommendation_follow_through),
             task.files_read_count,
             task.irrelevant_file_read_count,
             pct(task.context_precision),
@@ -1419,6 +1445,10 @@ pub fn render_markdown_compare(compare: &CompareReport) -> String {
     out.push_str(&format!(
         "| Recommendation recall | {:+.1}% |\n",
         pct(compare.average_recommendation_recall_delta)
+    ));
+    out.push_str(&format!(
+        "| Recommendation follow-through | {:+.1}% |\n",
+        pct(compare.average_recommendation_follow_through_delta)
     ));
     out.push_str(&format!(
         "| Context precision | {:+.1}% |\n",
@@ -1475,13 +1505,13 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
     out.push('\n');
 
     out.push_str("## Runs\n\n");
-    out.push_str("| Run | Tasks | Success | 95% CI | Validation | 95% CI | Rec recall | Context precision | Edited recall | Irrelevant reads | Avg first relevant | Tools | Tokens | Tools/success | Tokens/success |\n");
+    out.push_str("| Run | Tasks | Success | 95% CI | Validation | 95% CI | Rec recall | Rec follow-through | Context precision | Edited recall | Irrelevant reads | Avg first relevant | Tools | Tokens | Tools/success | Tokens/success |\n");
     out.push_str(
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n",
+        "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n",
     );
     for run in &report.runs {
         out.push_str(&format!(
-            "| {} / {:?} | {} | {:.1}% | {} | {:.1}% | {} | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {} | {} | {} | {} | {} |\n",
+            "| {} / {:?} | {} | {:.1}% | {} | {:.1}% | {} | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {:.1}% | {} | {} | {} | {} | {} |\n",
             run.agent,
             run.variant,
             run.task_count,
@@ -1490,6 +1520,7 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
             pct(run.validation_coverage_rate),
             format_interval(&run.validation_coverage_rate_interval),
             pct(run.recommendation_recall),
+            pct(run.recommendation_follow_through),
             pct(run.context_precision),
             pct(run.edited_file_recall),
             pct(run.irrelevant_read_rate),
@@ -1542,17 +1573,18 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
     }
 
     out.push_str("\n## Deltas From Baseline\n\n");
-    out.push_str("| Variant | Verdict | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens | Tools/success | Tokens/success |\n");
-    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    out.push_str("| Variant | Verdict | Success | Validation | Rec recall | Rec follow-through | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens | Tools/success | Tokens/success |\n");
+    out.push_str("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
     for comparison in &report.comparisons {
         out.push_str(&format!(
-            "| {} / {:?} | {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {} | {:+} | {:+} | {} | {} |\n",
+            "| {} / {:?} | {:?} | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {:+.1}% | {} | {:+} | {:+} | {} | {} |\n",
             comparison.head_agent,
             comparison.head_variant,
             comparison.verdict,
             pct(comparison.success_rate_delta),
             pct(comparison.validation_coverage_rate_delta),
             pct(comparison.recommendation_recall_delta),
+            pct(comparison.recommendation_follow_through_delta),
             pct(comparison.context_precision_delta),
             pct(comparison.edited_file_recall_delta),
             pct(comparison.irrelevant_read_rate_delta),
@@ -1630,6 +1662,33 @@ pub fn evaluate_quality_gate(
             comparison.recommendation_recall_delta,
             config.min_recommendation_recall_delta,
         );
+        push_min_check(
+            &mut checks,
+            comparison,
+            "recommendation_follow_through_delta",
+            comparison.recommendation_follow_through_delta,
+            config.min_recommendation_follow_through_delta,
+        );
+        if let Some(threshold) = config.min_recommendation_follow_through {
+            if let Some(run) = summary.runs.iter().find(|run| {
+                run.agent == comparison.head_agent && run.variant == comparison.head_variant
+            }) {
+                checks.push(QualityGateCheck {
+                    head_agent: comparison.head_agent.clone(),
+                    head_variant: comparison.head_variant.clone(),
+                    metric: "recommendation_follow_through".to_string(),
+                    operator: ">=".to_string(),
+                    actual: run.recommendation_follow_through as f64,
+                    threshold: threshold as f64,
+                    passed: run.recommendation_follow_through >= threshold,
+                });
+            } else {
+                warnings.push(format!(
+                    "Skipped recommendation_follow_through for {} / {:?}: missing head run summary.",
+                    comparison.head_agent, comparison.head_variant
+                ));
+            }
+        }
         push_min_check(
             &mut checks,
             comparison,
@@ -3059,6 +3118,7 @@ fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
     let irrelevant_file_read_count = read.difference(&expected_files).count();
     let relevant_recommended_file_count = recommended.intersection(&expected_evidence).count();
     let irrelevant_recommended_file_count = recommended.difference(&expected_evidence).count();
+    let recommended_files_read_count = recommended.intersection(&read).count();
     let expected_files_edited_count = edited.intersection(&expected_files).count();
     let validation_covered = validation_covered(trace, &expected_tests);
     let files_read_count = read.len();
@@ -3082,6 +3142,11 @@ fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
     } else {
         relevant_recommended_file_count as f32 / expected_evidence.len() as f32
     };
+    let recommendation_follow_through = if recommended.is_empty() {
+        0.0
+    } else {
+        recommended_files_read_count as f32 / recommended.len() as f32
+    };
     TaskReport {
         task_id: task.id.clone(),
         status: trace.status.clone(),
@@ -3092,6 +3157,8 @@ fn task_report(task: &BenchTask, trace: &AgentTrace) -> TaskReport {
         irrelevant_recommended_file_count,
         recommendation_precision,
         recommendation_recall,
+        recommended_files_read_count,
+        recommendation_follow_through,
         files_read_count,
         relevant_files_read_count: relevant_files_read,
         irrelevant_file_read_count,
@@ -3181,6 +3248,8 @@ fn summarize(tasks: &[TaskReport]) -> ReportSummary {
         average(tasks.iter().map(|task| task.recommendation_precision));
     let average_recommendation_recall =
         average(tasks.iter().map(|task| task.recommendation_recall));
+    let average_recommendation_follow_through =
+        average(tasks.iter().map(|task| task.recommendation_follow_through));
     let average_context_precision = average(tasks.iter().map(|task| task.context_precision));
     let average_edited_file_recall = average(tasks.iter().map(|task| task.edited_file_recall));
     let validation_coverage_rate = if task_count == 0 {
@@ -3212,6 +3281,7 @@ fn summarize(tasks: &[TaskReport]) -> ReportSummary {
         },
         average_recommendation_precision,
         average_recommendation_recall,
+        average_recommendation_follow_through,
         average_context_precision,
         average_edited_file_recall,
         validation_coverage_rate,
@@ -3372,6 +3442,9 @@ mod tests {
         assert_eq!(report.summary.success_count, 1);
         assert_eq!(report.summary.total_irrelevant_file_reads, 1);
         assert_eq!(report.tasks[0].relevant_files_read_count, 2);
+        assert_eq!(report.tasks[0].recommended_files_read_count, 1);
+        assert_eq!(report.tasks[0].recommendation_follow_through, 1.0);
+        assert_eq!(report.summary.average_recommendation_follow_through, 1.0);
         assert_eq!(report.tasks[0].time_to_first_relevant_file_millis, Some(20));
         assert!(report.tasks[0].validation_covered);
         assert_eq!(report.summary.total_tool_calls, 6);
@@ -3384,6 +3457,7 @@ mod tests {
         assert_eq!(report.summary.command_summary.failed_command_count, 1);
         let markdown = render_markdown_report(&report);
         assert!(markdown.contains("Command Summary"));
+        assert!(markdown.contains("Recommendation follow-through"));
         assert!(markdown.contains("Failed commands"));
     }
 
@@ -3510,6 +3584,7 @@ mod tests {
         assert_eq!(summary.runs[1].command_summary.total_command_count, 1);
         assert_eq!(summary.runs[1].command_summary.test_command_count, 1);
         assert_eq!(summary.runs[1].command_summary.successful_command_count, 1);
+        assert_eq!(summary.runs[1].recommendation_follow_through, 2.0 / 3.0);
         assert_eq!(summary.runs[0].failure_taxonomy.failed_task_count, 1);
         assert_eq!(summary.runs[0].failure_taxonomy.validation_gap_count, 1);
         assert_eq!(
@@ -3526,6 +3601,10 @@ mod tests {
         assert!(summary.runs[1].success_rate_interval.lower >= 0.0);
         assert!(summary.runs[1].success_rate_interval.upper <= 1.0);
         assert_eq!(summary.comparisons[0].success_rate_delta, 1.0);
+        assert_eq!(
+            summary.comparisons[0].recommendation_follow_through_delta,
+            2.0 / 3.0
+        );
         assert_eq!(
             summary.comparisons[0].average_time_to_first_relevant_file_millis_delta,
             Some(-30.0)
@@ -3668,6 +3747,9 @@ mod tests {
         assert!(pass.checks.iter().any(|check| {
             check.metric == "average_time_to_first_relevant_file_millis_delta" && check.passed
         }));
+        assert!(pass.checks.iter().any(|check| {
+            check.metric == "recommendation_follow_through_delta" && check.passed
+        }));
         assert!(render_markdown_quality_gate(&pass).contains("Status: **passed**"));
         assert!(render_markdown_quality_gate(&pass).contains("Warnings"));
 
@@ -3684,6 +3766,20 @@ mod tests {
             .checks
             .iter()
             .any(|check| check.metric == "success_rate_delta" && !check.passed));
+
+        let follow_through_fail = evaluate_quality_gate(
+            &summary,
+            &QualityGateConfig {
+                min_recommendation_follow_through: Some(1.1),
+                ..QualityGateConfig::default()
+            },
+        )
+        .expect("follow-through gate");
+        assert!(!follow_through_fail.passed);
+        assert!(follow_through_fail
+            .checks
+            .iter()
+            .any(|check| { check.metric == "recommendation_follow_through" && !check.passed }));
 
         let task_count_fail = evaluate_quality_gate(
             &summary,

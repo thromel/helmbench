@@ -721,6 +721,7 @@ pollute ctxhelm recommendation quality.
 | Irrelevant file reads | Files read that were not in the expected evidence set. |
 | Recommendation precision | Expected evidence paths divided by recommended paths. |
 | Recommendation recall | Recommended expected evidence divided by all expected evidence. |
+| Recommendation follow-through | Recommended paths the agent actually read divided by recommended paths. |
 | Context precision | Relevant reads divided by all reads. |
 | Edited-file recall | Expected target files edited divided by expected files. |
 | Validation coverage | Whether expected tests or validation command classes were run successfully. |

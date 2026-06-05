@@ -194,6 +194,12 @@
         "minRecommendationRecallDelta": {
           "$ref": "#/$defs/optionalNumber"
         },
+        "minRecommendationFollowThrough": {
+          "$ref": "#/$defs/optionalNumber"
+        },
+        "minRecommendationFollowThroughDelta": {
+          "$ref": "#/$defs/optionalNumber"
+        },
         "minContextPrecisionDelta": {
           "$ref": "#/$defs/optionalNumber"
         },

@@ -228,6 +228,9 @@
         "recommendationRecall": {
           "$ref": "#/$defs/rate"
         },
+        "recommendationFollowThrough": {
+          "$ref": "#/$defs/rate"
+        },
         "contextPrecision": {
           "$ref": "#/$defs/rate"
         },
@@ -294,6 +297,9 @@
           "$ref": "#/$defs/delta"
         },
         "recommendationRecallDelta": {
+          "$ref": "#/$defs/delta"
+        },
+        "recommendationFollowThroughDelta": {
           "$ref": "#/$defs/delta"
         },
         "contextPrecisionDelta": {

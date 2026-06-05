@@ -143,6 +143,9 @@
         "averageRecommendationRecall": {
           "$ref": "#/$defs/rate"
         },
+        "averageRecommendationFollowThrough": {
+          "$ref": "#/$defs/rate"
+        },
         "averageContextPrecision": {
           "$ref": "#/$defs/rate"
         },
@@ -220,6 +223,12 @@
           "$ref": "#/$defs/rate"
         },
         "recommendationRecall": {
+          "$ref": "#/$defs/rate"
+        },
+        "recommendedFilesReadCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "recommendationFollowThrough": {
           "$ref": "#/$defs/rate"
         },
         "filesReadCount": {

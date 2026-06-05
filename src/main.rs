@@ -594,6 +594,10 @@ enum Command {
         max_irrelevant_read_rate_delta: f32,
         #[arg(long, default_value_t = 0.0)]
         min_recommendation_recall_delta: f32,
+        #[arg(long)]
+        min_recommendation_follow_through: Option<f32>,
+        #[arg(long, default_value_t = 0.0)]
+        min_recommendation_follow_through_delta: f32,
         #[arg(long, default_value_t = 0.0)]
         min_context_precision_delta: f32,
         #[arg(long, default_value_t = 0.0)]
@@ -1567,6 +1571,8 @@ fn main() -> Result<()> {
             min_validation_coverage_rate_delta,
             max_irrelevant_read_rate_delta,
             min_recommendation_recall_delta,
+            min_recommendation_follow_through,
+            min_recommendation_follow_through_delta,
             min_context_precision_delta,
             min_edited_file_recall_delta,
             max_average_time_to_first_relevant_file_millis_delta,
@@ -1584,6 +1590,8 @@ fn main() -> Result<()> {
                     min_validation_coverage_rate_delta,
                     max_irrelevant_read_rate_delta,
                     min_recommendation_recall_delta,
+                    min_recommendation_follow_through,
+                    min_recommendation_follow_through_delta,
                     min_context_precision_delta,
                     min_edited_file_recall_delta,
                     max_average_time_to_first_relevant_file_millis_delta,
@@ -5378,6 +5386,10 @@ struct RunMatrixQualityGateConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     min_recommendation_recall_delta: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    min_recommendation_follow_through: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    min_recommendation_follow_through_delta: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     min_context_precision_delta: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     min_edited_file_recall_delta: Option<f32>,
@@ -5563,6 +5575,12 @@ fn run_matrix_quality_gate_config(
         }
         if let Some(value) = config.min_recommendation_recall_delta {
             gate.min_recommendation_recall_delta = value;
+        }
+        if let Some(value) = config.min_recommendation_follow_through {
+            gate.min_recommendation_follow_through = Some(value);
+        }
+        if let Some(value) = config.min_recommendation_follow_through_delta {
+            gate.min_recommendation_follow_through_delta = value;
         }
         if let Some(value) = config.min_context_precision_delta {
             gate.min_context_precision_delta = value;
