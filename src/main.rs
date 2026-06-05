@@ -7836,20 +7836,26 @@ fn run_local_suite(
         commit_setup_baseline_if_changed(&task_dir)
             .with_context(|| format!("snapshot setup baseline for `{}`", task.id))?;
 
+        let mut ctxhelm_guidance = CtxhelmGuidance::default();
         if let Some(ctxhelm) = ctxhelm {
-            append_ctxhelm_events(ctxhelm, task, &task_dir, &events, task_started)?;
+            ctxhelm_guidance =
+                append_ctxhelm_events(ctxhelm, task, &task_dir, &events, task_started)?;
         }
 
         let mut adapter_ok = true;
         if let Some(command) = adapter_command {
             let rendered = render_adapter_command(command, &task.id, &task_dir, &events);
-            let prompt = task.prompt.as_str();
+            let prompt = render_agent_task_prompt(task.prompt.as_str(), &ctxhelm_guidance);
             let env = [
                 ("HELMBENCH_TASK_ID", task.id.as_str()),
-                ("HELMBENCH_TASK_PROMPT", prompt),
+                ("HELMBENCH_TASK_PROMPT", prompt.as_str()),
                 ("HELMBENCH_REPO", path_as_str(&task_dir)?),
                 ("HELMBENCH_EVENTS", path_as_str(&events)?),
                 ("HELMBENCH_SUITE_NAME", suite.name.as_str()),
+                (
+                    "HELMBENCH_CTXHELM_RECOMMENDED_FILES",
+                    ctxhelm_guidance.recommended_files_env.as_str(),
+                ),
             ];
             let result = if capture_stream {
                 let result =
@@ -7877,6 +7883,24 @@ fn run_local_suite(
                 run_shell(&rendered, &task_dir, &env, task.timeout_seconds)?
             };
             adapter_ok = result.success;
+            append_event(
+                &events,
+                &AgentEvent {
+                    schema_version: TRACE_SCHEMA_VERSION,
+                    task_id: task.id.clone(),
+                    event_kind: AgentEventKind::Command,
+                    path: None,
+                    command_class: Some(CommandClass::Other),
+                    command_hash: Some(command_hash(&rendered)),
+                    touched_tests: Vec::new(),
+                    exit_status: result.exit_status,
+                    status: None,
+                    token_estimate: None,
+                    elapsed_millis: Some(result.elapsed_millis),
+                    observed_at_millis: Some(task_started.elapsed().as_millis() as u64),
+                    privacy: PrivacyStatus::source_free(),
+                },
+            )?;
         }
 
         let edited_paths = git_changed_paths(&task_dir)?;
@@ -7966,13 +7990,19 @@ struct CtxhelmRunConfig {
     pack_budget: String,
 }
 
+#[derive(Debug, Clone, Default)]
+struct CtxhelmGuidance {
+    recommended_files: Vec<String>,
+    recommended_files_env: String,
+}
+
 fn append_ctxhelm_events(
     config: &CtxhelmRunConfig,
     task: &helmbench::BenchTask,
     repo: &Path,
     events: &PathBuf,
     task_started: Instant,
-) -> Result<()> {
+) -> Result<CtxhelmGuidance> {
     let prepare = run_ctxhelm_json(config, repo, &task.prompt, false)
         .with_context(|| format!("ctxhelm prepare-task for `{}`", task.id))?;
     let value =
@@ -7982,6 +8012,10 @@ fn append_ctxhelm_events(
     collect_ctxhelm_paths(&value, "relatedTests", &mut recommended)?;
     recommended.sort();
     recommended.dedup();
+    let guidance = CtxhelmGuidance {
+        recommended_files_env: recommended.join("\n"),
+        recommended_files: recommended.clone(),
+    };
     for path in recommended {
         append_event(
             events,
@@ -8059,7 +8093,26 @@ fn append_ctxhelm_events(
             },
         )?;
     }
-    Ok(())
+    Ok(guidance)
+}
+
+fn render_agent_task_prompt(task_prompt: &str, ctxhelm: &CtxhelmGuidance) -> String {
+    if ctxhelm.recommended_files.is_empty() {
+        return task_prompt.to_string();
+    }
+
+    let mut prompt = String::new();
+    prompt.push_str(task_prompt);
+    prompt.push_str("\n\nHelmBench ctxhelm guidance:\n");
+    prompt.push_str("- Inspect these source-free recommended relative paths first when they exist in the repo.\n");
+    prompt.push_str("- Emit a HelmBench file-read event for each recommended file you inspect.\n");
+    prompt.push_str("- Verify the recommendation against the code before editing; do not edit unrelated files.\n");
+    for path in &ctxhelm.recommended_files {
+        prompt.push_str("- ");
+        prompt.push_str(path);
+        prompt.push('\n');
+    }
+    prompt
 }
 
 fn run_ctxhelm_json(
@@ -8225,7 +8278,8 @@ const AGENT_EVENT_INSTRUCTIONS: &str = r#"You are running inside HelmBench, a so
 Work only inside HELMBENCH_REPO.
 Before or immediately after inspecting a relevant file, emit:
 $HELMBENCH_BIN record-event --events "$HELMBENCH_EVENTS" --task-id "$HELMBENCH_TASK_ID" --event-kind file-read --path <relative-path>
-If ctxhelm or another context source recommends a file, emit event-kind recommended-file.
+If the task prompt contains HelmBench ctxhelm guidance, inspect those recommended relative paths first and emit file-read events for the files you inspect.
+If you discover a new source-free context recommendation yourself, emit event-kind recommended-file.
 Do not put source code, model text, terminal output, secrets, or raw tool payloads into HelmBench events.
 HelmBench will infer edited files from git status and run the task validation command after you exit.
 Make the smallest useful change for the task."#;
@@ -8767,6 +8821,29 @@ mod tests {
     }
 
     #[test]
+    fn agent_task_prompt_includes_source_free_ctxhelm_guidance() {
+        let guidance = CtxhelmGuidance {
+            recommended_files: vec![
+                "src/auth/session.ts".to_string(),
+                "tests/auth/session.test.ts".to_string(),
+            ],
+            recommended_files_env: "src/auth/session.ts\ntests/auth/session.test.ts".to_string(),
+        };
+        let prompt = render_agent_task_prompt("Fix the session redirect.", &guidance);
+
+        assert!(prompt.contains("Fix the session redirect."));
+        assert!(prompt.contains("HelmBench ctxhelm guidance"));
+        assert!(prompt.contains("src/auth/session.ts"));
+        assert!(prompt.contains("tests/auth/session.test.ts"));
+        assert!(prompt.contains("file-read event"));
+        assert!(!prompt.contains("raw source"));
+
+        let plain =
+            render_agent_task_prompt("Fix the session redirect.", &CtxhelmGuidance::default());
+        assert_eq!(plain, "Fix the session redirect.");
+    }
+
+    #[test]
     fn codex_command_uses_isolated_repo_and_workspace_sandbox_by_default() {
         let command = codex_adapter_command(
             Path::new("/tmp/helmbench"),
@@ -8940,6 +9017,14 @@ mod tests {
             .files_edited
             .iter()
             .any(|path| path.path == "app.txt"));
+        assert!(repair_traces[0].commands.iter().any(|command| {
+            command.command_class == CommandClass::Other
+                && command.exit_status == Some(0)
+                && command
+                    .command_hash
+                    .as_deref()
+                    .is_some_and(|hash| hash.starts_with("cmd:"))
+        }));
     }
 
     #[test]

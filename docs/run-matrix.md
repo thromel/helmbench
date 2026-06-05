@@ -397,4 +397,12 @@ helmbench run-matrix \
 
 The ctxhelm row records `recommended_file` events from `ctxhelm prepare-task`.
 If `pack=true`, it also records token metadata from `ctxhelm get-pack` without
-persisting pack sections, snippets, raw source, or raw prompts.
+persisting pack sections, snippets, raw source, or raw prompts. HelmBench also
+adds the recommended relative paths to the agent-visible task prompt as a
+source-free inspection queue, so the adapter can inspect those files without
+persisting raw ctxhelm context.
+
+Every adapter launch is recorded as a source-free `other` command event with a
+command hash, exit status, and elapsed time. That lets autopsies distinguish a
+failed adapter launch from an agent that ran but made no edits or a validation
+failure after edits.
