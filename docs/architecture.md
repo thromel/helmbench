@@ -213,7 +213,7 @@ The summary artifact includes:
   early results are not presented as high-confidence proof;
 - source-free failure taxonomy counts for failed/skipped tasks, validation
   gaps, missing relevant reads, missing expected edits, recommendation misses,
-  and tasks with irrelevant reads;
+  ignored recommendations, and tasks with irrelevant reads;
 - source-free command mix counts for test/build/lint/typecheck/other commands
   plus successful and failed command counts;
 - average time to first relevant file when traces include timing metadata;

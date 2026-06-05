@@ -715,7 +715,7 @@ pollute ctxhelm recommendation quality.
 | Task success | Whether the trace reports success, failure, or skip. |
 | 95% confidence intervals | Wilson score intervals for binary per-task rates in benchmark summaries. |
 | Low-sample warning | Whether a benchmark suite has fewer than the recommended 10 tasks; CI gates can require a minimum task count. |
-| Failure taxonomy | Source-free counts for failed/skipped tasks, validation gaps, context misses, edit misses, recommendation misses, and irrelevant-read tasks. |
+| Failure taxonomy | Source-free counts for failed/skipped tasks, validation gaps, context misses, edit misses, recommendation misses, ignored recommendations, and irrelevant-read tasks. |
 | Command mix | Source-free counts of test, build, lint, typecheck, other, successful, and failed commands. |
 | Files read | Source-free paths the agent inspected. |
 | Irrelevant file reads | Files read that were not in the expected evidence set. |

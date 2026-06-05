@@ -8,6 +8,7 @@
 - Irrelevant read rate: `0.0%`
 - Recommendation precision: `100.0%`
 - Recommendation recall: `100.0%`
+- Recommendation follow-through: `50.0%`
 - Context precision: `100.0%`
 - Edited-file recall: `100.0%`
 - Validation coverage: `100.0%`
@@ -23,9 +24,9 @@
 
 ## Tasks
 
-| Task | Status | Recommendations | Rec recall | Reads | Irrelevant reads | Context precision | Validation | Commands | Test commands | Failed commands | Tool calls |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |
-| `demo-auth-001` | Success | 2 | 100.0% | 1 | 0 | 100.0% | yes | 3 | 0 | 0 | 10 |
+| Task | Status | Recommendations | Rec recall | Rec follow-through | Reads | Irrelevant reads | Context precision | Validation | Commands | Test commands | Failed commands | Tool calls |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: | ---: | ---: | ---: |
+| `demo-auth-001` | Success | 2 | 100.0% | 50.0% | 1 | 0 | 100.0% | yes | 3 | 0 | 0 | 10 |
 
 ## Privacy
 

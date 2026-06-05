@@ -6,6 +6,7 @@
 | Irrelevant read rate | +0.0% |
 | Recommendation precision | +100.0% |
 | Recommendation recall | +50.0% |
+| Recommendation follow-through | +100.0% |
 | Context precision | +100.0% |
 | Edited-file recall | +100.0% |
 | Validation coverage | +100.0% |

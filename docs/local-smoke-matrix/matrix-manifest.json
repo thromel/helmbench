@@ -78,18 +78,18 @@
   "artifactDigests": [
     {
       "path": "docs/benchmark-summary.md",
-      "byteCount": 2599,
-      "contentHash": "fnv64:b1e1db93cab08129"
+      "byteCount": 2743,
+      "contentHash": "fnv64:0b35df9bfbc928c5"
     },
     {
       "path": "docs/compare-guided.md",
-      "byteCount": 431,
-      "contentHash": "fnv64:efeb80aa8e09e81e"
+      "byteCount": 474,
+      "contentHash": "fnv64:5599a35fd6cc1ceb"
     },
     {
       "path": "docs/compare-native-search.md",
-      "byteCount": 431,
-      "contentHash": "fnv64:4ccd265f692f3165"
+      "byteCount": 475,
+      "contentHash": "fnv64:24250169811beede"
     },
     {
       "path": "docs/dashboard.html",
@@ -118,8 +118,8 @@
     },
     {
       "path": "docs/quality-gate.md",
-      "byteCount": 1409,
-      "contentHash": "fnv64:e95eff7443c7f72d"
+      "byteCount": 1605,
+      "contentHash": "fnv64:2cbcd3b4751a50fd"
     },
     {
       "path": "docs/reproduction.md",
@@ -129,37 +129,37 @@
     {
       "path": "evidence/manifest.json",
       "byteCount": 1892,
-      "contentHash": "fnv64:dad7a8b9b6aea3b6"
+      "contentHash": "fnv64:1eb7b9cd733c649e"
     },
     {
       "path": "reports/benchmark-summary.json",
-      "byteCount": 7204,
-      "contentHash": "fnv64:7da52aeccccb4004"
+      "byteCount": 7626,
+      "contentHash": "fnv64:6d57e71755a188dc"
     },
     {
       "path": "reports/compare-guided.json",
-      "byteCount": 571,
-      "contentHash": "fnv64:5fe418935c2472a6"
+      "byteCount": 621,
+      "contentHash": "fnv64:d2509e4cc1fc2c9d"
     },
     {
       "path": "reports/compare-native-search.json",
-      "byteCount": 572,
-      "contentHash": "fnv64:f38fb9154d45355d"
+      "byteCount": 622,
+      "contentHash": "fnv64:0095de884353a7d8"
     },
     {
       "path": "reports/guided.json",
-      "byteCount": 2054,
-      "contentHash": "fnv64:c8e11b9f824459a6"
+      "byteCount": 2181,
+      "contentHash": "fnv64:77eecad6a0b376b5"
     },
     {
       "path": "reports/native-search.json",
-      "byteCount": 2052,
-      "contentHash": "fnv64:523b504af1ced6ef"
+      "byteCount": 2179,
+      "contentHash": "fnv64:a7adec3d1717b8dc"
     },
     {
       "path": "reports/native.json",
-      "byteCount": 2049,
-      "contentHash": "fnv64:f2de4816ae536d12"
+      "byteCount": 2176,
+      "contentHash": "fnv64:c3514865f9300804"
     },
     {
       "path": "reports/privacy-report.json",
@@ -168,8 +168,8 @@
     },
     {
       "path": "reports/quality-gate.json",
-      "byteCount": 3081,
-      "contentHash": "fnv64:9992cb3ba06ff46e"
+      "byteCount": 3539,
+      "contentHash": "fnv64:5ddfe7b5b6df5c30"
     },
     {
       "path": "reports/suite-health.json",

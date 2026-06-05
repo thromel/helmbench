@@ -14,11 +14,11 @@ Baseline: **demo-baseline / Native**
 
 ## Runs
 
-| Run | Tasks | Success | 95% CI | Validation | 95% CI | Rec recall | Context precision | Edited recall | Irrelevant reads | Avg first relevant | Tools | Tokens | Tools/success | Tokens/success |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| demo-baseline / Native | 1 | 0.0% | 0.0-79.3% | 0.0% | 0.0-79.3% | 0.0% | 0.0% | 0.0% | 0.0% | n/a | 2 | 0 | n/a | n/a |
-| demo-search / NativeSearch | 1 | 100.0% | 20.7-100.0% | 100.0% | 20.7-100.0% | 50.0% | 100.0% | 100.0% | 0.0% | 20 ms | 5 | 0 | 5.0 | 0.0 |
-| demo-guided / CtxhelmMcp | 1 | 100.0% | 20.7-100.0% | 100.0% | 20.7-100.0% | 100.0% | 100.0% | 100.0% | 0.0% | 20 ms | 10 | 64 | 10.0 | 64.0 |
+| Run | Tasks | Success | 95% CI | Validation | 95% CI | Rec recall | Rec follow-through | Context precision | Edited recall | Irrelevant reads | Avg first relevant | Tools | Tokens | Tools/success | Tokens/success |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| demo-baseline / Native | 1 | 0.0% | 0.0-79.3% | 0.0% | 0.0-79.3% | 0.0% | 0.0% | 0.0% | 0.0% | 0.0% | n/a | 2 | 0 | n/a | n/a |
+| demo-search / NativeSearch | 1 | 100.0% | 20.7-100.0% | 100.0% | 20.7-100.0% | 50.0% | 100.0% | 100.0% | 100.0% | 0.0% | 20 ms | 5 | 0 | 5.0 | 0.0 |
+| demo-guided / CtxhelmMcp | 1 | 100.0% | 20.7-100.0% | 100.0% | 20.7-100.0% | 100.0% | 50.0% | 100.0% | 100.0% | 0.0% | 20 ms | 10 | 64 | 10.0 | 64.0 |
 
 ## Command Mix
 
@@ -32,18 +32,18 @@ Baseline: **demo-baseline / Native**
 
 Counts are source-free and may overlap when one task has multiple issues.
 
-| Run | Failed | Skipped | Validation gaps | No relevant read | No expected edit | Recommendation miss | Irrelevant-read tasks |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| demo-baseline / Native | 1 | 0 | 1 | 1 | 1 | 1 | 0 |
-| demo-search / NativeSearch | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| demo-guided / CtxhelmMcp | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Run | Failed | Skipped | Validation gaps | No relevant read | No expected edit | Recommendation miss | Ignored recommendations | Irrelevant-read tasks |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| demo-baseline / Native | 1 | 0 | 1 | 1 | 1 | 1 | 0 | 0 |
+| demo-search / NativeSearch | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| demo-guided / CtxhelmMcp | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 ## Deltas From Baseline
 
-| Variant | Verdict | Success | Validation | Rec recall | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens | Tools/success | Tokens/success |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| demo-search / NativeSearch | Mixed | +100.0% | +100.0% | +50.0% | +100.0% | +100.0% | +0.0% | n/a | +3 | +0 | n/a | n/a |
-| demo-guided / CtxhelmMcp | Mixed | +100.0% | +100.0% | +100.0% | +100.0% | +100.0% | +0.0% | n/a | +8 | +64 | n/a | n/a |
+| Variant | Verdict | Success | Validation | Rec recall | Rec follow-through | Context precision | Edited recall | Irrelevant reads | First relevant | Tools | Tokens | Tools/success | Tokens/success |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| demo-search / NativeSearch | Mixed | +100.0% | +100.0% | +50.0% | +100.0% | +100.0% | +100.0% | +0.0% | n/a | +3 | +0 | n/a | n/a |
+| demo-guided / CtxhelmMcp | Mixed | +100.0% | +100.0% | +100.0% | +50.0% | +100.0% | +100.0% | +0.0% | n/a | +8 | +64 | n/a | n/a |
 
 ## Privacy
 

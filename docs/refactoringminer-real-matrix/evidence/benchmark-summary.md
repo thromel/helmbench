@@ -30,10 +30,10 @@ Baseline: **claude-code / Native**
 
 Counts are source-free and may overlap when one task has multiple issues.
 
-| Run | Failed | Skipped | Validation gaps | No relevant read | No expected edit | Recommendation miss | Irrelevant-read tasks |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| claude-code / Native | 7 | 0 | 7 | 2 | 2 | 10 | 2 |
-| claude-code / CtxhelmMcp | 10 | 0 | 10 | 10 | 10 | 1 | 0 |
+| Run | Failed | Skipped | Validation gaps | No relevant read | No expected edit | Recommendation miss | Ignored recommendations | Irrelevant-read tasks |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| claude-code / Native | 7 | 0 | 7 | 2 | 2 | 10 | 0 | 2 |
+| claude-code / CtxhelmMcp | 10 | 0 | 10 | 10 | 10 | 1 | 10 | 0 |
 
 ## Deltas From Baseline
 

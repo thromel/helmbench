@@ -331,6 +331,8 @@ pub struct BenchmarkFailureTaxonomy {
     pub no_relevant_file_read_count: usize,
     pub no_expected_edit_count: usize,
     pub recommendation_miss_count: usize,
+    #[serde(default)]
+    pub ignored_recommendation_count: usize,
     pub irrelevant_read_task_count: usize,
 }
 
@@ -1017,6 +1019,15 @@ fn benchmark_failure_taxonomy(report: &RunReport) -> BenchmarkFailureTaxonomy {
                     && task.relevant_recommended_file_count == 0
             })
             .count(),
+        ignored_recommendation_count: report
+            .tasks
+            .iter()
+            .filter(|task| {
+                task.recommended_file_count > 0
+                    && task.recommended_files_read_count == 0
+                    && (task.files_read_count == 0 || task.relevant_files_read_count == 0)
+            })
+            .count(),
         irrelevant_read_task_count: report
             .tasks
             .iter()
@@ -1555,11 +1566,11 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
 
     out.push_str("\n## Failure Taxonomy\n\n");
     out.push_str("Counts are source-free and may overlap when one task has multiple issues.\n\n");
-    out.push_str("| Run | Failed | Skipped | Validation gaps | No relevant read | No expected edit | Recommendation miss | Irrelevant-read tasks |\n");
-    out.push_str("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
+    out.push_str("| Run | Failed | Skipped | Validation gaps | No relevant read | No expected edit | Recommendation miss | Ignored recommendations | Irrelevant-read tasks |\n");
+    out.push_str("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n");
     for run in &report.runs {
         out.push_str(&format!(
-            "| {} / {:?} | {} | {} | {} | {} | {} | {} | {} |\n",
+            "| {} / {:?} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
             run.agent,
             run.variant,
             run.failure_taxonomy.failed_task_count,
@@ -1568,6 +1579,7 @@ pub fn render_markdown_benchmark_summary(report: &BenchmarkSummaryReport) -> Str
             run.failure_taxonomy.no_relevant_file_read_count,
             run.failure_taxonomy.no_expected_edit_count,
             run.failure_taxonomy.recommendation_miss_count,
+            run.failure_taxonomy.ignored_recommendation_count,
             run.failure_taxonomy.irrelevant_read_task_count
         ));
     }
@@ -3490,6 +3502,38 @@ mod tests {
         let report = build_report(&suite, &[trace]).expect("report");
         assert!(report.tasks[0].validation_covered);
         assert_eq!(report.summary.validation_coverage_rate, 1.0);
+    }
+
+    #[test]
+    fn failure_taxonomy_counts_ignored_recommendations() {
+        let suite = example_suite();
+        let report = build_report(
+            &suite,
+            &[AgentTrace {
+                schema_version: TRACE_SCHEMA_VERSION,
+                task_id: "auth-redirect-001".to_string(),
+                agent: "claude-code".to_string(),
+                variant: AgentVariant::CtxhelmMcp,
+                status: TaskStatus::Failure,
+                recommended_files: vec![path("src/auth/session.ts")],
+                files_read: Vec::new(),
+                files_edited: Vec::new(),
+                commands: Vec::new(),
+                tool_call_count: 2,
+                token_estimate: Some(800),
+                elapsed_millis: Some(1200),
+                time_to_first_relevant_file_millis: None,
+                privacy: PrivacyStatus::source_free(),
+            }],
+        )
+        .expect("report");
+
+        let summary = benchmark_run_summary(&report);
+        assert_eq!(summary.failure_taxonomy.failed_task_count, 1);
+        assert_eq!(summary.failure_taxonomy.no_relevant_file_read_count, 1);
+        assert_eq!(summary.failure_taxonomy.no_expected_edit_count, 1);
+        assert_eq!(summary.failure_taxonomy.recommendation_miss_count, 0);
+        assert_eq!(summary.failure_taxonomy.ignored_recommendation_count, 1);
     }
 
     #[test]

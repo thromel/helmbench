@@ -75,8 +75,10 @@ grep -q '"suiteEvidenceUse": "outcome_ready"' docs/refactoringminer-real-matrix/
 grep -q '"qualityGatePassed": false' docs/refactoringminer-real-matrix/matrix-manifest.json
 grep -q 'Status: \*\*failed\*\*' docs/refactoringminer-real-matrix/docs/quality-gate.md
 grep -q 'Rec follow-through' docs/refactoringminer-real-matrix/docs/benchmark-summary.md
+grep -q 'Ignored recommendations' docs/refactoringminer-real-matrix/docs/benchmark-summary.md
 grep -q 'recommendation_follow_through' docs/refactoringminer-real-matrix/docs/quality-gate.md
 grep -q '"recommendationFollowThrough": 0.0' docs/refactoringminer-real-matrix/reports/benchmark-summary.json
+grep -q '"ignoredRecommendationCount": 10' docs/refactoringminer-real-matrix/reports/benchmark-summary.json
 grep -q 'refresh-matrix' docs/run-matrix.md
 grep -q 'claude-real-smoke' docs/launch-proof.md
 grep -q 'claude-real-smoke' docs/direct-agent-runs.md
@@ -181,6 +183,7 @@ grep -q '"title": "HelmBench Compare Report"' "$TMP_DIR/compare-report.schema.js
 grep -q '"averageRecommendationFollowThroughDelta"' "$TMP_DIR/compare-report.schema.json"
 grep -q '"title": "HelmBench Benchmark Summary"' "$TMP_DIR/benchmark-summary.schema.json"
 grep -q '"recommendationFollowThrough"' "$TMP_DIR/benchmark-summary.schema.json"
+grep -q '"ignoredRecommendationCount"' "$TMP_DIR/benchmark-summary.schema.json"
 grep -q '"title": "HelmBench Launch Readiness"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"smoke_proof"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"realAgentReportCount"' "$TMP_DIR/launch-readiness.schema.json"

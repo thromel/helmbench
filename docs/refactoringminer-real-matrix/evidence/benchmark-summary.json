@@ -47,6 +47,7 @@
       "noRelevantFileReadCount": 2,
       "noExpectedEditCount": 2,
       "recommendationMissCount": 10,
+      "ignoredRecommendationCount": 0,
       "irrelevantReadTaskCount": 2
     }
   },
@@ -97,6 +98,7 @@
         "noRelevantFileReadCount": 2,
         "noExpectedEditCount": 2,
         "recommendationMissCount": 10,
+        "ignoredRecommendationCount": 0,
         "irrelevantReadTaskCount": 2
       }
     },
@@ -146,6 +148,7 @@
         "noRelevantFileReadCount": 10,
         "noExpectedEditCount": 10,
         "recommendationMissCount": 1,
+        "ignoredRecommendationCount": 10,
         "irrelevantReadTaskCount": 0
       }
     }

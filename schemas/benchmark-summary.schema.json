@@ -159,6 +159,9 @@
         "recommendationMissCount": {
           "$ref": "#/$defs/nonNegativeInteger"
         },
+        "ignoredRecommendationCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
         "irrelevantReadTaskCount": {
           "$ref": "#/$defs/nonNegativeInteger"
         }

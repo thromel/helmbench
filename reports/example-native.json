@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "suiteName": "example-auth-bugs",
   "agent": "claude-code",
   "variant": "native",
@@ -12,12 +12,23 @@
     "irrelevantReadRate": 0.75,
     "averageRecommendationPrecision": 0.0,
     "averageRecommendationRecall": 0.0,
+    "averageRecommendationFollowThrough": 0.0,
     "averageContextPrecision": 0.25,
     "averageEditedFileRecall": 0.5,
     "validationCoverageRate": 0.0,
     "averageTimeToFirstRelevantFileMillis": 2600.0,
     "totalToolCalls": 14,
-    "totalTokenEstimate": 6400
+    "totalTokenEstimate": 6400,
+    "commandSummary": {
+      "totalCommandCount": 1,
+      "testCommandCount": 1,
+      "buildCommandCount": 0,
+      "lintCommandCount": 0,
+      "typecheckCommandCount": 0,
+      "otherCommandCount": 0,
+      "successfulCommandCount": 0,
+      "failedCommandCount": 1
+    }
   },
   "tasks": [
     {
@@ -30,6 +41,8 @@
       "irrelevantRecommendedFileCount": 0,
       "recommendationPrecision": 0.0,
       "recommendationRecall": 0.0,
+      "recommendedFilesReadCount": 0,
+      "recommendationFollowThrough": 0.0,
       "filesReadCount": 4,
       "relevantFilesReadCount": 1,
       "irrelevantFileReadCount": 3,
@@ -38,6 +51,16 @@
       "contextPrecision": 0.25,
       "editedFileRecall": 0.5,
       "validationCovered": false,
+      "commandSummary": {
+        "totalCommandCount": 1,
+        "testCommandCount": 1,
+        "buildCommandCount": 0,
+        "lintCommandCount": 0,
+        "typecheckCommandCount": 0,
+        "otherCommandCount": 0,
+        "successfulCommandCount": 0,
+        "failedCommandCount": 1
+      },
       "toolCallCount": 14,
       "tokenEstimate": 6400,
       "elapsedMillis": 9000,

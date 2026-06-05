@@ -6,8 +6,11 @@
 | Irrelevant read rate | -41.7% |
 | Recommendation precision | +100.0% |
 | Recommendation recall | +100.0% |
+| Recommendation follow-through | +100.0% |
 | Context precision | +41.7% |
 | Edited-file recall | +50.0% |
 | Validation coverage | +100.0% |
 | Tool calls | -5 |
 | Token estimate | -2300 |
+| Tool calls per success | n/a |
+| Token estimate per success | n/a |

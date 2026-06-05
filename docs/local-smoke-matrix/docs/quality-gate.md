@@ -8,12 +8,14 @@ Status: **passed**
 | demo-search / NativeSearch | `validation_coverage_rate_delta` | >= 0.0000 | 1.0000 | pass |
 | demo-search / NativeSearch | `irrelevant_read_rate_delta` | <= 0.0000 | 0.0000 | pass |
 | demo-search / NativeSearch | `recommendation_recall_delta` | >= 0.0000 | 0.5000 | pass |
+| demo-search / NativeSearch | `recommendation_follow_through_delta` | >= 0.0000 | 1.0000 | pass |
 | demo-search / NativeSearch | `context_precision_delta` | >= 0.0000 | 1.0000 | pass |
 | demo-search / NativeSearch | `edited_file_recall_delta` | >= 0.0000 | 1.0000 | pass |
 | demo-guided / CtxhelmMcp | `success_rate_delta` | >= 0.0000 | 1.0000 | pass |
 | demo-guided / CtxhelmMcp | `validation_coverage_rate_delta` | >= 0.0000 | 1.0000 | pass |
 | demo-guided / CtxhelmMcp | `irrelevant_read_rate_delta` | <= 0.0000 | 0.0000 | pass |
 | demo-guided / CtxhelmMcp | `recommendation_recall_delta` | >= 0.0000 | 1.0000 | pass |
+| demo-guided / CtxhelmMcp | `recommendation_follow_through_delta` | >= 0.0000 | 0.5000 | pass |
 | demo-guided / CtxhelmMcp | `context_precision_delta` | >= 0.0000 | 1.0000 | pass |
 | demo-guided / CtxhelmMcp | `edited_file_recall_delta` | >= 0.0000 | 1.0000 | pass |
 

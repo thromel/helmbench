@@ -25,40 +25,40 @@
       "kind": "base_report",
       "path": "reports/base.json",
       "sourceName": "native.json",
-      "byteCount": 2049,
-      "contentHash": "fnv64:f2de4816ae536d12",
+      "byteCount": 2176,
+      "contentHash": "fnv64:c3514865f9300804",
       "sourceFreeChecked": true
     },
     {
       "kind": "head_report",
       "path": "reports/head-1.json",
       "sourceName": "native-search.json",
-      "byteCount": 2052,
-      "contentHash": "fnv64:523b504af1ced6ef",
+      "byteCount": 2179,
+      "contentHash": "fnv64:a7adec3d1717b8dc",
       "sourceFreeChecked": true
     },
     {
       "kind": "head_report",
       "path": "reports/head-2.json",
       "sourceName": "guided.json",
-      "byteCount": 2054,
-      "contentHash": "fnv64:c8e11b9f824459a6",
+      "byteCount": 2181,
+      "contentHash": "fnv64:77eecad6a0b376b5",
       "sourceFreeChecked": true
     },
     {
       "kind": "benchmark_summary_json",
       "path": "benchmark-summary.json",
       "sourceName": "generated",
-      "byteCount": 7204,
-      "contentHash": "fnv64:7da52aeccccb4004",
+      "byteCount": 7626,
+      "contentHash": "fnv64:6d57e71755a188dc",
       "sourceFreeChecked": true
     },
     {
       "kind": "benchmark_summary_markdown",
       "path": "benchmark-summary.md",
       "sourceName": "generated",
-      "byteCount": 2599,
-      "contentHash": "fnv64:b1e1db93cab08129",
+      "byteCount": 2743,
+      "contentHash": "fnv64:0b35df9bfbc928c5",
       "sourceFreeChecked": true
     }
   ],

@@ -62,8 +62,8 @@
   "artifactDigests": [
     {
       "path": "docs/benchmark-summary.md",
-      "byteCount": 2268,
-      "contentHash": "fnv64:a0b83b80acd0fd4f"
+      "byteCount": 2310,
+      "contentHash": "fnv64:2fad5553785f27ed"
     },
     {
       "path": "docs/compare-ctxhelm.md",
@@ -103,12 +103,12 @@
     {
       "path": "evidence/manifest.json",
       "byteCount": 1705,
-      "contentHash": "fnv64:d12bb8f1e1731efd"
+      "contentHash": "fnv64:320072b9276d4ad9"
     },
     {
       "path": "reports/benchmark-summary.json",
-      "byteCount": 5551,
-      "contentHash": "fnv64:51e535e4de5e1da3"
+      "byteCount": 5673,
+      "contentHash": "fnv64:d27b84fa393785ac"
     },
     {
       "path": "reports/compare-ctxhelm.json",

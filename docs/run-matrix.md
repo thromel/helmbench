@@ -325,7 +325,7 @@ directional evidence. Use `qualityGate.minTaskCount` or `--min-task-count` when
 CI should fail instead of only warning on underpowered suites. Each run summary
 also includes a source-free failure taxonomy for failed/skipped tasks,
 validation gaps, missing relevant reads, missing expected edits,
-recommendation misses, and irrelevant-read tasks. Run reports and benchmark
+recommendation misses, ignored recommendations, and irrelevant-read tasks. Run reports and benchmark
 summaries also include recommendation follow-through, which measures
 recommended paths the agent actually read divided by recommended paths, plus
 command mix counts for test, build, lint, typecheck,

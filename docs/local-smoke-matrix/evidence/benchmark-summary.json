@@ -22,6 +22,7 @@
     "irrelevantReadRate": 0.0,
     "recommendationPrecision": 0.0,
     "recommendationRecall": 0.0,
+    "recommendationFollowThrough": 0.0,
     "contextPrecision": 0.0,
     "editedFileRecall": 0.0,
     "averageTimeToFirstRelevantFileMillis": null,
@@ -46,6 +47,7 @@
       "noRelevantFileReadCount": 1,
       "noExpectedEditCount": 1,
       "recommendationMissCount": 1,
+      "ignoredRecommendationCount": 0,
       "irrelevantReadTaskCount": 0
     }
   },
@@ -71,6 +73,7 @@
       "irrelevantReadRate": 0.0,
       "recommendationPrecision": 0.0,
       "recommendationRecall": 0.0,
+      "recommendationFollowThrough": 0.0,
       "contextPrecision": 0.0,
       "editedFileRecall": 0.0,
       "averageTimeToFirstRelevantFileMillis": null,
@@ -95,6 +98,7 @@
         "noRelevantFileReadCount": 1,
         "noExpectedEditCount": 1,
         "recommendationMissCount": 1,
+        "ignoredRecommendationCount": 0,
         "irrelevantReadTaskCount": 0
       }
     },
@@ -119,6 +123,7 @@
       "irrelevantReadRate": 0.0,
       "recommendationPrecision": 1.0,
       "recommendationRecall": 0.5,
+      "recommendationFollowThrough": 1.0,
       "contextPrecision": 1.0,
       "editedFileRecall": 1.0,
       "averageTimeToFirstRelevantFileMillis": 20.0,
@@ -143,6 +148,7 @@
         "noRelevantFileReadCount": 0,
         "noExpectedEditCount": 0,
         "recommendationMissCount": 0,
+        "ignoredRecommendationCount": 0,
         "irrelevantReadTaskCount": 0
       }
     },
@@ -167,6 +173,7 @@
       "irrelevantReadRate": 0.0,
       "recommendationPrecision": 1.0,
       "recommendationRecall": 1.0,
+      "recommendationFollowThrough": 0.5,
       "contextPrecision": 1.0,
       "editedFileRecall": 1.0,
       "averageTimeToFirstRelevantFileMillis": 20.0,
@@ -191,6 +198,7 @@
         "noRelevantFileReadCount": 0,
         "noExpectedEditCount": 0,
         "recommendationMissCount": 0,
+        "ignoredRecommendationCount": 0,
         "irrelevantReadTaskCount": 0
       }
     }
@@ -203,6 +211,7 @@
       "validationCoverageRateDelta": 1.0,
       "irrelevantReadRateDelta": 0.0,
       "recommendationRecallDelta": 0.5,
+      "recommendationFollowThroughDelta": 1.0,
       "contextPrecisionDelta": 1.0,
       "editedFileRecallDelta": 1.0,
       "averageTimeToFirstRelevantFileMillisDelta": null,
@@ -219,6 +228,7 @@
       "validationCoverageRateDelta": 1.0,
       "irrelevantReadRateDelta": 0.0,
       "recommendationRecallDelta": 1.0,
+      "recommendationFollowThroughDelta": 0.5,
       "contextPrecisionDelta": 1.0,
       "editedFileRecallDelta": 1.0,
       "averageTimeToFirstRelevantFileMillisDelta": null,

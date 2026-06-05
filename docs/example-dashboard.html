@@ -87,6 +87,8 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spa
 <div><dt>Tasks</dt><dd>1</dd></div>
 <div><dt>Files read</dt><dd>4</dd></div>
 <div><dt>Tool calls</dt><dd>14</dd></div>
+<div><dt>Commands</dt><dd>1</dd></div>
+<div><dt>Test commands</dt><dd>1</dd></div>
 <div><dt>Token estimate</dt><dd>6400</dd></div>
 </dl>
 </article>
@@ -103,6 +105,8 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spa
 <div><dt>Tasks</dt><dd>1</dd></div>
 <div><dt>Files read</dt><dd>3</dd></div>
 <div><dt>Tool calls</dt><dd>9</dd></div>
+<div><dt>Commands</dt><dd>1</dd></div>
+<div><dt>Test commands</dt><dd>1</dd></div>
 <div><dt>Token estimate</dt><dd>4100</dd></div>
 </dl>
 </article>
@@ -119,23 +123,9 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spa
 <div><dt>Tasks</dt><dd>1</dd></div>
 <div><dt>Files read</dt><dd>4</dd></div>
 <div><dt>Tool calls</dt><dd>12</dd></div>
+<div><dt>Commands</dt><dd>1</dd></div>
+<div><dt>Test commands</dt><dd>1</dd></div>
 <div><dt>Token estimate</dt><dd>4100</dd></div>
-</dl>
-</article>
-<article class="run-card">
-<div class="run-title"><span>ctxhelm</span><code>CtxhelmPlan</code></div>
-<p class="suite">Suite: <strong>helmbench-meta</strong></p>
-<div class="metric-row">
-<div class="metric"><span>Success</span><strong>0.0%</strong></div>
-<div class="metric"><span>Validation</span><strong>0.0%</strong></div>
-<div class="metric"><span>Context precision</span><strong>0.0%</strong></div>
-<div class="metric"><span>Irrelevant reads</span><strong>0.0%</strong></div>
-</div>
-<dl class="facts">
-<div><dt>Tasks</dt><dd>1</dd></div>
-<div><dt>Files read</dt><dd>0</dd></div>
-<div><dt>Tool calls</dt><dd>9</dd></div>
-<div><dt>Token estimate</dt><dd>0</dd></div>
 </dl>
 </article>
 </section>
@@ -147,7 +137,6 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spa
 <tr><td><strong>claude-code</strong><br><code>Native</code></td><td>example-auth-bugs</td><td>1</td><td>0.0%</td><td>0.0%</td><td>25.0%</td><td>50.0%</td><td>75.0%</td><td>14</td><td>6400</td></tr>
 <tr><td><strong>claude-code</strong><br><code>CtxhelmMcp</code></td><td>example-auth-bugs</td><td>1</td><td>100.0%</td><td>100.0%</td><td>66.7%</td><td>100.0%</td><td>33.3%</td><td>9</td><td>4100</td></tr>
 <tr><td><strong>claude-code</strong><br><code>CtxhelmMcp</code></td><td>example-auth-bugs</td><td>1</td><td>100.0%</td><td>100.0%</td><td>50.0%</td><td>100.0%</td><td>50.0%</td><td>12</td><td>4100</td></tr>
-<tr><td><strong>ctxhelm</strong><br><code>CtxhelmPlan</code></td><td>helmbench-meta</td><td>1</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>0.0%</td><td>9</td><td>0</td></tr>
 </tbody></table></div>
 </section>
 <section class="panel">
@@ -158,7 +147,6 @@ th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spa
 <tr><td>claude-code<br><code>Native</code></td><td><code>auth-redirect-001</code></td><td><span class="status status-failure">Failure</span></td><td>0 / 0 relevant</td><td>4</td><td>3</td><td>no</td><td>2600 ms</td></tr>
 <tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>auth-redirect-001</code></td><td><span class="status status-success">Success</span></td><td>3 / 3 relevant</td><td>3</td><td>1</td><td>yes</td><td>600 ms</td></tr>
 <tr><td>claude-code<br><code>CtxhelmMcp</code></td><td><code>auth-redirect-001</code></td><td><span class="status status-success">Success</span></td><td>3 / 3 relevant</td><td>4</td><td>2</td><td>yes</td><td>550 ms</td></tr>
-<tr><td>ctxhelm<br><code>CtxhelmPlan</code></td><td><code>helmbench-recommendation-metrics-001</code></td><td><span class="status status-skipped">Skipped</span></td><td>2 / 8 relevant</td><td>0</td><td>0</td><td>no</td><td>n/a</td></tr>
 </tbody></table></div>
 </section>
 <section class="privacy">

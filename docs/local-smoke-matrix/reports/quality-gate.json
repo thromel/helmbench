@@ -46,6 +46,15 @@
     {
       "headAgent": "demo-search",
       "headVariant": "native_search",
+      "metric": "recommendation_follow_through_delta",
+      "operator": ">=",
+      "actual": 1.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-search",
+      "headVariant": "native_search",
       "metric": "context_precision_delta",
       "operator": ">=",
       "actual": 1.0,
@@ -94,6 +103,15 @@
       "metric": "recommendation_recall_delta",
       "operator": ">=",
       "actual": 1.0,
+      "threshold": 0.0,
+      "passed": true
+    },
+    {
+      "headAgent": "demo-guided",
+      "headVariant": "ctxhelm_mcp",
+      "metric": "recommendation_follow_through_delta",
+      "operator": ">=",
+      "actual": 0.5,
       "threshold": 0.0,
       "passed": true
     },
