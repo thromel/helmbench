@@ -34,6 +34,13 @@ Status: **smoke_proof**
 | launch-grade public matrix | `warn` | 0 verified outcome-ready quality-gated real-agent matrix output(s) at 10+ task(s), 1 quality-gate failure(s); launch target is 1 real-agent row(s) |
 | privacy boundary | `pass` | artifacts store paths, counts, statuses, hashes, and source-free flags only |
 
+## Blockers
+
+| Check | Severity | Evidence | Next action |
+| --- | --- | --- | --- |
+| direct-runner runtime | `warn` | `doctor_report` | Resolve the reported direct-runner runtime failure classes and rerun doctor preflight. |
+| launch-grade public matrix | `warn` | `run_matrix` | Rerun a 10+ task outcome-ready real-agent matrix and pass its quality gate. |
+
 ## Artifacts
 
 | Kind | Label | Source-free |

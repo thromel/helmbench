@@ -251,8 +251,8 @@ This report is intentionally conservative. Low task counts, missing
 outcome-health evidence, or absent verified matrices are warnings that keep the
 status at `smoke_proof`; privacy violations and broken matrix verification are
 hard failures. The JSON and Markdown outputs store artifact labels, counts,
-rates, statuses, and source-free privacy flags, not raw source, prompts,
-transcripts, terminal logs, or absolute checkout paths.
+rates, statuses, explicit blocker next actions, and source-free privacy flags,
+not raw source, prompts, transcripts, terminal logs, or absolute checkout paths.
 
 ## Quality Gate
 

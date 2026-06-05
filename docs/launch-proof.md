@@ -28,7 +28,10 @@ outcome-ready suite-health evidence, and it counts the checked-in real Claude
 Code smoke report as real-agent evidence. It counts the RefactoringMiner
 10-task recommendation proof as public benchmark coverage. It also verifies a
 10-task RefactoringMiner real-agent public matrix, but still keeps launch
-readiness at `smoke_proof` because that matrix's quality gate failed.
+readiness at `smoke_proof` because that matrix's quality gate failed. The
+launch-readiness report also lists the remaining blockers as source-free next
+actions, so the proof is explicit about what must be fixed before claiming
+`launch_ready`.
 
 HelmBench also includes a real direct-agent smoke run over
 `suites/local-run-smoke.json`. That proof launches Claude Code through

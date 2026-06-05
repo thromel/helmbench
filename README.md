@@ -25,7 +25,8 @@ readiness status is `smoke_proof`: it now includes a verified, source-free
 local smoke matrix with outcome-ready suite health and a real Claude Code smoke
 report. It also includes a verified 10-task RefactoringMiner real-agent matrix,
 but keeps launch readiness at `smoke_proof` because that matrix's quality gate
-failed.
+failed. The launch-readiness report now lists the remaining blockers and
+source-free next actions explicitly.
 
 The checked-in [RefactoringMiner public recommendation proof](docs/refactoringminer-public-proof.md)
 runs `ctxhelm prepare-task` over a healthy 10-task public suite and records
@@ -111,7 +112,8 @@ This repository currently implements the core HelmBench workflow:
   dashboard, evidence bundle, privacy report, and a failed quality gate
 - `launch-readiness` report that classifies checked-in proof artifacts as
   `launch_ready`, `smoke_proof`, or `not_ready` without storing source, and can
-  include source-free doctor runtime preflight evidence for direct runners
+  include source-free blocker next actions and doctor runtime preflight evidence
+  for direct runners
 - first-class `run-matrix` row presets for Claude Code and Codex, so real
   agent matrices can inject the source-free event contract without hand-written
   adapter commands

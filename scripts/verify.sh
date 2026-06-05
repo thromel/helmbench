@@ -69,6 +69,11 @@ grep -q 'verified run matrix | `pass`' docs/launch-readiness.md
 grep -q 'launch-grade public matrix | `warn`' docs/launch-readiness.md
 grep -q 'verified outcome-ready quality-gated real-agent matrix output' docs/launch-readiness.md
 grep -q '1 quality-gate failure(s)' docs/launch-readiness.md
+grep -q '## Blockers' docs/launch-readiness.md
+grep -q 'Resolve the reported direct-runner runtime failure classes' docs/launch-readiness.md
+grep -q 'Rerun a 10+ task outcome-ready real-agent matrix' docs/launch-readiness.md
+grep -q '"blockers"' reports/launch-readiness.json
+grep -q '"nextAction": "Resolve the reported direct-runner runtime failure classes and rerun doctor preflight."' reports/launch-readiness.json
 grep -q '"suiteEvidenceUse": "outcome_ready"' docs/local-smoke-matrix/matrix-manifest.json
 grep -q '"evidenceUse": "outcome_ready"' docs/local-smoke-matrix/evidence/manifest.json
 grep -q '"suiteEvidenceUse": "outcome_ready"' docs/refactoringminer-real-matrix/matrix-manifest.json
@@ -189,6 +194,8 @@ grep -q '"smoke_proof"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"realAgentReportCount"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"publicReportCount"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"publicTaskCount"' "$TMP_DIR/launch-readiness.schema.json"
+grep -q '"blockers"' "$TMP_DIR/launch-readiness.schema.json"
+grep -q '"nextAction"' "$TMP_DIR/launch-readiness.schema.json"
 grep -q '"title": "HelmBench Quality Gate"' "$TMP_DIR/quality-gate.schema.json"
 grep -q '"title": "HelmBench Run Matrix Config"' "$TMP_DIR/run-matrix-config.schema.json"
 grep -q '"minRecommendationFollowThrough"' "$TMP_DIR/run-matrix-config.schema.json"
@@ -492,10 +499,14 @@ grep -q 'verified run matrix | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'launch-grade public matrix | `warn`' "$TMP_DIR/launch-readiness.md"
 grep -q 'verified outcome-ready quality-gated real-agent matrix output' "$TMP_DIR/launch-readiness.md"
 grep -q '1 quality-gate failure(s)' "$TMP_DIR/launch-readiness.md"
+grep -q '## Blockers' "$TMP_DIR/launch-readiness.md"
+grep -q 'Rerun a 10+ task outcome-ready real-agent matrix' "$TMP_DIR/launch-readiness.md"
 grep -q '"status": "smoke_proof"' "$TMP_DIR/launch-readiness.json"
 grep -q '"realAgentReportCount": 1' "$TMP_DIR/launch-readiness.json"
 grep -q '"publicReportCount": 1' "$TMP_DIR/launch-readiness.json"
 grep -q '"publicTaskCount": 10' "$TMP_DIR/launch-readiness.json"
+grep -q '"blockers"' "$TMP_DIR/launch-readiness.json"
+grep -q '"nextAction": "Rerun a 10+ task outcome-ready real-agent matrix and pass its quality gate."' "$TMP_DIR/launch-readiness.json"
 grep -q '"name": "direct-runner runtime"' "$TMP_DIR/launch-readiness.json"
 grep -q '"sourceFree": true' "$TMP_DIR/launch-readiness.json"
 

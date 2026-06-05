@@ -50,6 +50,12 @@
         "$ref": "#/$defs/check"
       }
     },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/blocker"
+      }
+    },
     "privacy": {
       "$ref": "#/$defs/privacy"
     }
@@ -152,6 +158,32 @@
           "minLength": 1
         },
         "detail": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "severity", "evidence", "detail", "nextAction"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": ["warn", "fail"]
+        },
+        "evidence": {
+          "type": "string",
+          "minLength": 1
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nextAction": {
           "type": "string",
           "minLength": 1
         }

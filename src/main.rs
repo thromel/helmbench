@@ -2276,6 +2276,8 @@ struct LaunchReadinessReport {
     benchmark: LaunchReadinessBenchmark,
     artifacts: Vec<LaunchReadinessArtifact>,
     checks: Vec<LaunchReadinessCheck>,
+    #[serde(default)]
+    blockers: Vec<LaunchReadinessBlocker>,
     privacy: PrivacyStatus,
 }
 
@@ -2322,6 +2324,16 @@ struct LaunchReadinessCheck {
     status: LaunchReadinessCheckStatus,
     evidence: String,
     detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LaunchReadinessBlocker {
+    name: String,
+    severity: LaunchReadinessCheckStatus,
+    evidence: String,
+    detail: String,
+    next_action: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2672,6 +2684,13 @@ fn build_launch_readiness_report(
         "artifacts store paths, counts, statuses, hashes, and source-free flags only".to_string(),
     ));
 
+    let blockers = launch_readiness_blockers(
+        &checks,
+        inputs.min_task_count,
+        inputs.min_real_agent_rows,
+        &suite.name,
+    );
+
     let status = if checks
         .iter()
         .any(|check| check.status == LaunchReadinessCheckStatus::Fail)
@@ -2708,6 +2727,7 @@ fn build_launch_readiness_report(
         },
         artifacts,
         checks,
+        blockers,
         privacy: PrivacyStatus::source_free(),
     })
 }
@@ -2806,6 +2826,20 @@ fn render_markdown_launch_readiness(report: &LaunchReadinessReport) -> String {
         ));
     }
 
+    out.push_str("\n## Blockers\n\n");
+    if report.blockers.is_empty() {
+        out.push_str("No launch blockers detected.\n");
+    } else {
+        out.push_str("| Check | Severity | Evidence | Next action |\n");
+        out.push_str("| --- | --- | --- | --- |\n");
+        for blocker in &report.blockers {
+            out.push_str(&format!(
+                "| {} | `{}` | `{}` | {} |\n",
+                blocker.name, blocker.severity, blocker.evidence, blocker.next_action
+            ));
+        }
+    }
+
     out.push_str("\n## Artifacts\n\n");
     out.push_str("| Kind | Label | Source-free |\n");
     out.push_str("| --- | --- | --- |\n");
@@ -2838,6 +2872,62 @@ fn launch_check(
         status,
         evidence,
         detail,
+    }
+}
+
+fn launch_readiness_blockers(
+    checks: &[LaunchReadinessCheck],
+    min_task_count: usize,
+    min_real_agent_rows: usize,
+    suite_name: &str,
+) -> Vec<LaunchReadinessBlocker> {
+    checks
+        .iter()
+        .filter(|check| check.status != LaunchReadinessCheckStatus::Pass)
+        .map(|check| LaunchReadinessBlocker {
+            name: check.name.clone(),
+            severity: check.status,
+            evidence: check.evidence.clone(),
+            detail: check.detail.clone(),
+            next_action: launch_readiness_next_action(
+                check,
+                min_task_count,
+                min_real_agent_rows,
+                suite_name,
+            ),
+        })
+        .collect()
+}
+
+fn launch_readiness_next_action(
+    check: &LaunchReadinessCheck,
+    min_task_count: usize,
+    min_real_agent_rows: usize,
+    suite_name: &str,
+) -> String {
+    match check.name.as_str() {
+        "public benchmark coverage" => format!(
+            "Supply a source-free public benchmark report with at least {min_task_count} task(s)."
+        ),
+        "real-agent evidence" => format!(
+            "Supply at least {min_real_agent_rows} matching source-free real-agent report or matrix row(s) for suite `{suite_name}`."
+        ),
+        "direct-runner runtime" => {
+            "Resolve the reported direct-runner runtime failure classes and rerun doctor preflight."
+                .to_string()
+        }
+        "outcome-health evidence" => {
+            "Regenerate suite-health evidence with outcome-ready validation for the launch suite."
+                .to_string()
+        }
+        "verified run matrix" => {
+            "Supply a verified run-matrix artifact whose benchmark summary matches the launch suite."
+                .to_string()
+        }
+        "launch-grade public matrix" => format!(
+            "Rerun a {min_task_count}+ task outcome-ready real-agent matrix and pass its quality gate."
+        ),
+        _ => "Resolve this check and regenerate the launch-readiness report.".to_string(),
     }
 }
 
@@ -11826,15 +11916,23 @@ mod tests {
         assert!(report.checks.iter().any(|check| {
             check.name == "verified run matrix" && check.status == LaunchReadinessCheckStatus::Warn
         }));
+        assert!(report
+            .blockers
+            .iter()
+            .any(|blocker| blocker.name == "public benchmark coverage"
+                && blocker.severity == LaunchReadinessCheckStatus::Warn
+                && blocker.next_action.contains("10 task")));
 
         let rendered = render_markdown_launch_readiness(&report);
         assert!(rendered.contains("Status: **smoke_proof**"));
         assert!(rendered.contains("Best success rate"));
+        assert!(rendered.contains("## Blockers"));
 
         let json = serde_json::to_string(&report).expect("json");
         assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));
         assert!(!json.contains("rawSourceLogged\":true"));
         assert!(json.contains("\"sourceFree\":true"));
+        assert!(json.contains("\"blockers\""));
     }
 
     #[test]
@@ -11880,6 +11978,13 @@ mod tests {
                 && check.status == LaunchReadinessCheckStatus::Warn
                 && check.detail.contains("1 quality-gate failure(s)")
         }));
+        assert!(report
+            .blockers
+            .iter()
+            .any(|blocker| blocker.name == "launch-grade public matrix"
+                && blocker
+                    .next_action
+                    .contains("10+ task outcome-ready real-agent matrix")));
 
         let json = serde_json::to_string(&report).expect("json");
         assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));
@@ -11936,6 +12041,13 @@ mod tests {
             .artifacts
             .iter()
             .any(|artifact| { artifact.kind == "doctor_report" && artifact.source_free }));
+        assert!(report.blockers.iter().any(|blocker| {
+            blocker.name == "direct-runner runtime"
+                && blocker.evidence == "doctor_report"
+                && blocker
+                    .next_action
+                    .contains("direct-runner runtime failure classes")
+        }));
 
         let json = serde_json::to_string(&report).expect("json");
         assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));

@@ -136,6 +136,22 @@
       "detail": "artifacts store paths, counts, statuses, hashes, and source-free flags only"
     }
   ],
+  "blockers": [
+    {
+      "name": "direct-runner runtime",
+      "severity": "warn",
+      "evidence": "doctor_report",
+      "detail": "1 doctor report(s), 2 checked direct runner(s), 0 ok, 2 warning(s); failure classes: cli_upgrade_required=1, session_limit=1",
+      "nextAction": "Resolve the reported direct-runner runtime failure classes and rerun doctor preflight."
+    },
+    {
+      "name": "launch-grade public matrix",
+      "severity": "warn",
+      "evidence": "run_matrix",
+      "detail": "0 verified outcome-ready quality-gated real-agent matrix output(s) at 10+ task(s), 1 quality-gate failure(s); launch target is 1 real-agent row(s)",
+      "nextAction": "Rerun a 10+ task outcome-ready real-agent matrix and pass its quality gate."
+    }
+  ],
   "privacy": {
     "sourceFree": true,
     "rawSourceLogged": false,
