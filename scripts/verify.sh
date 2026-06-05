@@ -108,6 +108,7 @@ cargo run -- init-public-suite --help >/dev/null
 cargo run -- suite-health --help >/dev/null
 cargo run -- benchmark-summary --help >/dev/null
 cargo run -- launch-readiness --help >/dev/null
+cargo run -- launch-readiness --help | grep -q -- '--doctor-report'
 cargo run -- evidence-bundle --help >/dev/null
 cargo run -- verify-bundle --help >/dev/null
 cargo run -- verify-matrix --help >/dev/null
@@ -435,6 +436,7 @@ cargo run -- launch-readiness \
   --matrix docs/refactoringminer-real-matrix \
   --real-agent-report reports/claude-real-smoke.json \
   --public-report reports/refactoringminer-ctxhelm-plan.json \
+  --doctor-report "$TMP_DIR/doctor.json" \
   --out "$TMP_DIR/launch-readiness.md" \
   --format markdown
 
@@ -448,12 +450,15 @@ cargo run -- launch-readiness \
   --matrix docs/refactoringminer-real-matrix \
   --real-agent-report reports/claude-real-smoke.json \
   --public-report reports/refactoringminer-ctxhelm-plan.json \
+  --doctor-report "$TMP_DIR/doctor.json" \
   --out "$TMP_DIR/launch-readiness.json" \
   --format json
 grep -q 'Status: \*\*smoke_proof\*\*' "$TMP_DIR/launch-readiness.md"
 grep -q 'public benchmark coverage | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'real-agent evidence | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'outcome-health evidence | `pass`' "$TMP_DIR/launch-readiness.md"
+grep -q 'direct-runner runtime | `warn`' "$TMP_DIR/launch-readiness.md"
+grep -q '0 checked direct runner' "$TMP_DIR/launch-readiness.md"
 grep -q 'verified run matrix | `pass`' "$TMP_DIR/launch-readiness.md"
 grep -q 'launch-grade public matrix | `warn`' "$TMP_DIR/launch-readiness.md"
 grep -q 'verified outcome-ready quality-gated real-agent matrix output' "$TMP_DIR/launch-readiness.md"
@@ -462,6 +467,7 @@ grep -q '"status": "smoke_proof"' "$TMP_DIR/launch-readiness.json"
 grep -q '"realAgentReportCount": 1' "$TMP_DIR/launch-readiness.json"
 grep -q '"publicReportCount": 1' "$TMP_DIR/launch-readiness.json"
 grep -q '"publicTaskCount": 10' "$TMP_DIR/launch-readiness.json"
+grep -q '"name": "direct-runner runtime"' "$TMP_DIR/launch-readiness.json"
 grep -q '"sourceFree": true' "$TMP_DIR/launch-readiness.json"
 
 cargo run -- quality-gate \

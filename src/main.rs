@@ -539,6 +539,9 @@ enum Command {
         real_agent_report: Vec<PathBuf>,
         #[arg(long)]
         public_report: Vec<PathBuf>,
+        /// Optional source-free doctor reports, ideally generated with --check-direct-runners.
+        #[arg(long)]
+        doctor_report: Vec<PathBuf>,
         #[arg(long, default_value_t = helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS)]
         min_task_count: usize,
         #[arg(long, default_value_t = 1)]
@@ -1495,6 +1498,7 @@ fn main() -> Result<()> {
             matrix,
             real_agent_report,
             public_report,
+            doctor_report,
             min_task_count,
             min_real_agent_rows,
             out,
@@ -1508,6 +1512,7 @@ fn main() -> Result<()> {
                 matrix_paths: &matrix,
                 real_agent_report_paths: &real_agent_report,
                 public_report_paths: &public_report,
+                doctor_report_paths: &doctor_report,
                 min_task_count,
                 min_real_agent_rows,
             })?;
@@ -2311,6 +2316,7 @@ struct LaunchReadinessInputs<'a> {
     matrix_paths: &'a [PathBuf],
     real_agent_report_paths: &'a [PathBuf],
     public_report_paths: &'a [PathBuf],
+    doctor_report_paths: &'a [PathBuf],
     min_task_count: usize,
     min_real_agent_rows: usize,
 }
@@ -2389,6 +2395,40 @@ fn build_launch_readiness_report(
         public_task_count = public_task_count.max(report.summary.task_count);
     }
 
+    let mut doctor_report_count = 0usize;
+    let mut doctor_failure_count = 0usize;
+    let mut doctor_checked_runner_count = 0usize;
+    let mut doctor_ok_runner_count = 0usize;
+    let mut doctor_warning_runner_count = 0usize;
+    let mut doctor_failure_classes = BTreeMap::<String, usize>::new();
+    for path in inputs.doctor_report_paths {
+        let report = read_doctor_report(path)?;
+        if !privacy_status_is_source_free(&report.privacy) {
+            anyhow::bail!("launch readiness doctor artifact is not source-free");
+        }
+        artifacts.push(launch_artifact("doctor_report", path));
+        doctor_report_count += 1;
+        if !report.ok {
+            doctor_failure_count += 1;
+        }
+        for runner in &report.direct_runners {
+            if runner.runtime_preflight.checked {
+                doctor_checked_runner_count += 1;
+                if runner.runtime_preflight.ok == Some(true) {
+                    doctor_ok_runner_count += 1;
+                } else {
+                    doctor_warning_runner_count += 1;
+                    let class = runner
+                        .runtime_preflight
+                        .failure_class
+                        .clone()
+                        .unwrap_or_else(|| "runtime_error".to_string());
+                    *doctor_failure_classes.entry(class).or_default() += 1;
+                }
+            }
+        }
+    }
+
     let best = summary
         .runs
         .iter()
@@ -2437,6 +2477,27 @@ fn build_launch_readiness_report(
             inputs.min_real_agent_rows
         ),
     ));
+
+    if doctor_report_count > 0 {
+        checks.push(launch_check(
+            "direct-runner runtime",
+            if doctor_failure_count > 0 {
+                LaunchReadinessCheckStatus::Fail
+            } else if doctor_checked_runner_count > 0 && doctor_warning_runner_count == 0 {
+                LaunchReadinessCheckStatus::Pass
+            } else {
+                LaunchReadinessCheckStatus::Warn
+            },
+            "doctor_report".to_string(),
+            format_doctor_runtime_detail(
+                doctor_report_count,
+                doctor_checked_runner_count,
+                doctor_ok_runner_count,
+                doctor_warning_runner_count,
+                &doctor_failure_classes,
+            ),
+        ));
+    }
 
     let mut matching_health = Vec::new();
     for path in inputs.health_paths {
@@ -2608,6 +2669,42 @@ fn build_launch_readiness_report(
         checks,
         privacy: PrivacyStatus::source_free(),
     })
+}
+
+fn read_doctor_report(path: &Path) -> Result<DoctorReport> {
+    let raw = std::fs::read_to_string(path).with_context(|| format!("read {}", path.display()))?;
+    let report: DoctorReport =
+        serde_json::from_str(&raw).with_context(|| format!("parse {}", path.display()))?;
+    if report.schema_version != DOCTOR_REPORT_SCHEMA_VERSION {
+        anyhow::bail!(
+            "doctor report {} has unsupported schemaVersion {}; expected {}",
+            path.display(),
+            report.schema_version,
+            DOCTOR_REPORT_SCHEMA_VERSION
+        );
+    }
+    Ok(report)
+}
+
+fn format_doctor_runtime_detail(
+    doctor_report_count: usize,
+    checked_runner_count: usize,
+    ok_runner_count: usize,
+    warning_runner_count: usize,
+    failure_classes: &BTreeMap<String, usize>,
+) -> String {
+    let class_summary = if failure_classes.is_empty() {
+        "none".to_string()
+    } else {
+        failure_classes
+            .iter()
+            .map(|(class, count)| format!("{class}={count}"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    format!(
+        "{doctor_report_count} doctor report(s), {checked_runner_count} checked direct runner(s), {ok_runner_count} ok, {warning_runner_count} warning(s); failure classes: {class_summary}"
+    )
 }
 
 fn render_markdown_launch_readiness(report: &LaunchReadinessReport) -> String {
@@ -11397,6 +11494,7 @@ mod tests {
             matrix_paths: &[],
             real_agent_report_paths: &[],
             public_report_paths: &[],
+            doctor_report_paths: &[],
             min_task_count: helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS,
             min_real_agent_rows: 2,
         })
@@ -11445,6 +11543,7 @@ mod tests {
             ],
             real_agent_report_paths: &[root.join("reports/claude-real-smoke.json")],
             public_report_paths: &[root.join("reports/refactoringminer-ctxhelm-plan.json")],
+            doctor_report_paths: &[],
             min_task_count: helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS,
             min_real_agent_rows: 1,
         })
@@ -11476,6 +11575,61 @@ mod tests {
         assert!(json.contains("\"realAgentReportCount\":1"));
         assert!(json.contains("\"publicReportCount\":1"));
         assert!(json.contains("\"publicTaskCount\":10"));
+    }
+
+    #[test]
+    fn launch_readiness_summarizes_doctor_runtime_preflight_source_free() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let temp = tempfile::tempdir().expect("tempdir");
+        let mut doctor = build_doctor_report(root, false);
+        let runner = doctor
+            .direct_runners
+            .iter_mut()
+            .find(|runner| runner.name == "claude-run")
+            .expect("claude runner");
+        runner.runtime_preflight = DoctorRuntimePreflight {
+            checked: true,
+            ok: Some(false),
+            exit_status: Some(1),
+            output_hash: Some("output:0123456789abcdef".to_string()),
+            diagnostic_hash: Some("diagnostic:0123456789abcdef".to_string()),
+            failure_class: Some("session_limit".to_string()),
+            elapsed_millis: Some(1200),
+        };
+        let doctor_path = temp.path().join("doctor.json");
+        write_json(&doctor, &doctor_path).expect("doctor");
+
+        let report = build_launch_readiness_report(LaunchReadinessInputs {
+            suite_path: &root.join("suites/example-auth-bugs.json"),
+            base_report_path: &root.join("reports/example-native.json"),
+            head_report_paths: &[root.join("reports/example-ctxhelm.json")],
+            health_paths: &[],
+            matrix_paths: &[],
+            real_agent_report_paths: &[],
+            public_report_paths: &[],
+            doctor_report_paths: &[doctor_path],
+            min_task_count: helmbench::MIN_RECOMMENDED_BENCHMARK_TASKS,
+            min_real_agent_rows: 2,
+        })
+        .expect("launch readiness");
+
+        let runtime = report
+            .checks
+            .iter()
+            .find(|check| check.name == "direct-runner runtime")
+            .expect("runtime check");
+        assert_eq!(runtime.status, LaunchReadinessCheckStatus::Warn);
+        assert_eq!(runtime.evidence, "doctor_report");
+        assert!(runtime.detail.contains("session_limit=1"));
+        assert!(report
+            .artifacts
+            .iter()
+            .any(|artifact| { artifact.kind == "doctor_report" && artifact.source_free }));
+
+        let json = serde_json::to_string(&report).expect("json");
+        assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));
+        assert!(!json.contains("session limit reached"));
+        assert!(json.contains("session_limit=1"));
     }
 
     #[test]

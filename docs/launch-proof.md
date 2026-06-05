@@ -160,6 +160,30 @@ cargo run -- launch-readiness \
 ./scripts/verify.sh
 ```
 
+Before a real-agent rerun, add source-free runtime evidence:
+
+```bash
+cargo run -- doctor \
+  --repo . \
+  --check-direct-runners \
+  --format json \
+  --out /tmp/helmbench-doctor-runtime.json
+
+cargo run -- launch-readiness \
+  --suite suites/local-run-smoke.json \
+  --base-report docs/local-smoke-matrix/reports/native.json \
+  --head-report docs/local-smoke-matrix/reports/native-search.json \
+  --head-report docs/local-smoke-matrix/reports/guided.json \
+  --health docs/local-smoke-matrix/reports/suite-health.json \
+  --matrix docs/local-smoke-matrix \
+  --matrix docs/refactoringminer-real-matrix \
+  --real-agent-report reports/claude-real-smoke.json \
+  --public-report reports/refactoringminer-ctxhelm-plan.json \
+  --doctor-report /tmp/helmbench-doctor-runtime.json \
+  --out /tmp/helmbench-launch-readiness-runtime.md \
+  --format markdown
+```
+
 ## Privacy Contract
 
 The proof artifacts store paths, counts, statuses, timings, command classes,

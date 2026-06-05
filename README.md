@@ -110,7 +110,8 @@ This repository currently implements the core HelmBench workflow:
   `docs/refactoringminer-real-matrix/`, including source-free traces, reports,
   dashboard, evidence bundle, privacy report, and a failed quality gate
 - `launch-readiness` report that classifies checked-in proof artifacts as
-  `launch_ready`, `smoke_proof`, or `not_ready` without storing source
+  `launch_ready`, `smoke_proof`, or `not_ready` without storing source, and can
+  include source-free doctor runtime preflight evidence for direct runners
 - first-class `run-matrix` row presets for Claude Code and Codex, so real
   agent matrices can inject the source-free event contract without hand-written
   adapter commands
