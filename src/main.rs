@@ -23,7 +23,8 @@ const RUN_MATRIX_PRIVACY_REPORT_SCHEMA_VERSION: u32 = 1;
 const MATRIX_HISTORY_SCHEMA_VERSION: u32 = 2;
 const SUITE_HEALTH_SCHEMA_VERSION: u32 = 1;
 const EVIDENCE_BUNDLE_SCHEMA_VERSION: u32 = 1;
-const DOCTOR_REPORT_SCHEMA_VERSION: u32 = 2;
+const DOCTOR_REPORT_SCHEMA_VERSION: u32 = 3;
+const CODEX_COMPAT_REASONING_ARG: &str = "model_reasoning_effort=high";
 const LAUNCH_READINESS_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Parser)]
@@ -1853,6 +1854,8 @@ struct DoctorRuntimePreflight {
     ok: Option<bool>,
     exit_status: Option<i32>,
     output_hash: Option<String>,
+    diagnostic_hash: Option<String>,
+    failure_class: Option<String>,
     elapsed_millis: Option<u64>,
 }
 
@@ -2014,6 +2017,8 @@ fn doctor_runtime_preflight(
             ok: None,
             exit_status: None,
             output_hash: None,
+            diagnostic_hash: None,
+            failure_class: None,
             elapsed_millis: None,
         };
     }
@@ -2023,6 +2028,8 @@ fn doctor_runtime_preflight(
             ok: Some(false),
             exit_status: None,
             output_hash: None,
+            diagnostic_hash: None,
+            failure_class: Some("command_missing".to_string()),
             elapsed_millis: None,
         };
     }
@@ -2034,28 +2041,36 @@ fn doctor_runtime_preflight(
             shell_escape("Return only ok.")
         ),
         "codex" => format!(
-            "{} exec --full-auto --cd {} {}",
+            "{} exec -c {} --full-auto --cd {} {}",
             shell_escape(command),
+            shell_escape(CODEX_COMPAT_REASONING_ARG),
             shell_escape(&root.display().to_string()),
             shell_escape("Return only ok.")
         ),
         _ => return unknown_runtime_preflight(),
     };
 
-    match run_shell_capture_stdout(&command_line, root, &[], Some(45)) {
-        Ok(result) => DoctorRuntimePreflight {
-            checked: true,
-            ok: Some(result.success && !result.stdout_truncated),
-            exit_status: result.exit_status,
-            output_hash: (!result.stdout.is_empty())
-                .then(|| source_free_hash("output", &result.stdout)),
-            elapsed_millis: Some(result.elapsed_millis),
-        },
+    match run_shell_capture_diagnostic_output(&command_line, root, &[], Some(45)) {
+        Ok(result) => {
+            let ok = result.success && !result.stdout_truncated && !result.stderr_truncated;
+            DoctorRuntimePreflight {
+                checked: true,
+                ok: Some(ok),
+                exit_status: result.exit_status,
+                output_hash: (!result.stdout.is_empty())
+                    .then(|| source_free_hash("output", &result.stdout)),
+                diagnostic_hash: preflight_diagnostic_hash(&result),
+                failure_class: (!ok).then(|| classify_runtime_preflight_failure(&result)),
+                elapsed_millis: Some(result.elapsed_millis),
+            }
+        }
         Err(_) => DoctorRuntimePreflight {
             checked: true,
             ok: Some(false),
             exit_status: None,
             output_hash: None,
+            diagnostic_hash: None,
+            failure_class: Some("launch_error".to_string()),
             elapsed_millis: None,
         },
     }
@@ -2067,7 +2082,51 @@ fn unknown_runtime_preflight() -> DoctorRuntimePreflight {
         ok: Some(false),
         exit_status: None,
         output_hash: None,
+        diagnostic_hash: None,
+        failure_class: Some("unsupported_command".to_string()),
         elapsed_millis: None,
+    }
+}
+
+fn preflight_diagnostic_hash(result: &ShellDiagnosticCaptureResult) -> Option<String> {
+    if result.stdout.is_empty() && result.stderr.is_empty() {
+        None
+    } else {
+        Some(source_free_hash(
+            "diagnostic",
+            &format!("stdout:{}\nstderr:{}", result.stdout, result.stderr),
+        ))
+    }
+}
+
+fn classify_runtime_preflight_failure(result: &ShellDiagnosticCaptureResult) -> String {
+    if result.timed_out {
+        return "timeout".to_string();
+    }
+    if result.stdout_truncated || result.stderr_truncated {
+        return "diagnostic_truncated".to_string();
+    }
+
+    let combined = format!("{}\n{}", result.stdout, result.stderr).to_ascii_lowercase();
+    if combined.contains("session limit") {
+        "session_limit".to_string()
+    } else if combined.contains("requires a newer version")
+        || combined.contains("upgrade to the latest")
+    {
+        "cli_upgrade_required".to_string()
+    } else if combined.contains("unknown variant")
+        || combined.contains("model_reasoning_effort")
+        || combined.contains("config")
+    {
+        "cli_config_incompatible".to_string()
+    } else if combined.contains("auth")
+        || combined.contains("api key")
+        || combined.contains("not logged in")
+        || combined.contains("login")
+    {
+        "auth_required".to_string()
+    } else {
+        "runtime_error".to_string()
     }
 }
 
@@ -2146,13 +2205,17 @@ fn render_markdown_doctor_report(root: &Path, report: &DoctorReport) -> String {
     out
 }
 
-fn doctor_preflight_label(preflight: &DoctorRuntimePreflight) -> &'static str {
+fn doctor_preflight_label(preflight: &DoctorRuntimePreflight) -> String {
     if !preflight.checked {
-        "not checked"
+        "not checked".to_string()
     } else if preflight.ok == Some(true) {
-        "ok"
+        "ok".to_string()
     } else {
-        "warn"
+        preflight
+            .failure_class
+            .as_ref()
+            .map(|class| format!("warn ({class})"))
+            .unwrap_or_else(|| "warn".to_string())
     }
 }
 
@@ -8369,6 +8432,8 @@ fn codex_adapter_command(
         ),
         shell_escape(&codex_bin.to_string_lossy()),
         "exec".to_string(),
+        "-c".to_string(),
+        shell_escape(CODEX_COMPAT_REASONING_ARG),
         "--cd".to_string(),
         "\"$HELMBENCH_REPO\"".to_string(),
     ];
@@ -8578,6 +8643,110 @@ fn run_shell_capture_stdout(
     })
 }
 
+fn run_shell_capture_diagnostic_output(
+    command: &str,
+    cwd: &Path,
+    env: &[(&str, &str)],
+    timeout_seconds: Option<u64>,
+) -> Result<ShellDiagnosticCaptureResult> {
+    const MAX_CAPTURE_BYTES: usize = 1024 * 1024;
+
+    let started = Instant::now();
+    let mut process = ProcessCommand::new("sh");
+    process
+        .arg("-lc")
+        .arg(command)
+        .current_dir(cwd)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    for (key, value) in env {
+        process.env(key, value);
+    }
+    let mut child = process
+        .spawn()
+        .with_context(|| format!("run shell command in {}", cwd.display()))?;
+    let stdout = child
+        .stdout
+        .take()
+        .context("capture stdout pipe from shell command")?;
+    let stderr = child
+        .stderr
+        .take()
+        .context("capture stderr pipe from shell command")?;
+    let stdout_reader = spawn_limited_reader(stdout, MAX_CAPTURE_BYTES);
+    let stderr_reader = spawn_limited_reader(stderr, MAX_CAPTURE_BYTES);
+
+    let mut timed_out = false;
+    let status = loop {
+        if let Some(status) = child
+            .try_wait()
+            .with_context(|| format!("wait for shell command in {}", cwd.display()))?
+        {
+            break status;
+        }
+        if timeout_seconds.is_some_and(|seconds| started.elapsed() >= Duration::from_secs(seconds))
+        {
+            timed_out = true;
+            child
+                .kill()
+                .with_context(|| format!("kill timed-out command in {}", cwd.display()))?;
+            break child
+                .wait()
+                .with_context(|| format!("wait for killed shell command in {}", cwd.display()))?;
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    };
+
+    let (stdout, stdout_truncated) = stdout_reader
+        .join()
+        .map_err(|_| anyhow::anyhow!("stdout capture thread panicked"))?
+        .context("read captured stdout")?;
+    let (stderr, stderr_truncated) = stderr_reader
+        .join()
+        .map_err(|_| anyhow::anyhow!("stderr capture thread panicked"))?
+        .context("read captured stderr")?;
+    Ok(ShellDiagnosticCaptureResult {
+        success: status.success() && !timed_out,
+        exit_status: status.code(),
+        elapsed_millis: started.elapsed().as_millis() as u64,
+        timed_out,
+        stdout: String::from_utf8_lossy(&stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&stderr).into_owned(),
+        stdout_truncated,
+        stderr_truncated,
+    })
+}
+
+fn spawn_limited_reader<R>(
+    mut reader: R,
+    max_capture_bytes: usize,
+) -> std::thread::JoinHandle<std::io::Result<(Vec<u8>, bool)>>
+where
+    R: Read + Send + 'static,
+{
+    std::thread::spawn(move || {
+        let mut captured = Vec::new();
+        let mut buffer = [0u8; 8192];
+        let mut truncated = false;
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(count) => {
+                    let remaining = max_capture_bytes.saturating_sub(captured.len());
+                    if remaining > 0 {
+                        captured.extend_from_slice(&buffer[..count.min(remaining)]);
+                    }
+                    if count > remaining {
+                        truncated = true;
+                    }
+                }
+                Err(error) => return Err(error),
+            }
+        }
+        Ok((captured, truncated))
+    })
+}
+
 fn append_stream_capture_events(
     task: &helmbench::BenchTask,
     repo: &Path,
@@ -8614,6 +8783,17 @@ struct ShellCaptureResult {
     timed_out: bool,
     stdout: String,
     stdout_truncated: bool,
+}
+
+struct ShellDiagnosticCaptureResult {
+    success: bool,
+    exit_status: Option<i32>,
+    elapsed_millis: u64,
+    timed_out: bool,
+    stdout: String,
+    stderr: String,
+    stdout_truncated: bool,
+    stderr_truncated: bool,
 }
 
 fn timed_out_suffix(timed_out: bool) -> &'static str {
@@ -8972,6 +9152,7 @@ mod tests {
             true,
         );
         assert!(command.contains("'codex' exec"));
+        assert!(command.contains("-c 'model_reasoning_effort=high'"));
         assert!(command.contains("--cd \"$HELMBENCH_REPO\""));
         assert!(command.contains("--full-auto"));
         assert!(command.contains("record-event"));
@@ -11129,7 +11310,9 @@ mod tests {
             .iter()
             .all(|runner| !runner.runtime_preflight.checked
                 && runner.runtime_preflight.ok.is_none()
-                && runner.runtime_preflight.output_hash.is_none()));
+                && runner.runtime_preflight.output_hash.is_none()
+                && runner.runtime_preflight.diagnostic_hash.is_none()
+                && runner.runtime_preflight.failure_class.is_none()));
         let missing = doctor_runtime_preflight(
             Path::new(env!("CARGO_MANIFEST_DIR")),
             "helmbench-missing-agent",
@@ -11138,6 +11321,8 @@ mod tests {
         assert!(missing.checked);
         assert_eq!(missing.ok, Some(false));
         assert!(missing.output_hash.is_none());
+        assert!(missing.diagnostic_hash.is_none());
+        assert_eq!(missing.failure_class.as_deref(), Some("command_missing"));
         assert!(report
             .observation_modes
             .iter()
@@ -11147,6 +11332,54 @@ mod tests {
         assert!(report
             .supported_variants
             .contains(&AgentVariant::NativeSearch));
+
+        let session_limit = ShellDiagnosticCaptureResult {
+            success: false,
+            exit_status: Some(1),
+            elapsed_millis: 42,
+            timed_out: false,
+            stdout: "session limit reached".to_string(),
+            stderr: String::new(),
+            stdout_truncated: false,
+            stderr_truncated: false,
+        };
+        assert_eq!(
+            classify_runtime_preflight_failure(&session_limit),
+            "session_limit"
+        );
+        assert!(preflight_diagnostic_hash(&session_limit)
+            .expect("diagnostic hash")
+            .starts_with("diagnostic:"));
+
+        let upgrade_required = ShellDiagnosticCaptureResult {
+            success: false,
+            exit_status: Some(1),
+            elapsed_millis: 42,
+            timed_out: false,
+            stdout: String::new(),
+            stderr: "requires a newer version of Codex".to_string(),
+            stdout_truncated: false,
+            stderr_truncated: false,
+        };
+        assert_eq!(
+            classify_runtime_preflight_failure(&upgrade_required),
+            "cli_upgrade_required"
+        );
+
+        let config_incompatible = ShellDiagnosticCaptureResult {
+            success: false,
+            exit_status: Some(1),
+            elapsed_millis: 42,
+            timed_out: false,
+            stdout: String::new(),
+            stderr: "unknown variant `xhigh` in model_reasoning_effort".to_string(),
+            stdout_truncated: false,
+            stderr_truncated: false,
+        };
+        assert_eq!(
+            classify_runtime_preflight_failure(&config_incompatible),
+            "cli_config_incompatible"
+        );
 
         let json = serde_json::to_string(&report).expect("json");
         assert!(!json.contains(env!("CARGO_MANIFEST_DIR")));

@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schemaVersion": {
-      "const": 2
+      "const": 3
     },
     "repoName": {
       "type": "string",
@@ -163,7 +163,15 @@
     "runtimePreflight": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["checked", "ok", "exitStatus", "outputHash", "elapsedMillis"],
+      "required": [
+        "checked",
+        "ok",
+        "exitStatus",
+        "outputHash",
+        "diagnosticHash",
+        "failureClass",
+        "elapsedMillis"
+      ],
       "properties": {
         "checked": {
           "type": "boolean"
@@ -179,6 +187,38 @@
             {
               "type": "string",
               "pattern": "^output:[0-9a-f]{16}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "diagnosticHash": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^diagnostic:[0-9a-f]{16}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "failureClass": {
+          "anyOf": [
+            {
+              "enum": [
+                "auth_required",
+                "cli_config_incompatible",
+                "cli_upgrade_required",
+                "command_missing",
+                "diagnostic_truncated",
+                "launch_error",
+                "runtime_error",
+                "session_limit",
+                "timeout",
+                "unsupported_command"
+              ]
             },
             {
               "type": "null"

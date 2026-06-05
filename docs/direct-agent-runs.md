@@ -35,7 +35,10 @@ stores version hashes, not raw version strings.
 To catch runtime issues such as an expired Claude/Codex session before a matrix
 run, add `--check-direct-runners`. HelmBench runs bounded non-interactive smoke
 checks and stores only source-free status metadata: exit status, elapsed time,
-and an output hash.
+output/diagnostic hashes, and a coarse failure class. The failure class can
+identify common runtime blockers such as `session_limit`, `auth_required`,
+`cli_config_incompatible`, or `cli_upgrade_required` without storing raw stdout
+or stderr.
 
 ```bash
 helmbench doctor \
@@ -107,7 +110,12 @@ helmbench codex-run \
   --out-dir traces/codex-run
 ```
 
-By default HelmBench invokes `codex exec --full-auto --cd "$HELMBENCH_REPO"`.
+By default HelmBench invokes
+`codex exec -c model_reasoning_effort=high --full-auto --cd "$HELMBENCH_REPO"`.
+The compatibility override avoids inheriting unsupported local
+`model_reasoning_effort` values during benchmark runs. If your configured
+default Codex model requires a newer CLI, either upgrade Codex or pass a
+compatible `--model` before launching a matrix.
 
 Options:
 

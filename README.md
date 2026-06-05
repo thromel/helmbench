@@ -170,7 +170,9 @@ The JSON doctor report is source-free. It records required checks, optional
 observation modes, and privacy flags without storing raw version strings. Add
 `--check-direct-runners` when you want HelmBench to run bounded, source-free
 non-interactive smoke checks for Claude/Codex and store only exit status,
-elapsed time, and output hashes.
+elapsed time, output/diagnostic hashes, and a coarse failure class such as
+`session_limit`, `auth_required`, `cli_config_incompatible`, or
+`cli_upgrade_required`.
 
 Install from source:
 
@@ -569,6 +571,11 @@ cargo run -- codex-run \
   --repo . \
   --out-dir traces/codex-run
 ```
+
+`codex-run` invokes `codex exec` with a source-free compatibility override for
+`model_reasoning_effort=high`, which avoids inheriting unsupported local config
+values during benchmark runs. Pass `--model` or `--codex-arg` when you need to
+pin a specific Codex runtime contract.
 
 These commands suppress agent stdout/stderr and do not store transcripts. They
 ask the agent to emit source-free `record-event` calls. HelmBench still infers
